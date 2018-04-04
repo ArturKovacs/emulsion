@@ -5,6 +5,7 @@ extern crate glium;
 extern crate image;
 
 use std::env;
+use std::time::{Duration, Instant};
 
 use glium::{glutin, Surface};
 use glium::index::PrimitiveType;
@@ -22,25 +23,46 @@ implement_vertex!(Vertex, position, tex_coords);
 
 struct MainWindow {
     display: glium::Display,
+    fullscreen: bool,
 
-    transform: [[f32; 4]; 4],
     vertex_buffer: glium::VertexBuffer<Vertex>,
     index_buffer: glium::IndexBuffer<u16>,
     program: glium::Program,
-    image_texture: Option<glium::texture::SrgbTexture2d>
+    image_texture: Option<glium::texture::SrgbTexture2d>,
+    zoom_scale: f32,
+    scale_x: f32,
+    scale_y: f32
 }
 
 
 impl MainWindow {
     fn init(events_loop: &glutin::EventsLoop) -> MainWindow {
+
+        let img_path = env::args().skip(1).next();
+        let img_name = if let Some(ref img_path) = img_path {
+            let img_path = std::path::Path::new(img_path.as_str());
+            img_path.file_name().unwrap().to_str()
+        } else {
+            None
+        };
+
+        let title = format!("E M U L S I O N  ⬕  {}", if let Some(img_name) = img_name {
+            img_name
+        } else {
+            ""
+        });
+
         let window = glutin::WindowBuilder::new()
-            .with_title("E M U L S I O N")
+            .with_title(title)
             .with_dimensions(512, 512)
+            .with_fullscreen(None)
             //.with_decorations(true)
             .with_visibility(true);
         //let context = glutin::ContextBuilder::new().with_gl(GlRequest::Specific(Api::OpenGl, (3, 1)));
         let context = glutin::ContextBuilder::new().with_gl_profile(glutin::GlProfile::Core);
         let display = glium::Display::new(window, context, events_loop).unwrap();
+
+        let fullscreen = false;
 
         // Clear the screen right at the start so that the user sees a black window instead
         // of white while the image is loading.
@@ -114,7 +136,17 @@ impl MainWindow {
                     in vec2 v_tex_coords;
                     out vec4 f_color;
                     void main() {
-                        f_color = texture(tex, v_tex_coords);
+                        vec4 color = texture(tex, v_tex_coords);
+                        const float grid_size = 5.0;
+                        vec4 grid_color;
+                        if ((mod(gl_FragCoord.x, grid_size * 2.0) < grid_size)
+                            ^^ (mod(gl_FragCoord.y, grid_size * 2.0) < grid_size)
+                        ) {
+                            grid_color = vec4(0.9);
+                        } else {
+                            grid_color = vec4(0.5);
+                        }
+                        f_color = mix(grid_color, color, color.a);
                     }
                 "
             },
@@ -137,50 +169,34 @@ impl MainWindow {
                     uniform sampler2D tex;
                     varying vec2 v_tex_coords;
                     void main() {
-                        gl_FragColor = texture2D(tex, v_tex_coords);
-                    }
-                ",
-            },
-
-            100 => {
-                vertex: "
-                    #version 100
-                    uniform lowp mat4 matrix;
-                    attribute lowp vec2 position;
-                    attribute lowp vec2 tex_coords;
-                    varying lowp vec2 v_tex_coords;
-                    void main() {
-                        gl_Position = matrix * vec4(position, 0.0, 1.0);
-                        v_tex_coords = tex_coords;
-                    }
-                ",
-
-                fragment: "
-                    #version 100
-                    uniform lowp sampler2D tex;
-                    varying lowp vec2 v_tex_coords;
-                    void main() {
-                        gl_FragColor = texture2D(tex, v_tex_coords);
+                        vec4 color = texture2D(tex, v_tex_coords);
+                        const float grid_size = 5.0;
+                        vec4 grid_color;
+                        if ((mod(gl_FragCoord.x, grid_size * 2.0) < grid_size)
+                            ^^ (mod(gl_FragCoord.y, grid_size * 2.0) < grid_size)
+                        ) {
+                            grid_color = vec4(0.9);
+                        } else {
+                            grid_color = vec4(0.5);
+                        }
+                        gl_FragColor = mix(grid_color, color, color.a);
+                        //gl_FragColor = texture2D(tex, v_tex_coords);
                     }
                 ",
             },
         ).unwrap();
 
-        let transform = [
-            [1.0, 0.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0, 0.0],
-            [0.0, 0.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0f32]
-        ];
-
         MainWindow {
             display,
+            fullscreen,
 
-            transform,
             vertex_buffer,
             index_buffer,
             program,
-            image_texture
+            image_texture,
+            zoom_scale: 1f32,
+            scale_x: 1f32,
+            scale_y: 1f32
         }
     }
 
@@ -216,11 +232,24 @@ impl MainWindow {
                                 window_pos.1 + offset.1 as i32,
                             );
                             */
-
                         }
                         last_mouse_pos = position;
                     }
-
+                    WindowEvent::MouseWheel {delta, ..} => {
+                        use glium::glutin::MouseScrollDelta;
+                        let delta = match delta {
+                            MouseScrollDelta::LineDelta(_, y) => { println!("line"); y },
+                            MouseScrollDelta::PixelDelta(_, y) => { println!("pixel"); y / 13f32 }
+                        };
+                        let delta = delta * 0.75f32;
+                        if delta > 0f32 {
+                            self.zoom_scale /= delta;
+                        } else {
+                            self.zoom_scale *= delta.abs();
+                        }
+                        println!("scale set to {}", self.zoom_scale);
+                        self.draw();
+                    }
                     // Redraw the triangle when the window is resized.
                     WindowEvent::Resized(window_w, window_h) => {
                         if let Some(ref image) = self.image_texture {
@@ -230,23 +259,15 @@ impl MainWindow {
                             let img_ratio = img_w as f32 / img_h as f32;
                             let window_ratio = window_w as f32 / window_h as f32;
 
-                            let mut scale_x = 1f32;
-                            let mut scale_y = 1f32;
+                            self.scale_x = 1f32;
+                            self.scale_y = 1f32;
 
                             if img_ratio < window_ratio {
-                                scale_x = ((img_ratio / window_ratio) * window_w as f32).floor() / window_w as f32;
+                                self.scale_x = ((img_ratio / window_ratio) * window_w as f32).floor() / window_w as f32;
                             } else {
-                                scale_y = ((window_ratio / img_ratio) * window_h as f32).floor() / window_h as f32;
+                                self.scale_y = ((window_ratio / img_ratio) * window_h as f32).floor() / window_h as f32;
                             }
-
-                            self.transform = [
-                                [scale_x, 0.0, 0.0, 0.0],
-                                [0.0, scale_y, 0.0, 0.0],
-                                [0.0, 0.0, 1.0, 0.0],
-                                [0.0, 0.0, 0.0, 1.0f32]
-                            ];
                         }
-
                         self.draw()
                     },
                     _ => (),
@@ -262,10 +283,29 @@ impl MainWindow {
         let mut target = self.display.draw();
         target.clear_color(0.0, 0.0, 0.0, 0.0);
         if let Some(ref texture) = self.image_texture {
+            let x = self.scale_x * self.zoom_scale;
+            let y = self.scale_y * self.zoom_scale;
+            let transform = [
+                [x, 0.0, 0.0, 0.0],
+                [0.0, y, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0f32]
+            ];
+            let sampler = if self.get_texel_size() >= 6f32 {
+                texture
+                    .sampled()
+                    .wrap_function(glium::uniforms::SamplerWrapFunction::Clamp)
+                    .magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest)
+            } else {
+                texture
+                    .sampled()
+                    .wrap_function(glium::uniforms::SamplerWrapFunction::Clamp)
+                    .magnify_filter(glium::uniforms::MagnifySamplerFilter::Linear)
+            };
             // building the uniforms
             let uniforms = uniform! {
-                matrix: self.transform,
-                tex: texture.sampled().wrap_function(glium::uniforms::SamplerWrapFunction::Clamp)
+                matrix: transform,
+                tex: sampler
             };
             target
                 .draw(
@@ -278,6 +318,17 @@ impl MainWindow {
                 .unwrap();
         }
         target.finish().unwrap();
+    }
+
+    fn get_texel_size(&self) -> f32 {
+        if let Some(ref image_texture) = self.image_texture {
+            let window = self.display.gl_window();
+            let (window_w, window_h) = window.get_inner_size().unwrap();
+
+            (window_w.min(window_h) as f32 / image_texture.width().max(image_texture.height()) as f32) * self.zoom_scale
+        } else {
+            0f32
+        }
     }
 }
 
