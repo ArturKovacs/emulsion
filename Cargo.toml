@@ -1,0 +1,9 @@
+[package]
+name = "emulsion"
+version = "0.1.0"
+authors = ["Artur Barnabas <kovacs.artur.barnabas@gmail.com>"]
+
+[dependencies]
+glium = "0.20"
+glutin = "0.13"
+image = "0.18"
