@@ -204,7 +204,7 @@ impl MainWindow {
             index_buffer,
             program,
             image_texture,
-            zoom_scale: 2.0,
+            zoom_scale: 1.0,
             cam_pos: Vector2::new(0.0, 0.0),
             projection_transform: Matrix4::identity(),
         }
@@ -296,7 +296,7 @@ impl MainWindow {
             };
             let cam_scale_x = self.zoom_scale / camera_width;
             let cam_scale_y = self.zoom_scale / camera_height;
-            self.projection_transform = Matrix4::from_nonuniform_scale(cam_scale_x, cam_scale_y, 1.0);
+            self.projection_transform = Matrix4::from_nonuniform_scale(cam_scale_x * 2.0, cam_scale_y * 2.0, 1.0);
         }
     }
 

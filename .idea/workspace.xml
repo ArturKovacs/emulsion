@@ -16,8 +16,8 @@
       <file leaf-file-name="main.rs" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/main.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="150">
-              <caret line="206" column="28" selection-start-line="206" selection-start-column="28" selection-end-line="206" selection-end-column="28" />
+            <state relative-caret-position="-31">
+              <caret line="209" column="9" selection-start-line="209" selection-start-column="9" selection-end-line="209" selection-end-column="9" />
             </state>
           </provider>
         </entry>
@@ -46,6 +46,12 @@
       </file>
     </leaf>
   </component>
+  <component name="FindInProjectRecents">
+    <findStrings>
+      <find>if let</find>
+      <find>zoom_scale</find>
+    </findStrings>
+  </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
@@ -57,10 +63,10 @@
     </option>
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="317" />
-    <option name="y" value="16" />
-    <option name="width" value="1587" />
-    <option name="height" value="1020" />
+    <option name="x" value="280" />
+    <option name="y" value="10" />
+    <option name="width" value="1608" />
+    <option name="height" value="1033" />
   </component>
   <component name="ProjectView">
     <navigator proportions="" version="1">
@@ -131,14 +137,14 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="317" y="16" width="1587" height="1020" extended-state="0" />
+    <frame x="280" y="10" width="1608" height="1033" extended-state="0" />
     <editor active="true" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.2626064" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.25904393" />
       <window_info anchor="bottom" id="TODO" order="6" />
       <window_info anchor="right" id="Cargo" order="3" />
       <window_info anchor="bottom" id="Event Log" order="7" side_tool="true" />
-      <window_info active="true" anchor="bottom" id="Run" order="2" visible="true" weight="0.40202704" />
+      <window_info active="true" anchor="bottom" id="Run" order="2" visible="true" weight="0.3962264" />
       <window_info anchor="bottom" id="Version Control" order="7" />
       <window_info anchor="bottom" id="Python Console" order="7" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
@@ -274,8 +280,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/main.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="150">
-          <caret line="206" column="28" selection-start-line="206" selection-start-column="28" selection-end-line="206" selection-end-column="28" />
+        <state relative-caret-position="-31">
+          <caret line="209" column="9" selection-start-line="209" selection-start-column="9" selection-end-line="209" selection-end-column="9" />
         </state>
       </provider>
     </entry>
