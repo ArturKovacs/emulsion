@@ -7,3 +7,4 @@ authors = ["Artur Barnabas <kovacs.artur.barnabas@gmail.com>"]
 glium = "0.20"
 glutin = "0.13"
 image = "0.18"
+cgmath = "0.16"
