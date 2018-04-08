@@ -8,7 +8,8 @@ extern crate glium;
 extern crate image;
 
 use std::env;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 
 use glium::{glutin, Surface};
 use glium::index::PrimitiveType;
@@ -37,7 +38,7 @@ struct MainWindow {
     vertex_buffer: glium::VertexBuffer<Vertex>,
     index_buffer: glium::IndexBuffer<u16>,
     program: glium::Program,
-    image_texture: Option<Arc<glium::texture::SrgbTexture2d>>,
+    image_texture: Option<Rc<glium::texture::SrgbTexture2d>>,
     zoom_scale: f32,
     cam_pos: Vector2<f32>,
     projection_transform: Matrix4<f32>,
@@ -144,7 +145,6 @@ impl MainWindow {
         resulting_window
     }
 
-
     fn start_event_loop(&mut self, events_loop: &mut glutin::EventsLoop) {
         let mut last_mouse_pos = Vector2::new(0.0, 0.0);
 
@@ -219,7 +219,6 @@ impl MainWindow {
         });
     }
 
-
     fn update_projection_transform(&mut self) {
         if let Some(ref texture) = self.image_texture {
             let img_w = texture.width() as f32;
@@ -242,11 +241,9 @@ impl MainWindow {
         }
     }
 
-
     fn load_image(&mut self, path: &str) {
         self.image_texture = Some(self.image_cache.load_specific(&self.display, path).unwrap());
     }
-
 
     fn draw(&self) {
         // drawing a frame
@@ -289,7 +286,6 @@ impl MainWindow {
         target.finish().unwrap();
     }
 
-
     fn get_texel_size(&self) -> f32 {
         if let Some(ref image_texture) = self.image_texture {
             let window = self.display.gl_window();
@@ -303,7 +299,6 @@ impl MainWindow {
         }
     }
 }
-
 
 fn main() {
     // I don't know how to Rust
