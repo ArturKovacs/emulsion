@@ -8,7 +8,6 @@ extern crate glium;
 extern crate image;
 
 use std::env;
-use std::sync::{Arc, Mutex};
 use std::rc::Rc;
 
 use glium::{glutin, Surface};
@@ -55,14 +54,7 @@ impl MainWindow {
             _ => None,
         };
 
-        let title = format!(
-            "E M U L S I O N  ⬕  {}",
-            if let Some(img_name) = img_name {
-                img_name
-            } else {
-                ""
-            }
-        );
+        let title = Self::create_title_filename(if let Some(name) = img_name { name } else { "" });
 
         let window = glutin::WindowBuilder::new()
             .with_title(title)
@@ -155,8 +147,27 @@ impl MainWindow {
                     // Break from the main loop when the window is closed.
                     WindowEvent::Closed => return glutin::ControlFlow::Break,
                     WindowEvent::KeyboardInput { input, .. } => {
-                        if input.virtual_keycode == Some(VirtualKeyCode::Escape) {
-                            return glutin::ControlFlow::Break;
+                        if input.state == glutin::ElementState::Pressed {
+                            if let Some(keycode) = input.virtual_keycode {
+                                match keycode {
+                                    VirtualKeyCode::Escape => return glutin::ControlFlow::Break,
+                                    VirtualKeyCode::Right => {
+                                        match self.image_cache.load_next(&self.display) {
+                                            Ok((texture, filename)) => {
+                                                self.image_texture = Some(texture);
+                                                self.set_title_filename(filename.to_str().unwrap());
+                                            }
+                                            _ => {
+                                                self.image_texture = None;
+                                                self.set_title_filename("[none]");
+                                            }
+                                        }
+                                        self.update_projection_transform();
+                                        self.draw();
+                                    }
+                                    _ => (),
+                                }
+                            }
                         }
                     }
                     WindowEvent::CursorMoved { position, .. } => {
@@ -239,6 +250,16 @@ impl MainWindow {
             self.projection_transform =
                 Matrix4::from_nonuniform_scale(cam_scale_x * 2.0, cam_scale_y * 2.0, 1.0);
         }
+    }
+
+    fn set_title_filename(&mut self, name: &str) {
+        self.display
+            .gl_window()
+            .set_title(Self::create_title_filename(name).as_ref());
+    }
+
+    fn create_title_filename(name: &str) -> String {
+        format!("E M U L S I O N  ⬕  {}", name)
     }
 
     fn load_image(&mut self, path: &str) {
