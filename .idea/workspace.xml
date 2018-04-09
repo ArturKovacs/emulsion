@@ -6,7 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="3befee56-0519-440a-8c3c-c96aa9c7baa7" name="Default" comment="">
       <change beforePath="$PROJECT_DIR$/src/image_cache.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/image_cache.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.rs" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -17,24 +16,20 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="main.rs" pinned="false" current-in-tab="true">
+      <file leaf-file-name="main.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/main.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="113">
-              <caret line="142" column="24" lean-forward="true" selection-start-line="142" selection-start-column="24" selection-end-line="142" selection-end-column="24" />
-              <folding>
-                <element signature="e#9710#9711#0" expanded="true" />
-                <element signature="e#9764#9765#0" expanded="true" />
-              </folding>
+            <state relative-caret-position="17">
+              <caret line="142" column="24" selection-start-line="142" selection-start-column="24" selection-end-line="142" selection-end-column="24" />
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="image_cache.rs" pinned="false" current-in-tab="false">
+      <file leaf-file-name="image_cache.rs" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/image_cache.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="375">
-              <caret line="182" column="57" selection-start-line="182" selection-start-column="57" selection-end-line="182" selection-end-column="57" />
+            <state relative-caret-position="491">
+              <caret line="187" column="8" selection-start-line="187" selection-start-column="8" selection-end-line="187" selection-end-column="8" />
             </state>
           </provider>
         </entry>
@@ -83,14 +78,14 @@
         <option value="$PROJECT_DIR$/src/shaders/fragment_140.glsl" />
         <option value="$PROJECT_DIR$/src/shaders/vertex_140.glsl" />
         <option value="$PROJECT_DIR$/src/errors.rs" />
-        <option value="$PROJECT_DIR$/src/image_cache.rs" />
         <option value="$PROJECT_DIR$/src/main.rs" />
+        <option value="$PROJECT_DIR$/src/image_cache.rs" />
       </list>
     </option>
   </component>
   <component name="ProjectFrameBounds">
     <option name="x" value="293" />
-    <option name="y" value="15" />
+    <option name="y" value="14" />
     <option name="width" value="1610" />
     <option name="height" value="1033" />
   </component>
@@ -171,20 +166,20 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="293" y="15" width="1610" height="1033" extended-state="0" />
+    <frame x="293" y="14" width="1610" height="1033" extended-state="0" />
     <editor active="true" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.2683871" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.2716129" />
       <window_info anchor="bottom" id="TODO" order="6" />
       <window_info anchor="right" id="Cargo" order="3" />
       <window_info anchor="bottom" id="Event Log" order="7" side_tool="true" />
-      <window_info anchor="bottom" id="Run" order="2" weight="0.22530521" />
       <window_info anchor="bottom" id="Version Control" order="7" />
       <window_info anchor="bottom" id="Python Console" order="7" />
+      <window_info active="true" anchor="bottom" id="Run" order="2" visible="true" weight="0.22530521" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info anchor="bottom" id="Terminal" order="7" weight="0.32963374" />
-      <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info id="Favorites" order="2" side_tool="true" />
+      <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="right" id="Commander" order="0" weight="0.4" />
@@ -200,12 +195,33 @@
   <component name="editorHistoryManager">
     <entry file="file://$PROJECT_DIR$/src/main.rs">
       <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2414">
+          <caret line="142" column="24" lean-forward="true" selection-start-line="142" selection-start-column="24" selection-end-line="142" selection-end-column="24" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/image_cache.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="3094">
+          <caret line="182" column="57" selection-start-line="182" selection-start-column="57" selection-end-line="182" selection-end-column="57" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.10.0/src/platform/windows/window.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="4675">
+          <caret line="275" selection-start-line="275" selection-end-line="275" />
+          <folding>
+            <element signature="e#10096#10097#0" expanded="true" />
+            <element signature="e#10127#10128#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main.rs">
+      <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="4216">
           <caret line="248" lean-forward="true" selection-start-line="248" selection-end-line="248" />
-          <folding>
-            <element signature="e#9710#9711#0" expanded="true" />
-            <element signature="e#9764#9765#0" expanded="true" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -445,10 +461,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="202">
           <caret line="245" column="11" selection-start-line="245" selection-start-column="11" selection-end-line="245" selection-end-column="11" />
-          <folding>
-            <element signature="e#7915#7916#0" expanded="true" />
-            <element signature="e#7939#7940#0" expanded="true" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -470,10 +482,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="405">
           <caret line="1008" column="11" selection-start-line="1008" selection-start-column="11" selection-end-line="1008" selection-end-column="11" />
-          <folding>
-            <element signature="e#71801#71802#0" expanded="true" />
-            <element signature="e#71838#71839#0" expanded="true" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -512,21 +520,17 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/image_cache.rs">
+    <entry file="file://$PROJECT_DIR$/src/main.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="375">
-          <caret line="182" column="57" selection-start-line="182" selection-start-column="57" selection-end-line="182" selection-end-column="57" />
+        <state relative-caret-position="17">
+          <caret line="142" column="24" selection-start-line="142" selection-start-column="24" selection-end-line="142" selection-end-column="24" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main.rs">
+    <entry file="file://$PROJECT_DIR$/src/image_cache.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="113">
-          <caret line="142" column="24" lean-forward="true" selection-start-line="142" selection-start-column="24" selection-end-line="142" selection-end-column="24" />
-          <folding>
-            <element signature="e#9710#9711#0" expanded="true" />
-            <element signature="e#9764#9765#0" expanded="true" />
-          </folding>
+        <state relative-caret-position="491">
+          <caret line="187" column="8" selection-start-line="187" selection-start-column="8" selection-end-line="187" selection-end-column="8" />
         </state>
       </provider>
     </entry>

@@ -23,7 +23,7 @@ pub mod errors {
         foreign_links {
             Io(io::Error) #[doc = "Error during IO"];
             TextureCreationError(texture::TextureCreationError);
-            ImageError(image::ImageError);
+            ImageLoadError(image::ImageError);
         }
     }
 }
@@ -139,48 +139,54 @@ impl ImageCache {
 
     pub fn load_next(&mut self, display: &glium::Display) -> Result<(Rc<SrgbTexture2d>, OsString)> {
         let mut elements = fs::read_dir(self.dir_path.as_path()).unwrap();
+        // some pesky workaround because dir list doesn't support cycle.
+        let mut restarted_elements = fs::read_dir(self.dir_path.as_path()).unwrap();
 
-        let mut found = false;
+        let mut next_loaded = false;
+
+        //let mut found = false;
         let mut first = None;
-        while let Some(curr_file) = elements.next() {
+        'finding_current: while let Some(curr_file) = elements.next() {
             let curr_file = curr_file?;
             if curr_file.file_type()?.is_file() {
                 if first.is_none() {
                     first = Some(curr_file.path());
                 }
                 if curr_file.file_name() == self.current_name {
-                    found = true;
-                    break;
+                    // Find next file
+                    let mut dir_lists = [
+                        &mut elements,
+                        &mut restarted_elements
+                    ];
+                    for ref mut curr_dir_list in dir_lists.iter_mut() {
+                        'finding_next: while let Some(next) = curr_dir_list.next() {
+                            let next = next?;
+                            if next.file_type().unwrap().is_file() {
+                                let next_filename = next.path();
+                                match self.load_specific(display, next_filename.to_str().unwrap()) {
+                                    Err(Error(ErrorKind::ImageLoadError(err), ..)) => {
+                                        // Image type not supported, just skip it
+                                        continue 'finding_next;
+                                    },
+                                    Err(err) => {
+                                        // Some other error occured, it is a bad sign, just return the error
+                                        return Err(err);
+                                    }
+                                    Ok(result) => {
+                                        return Ok((result, next_filename.file_name().unwrap().to_owned()));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // Current already found at this point
+                    break 'finding_current;
                 }
             }
         }
-        let next_filename = match found {
-            true => {
-                // Find next file
-                let mut result = None;
-                while let Some(next) = elements.next() {
-                    let next = next?;
-                    if next.file_type().unwrap().is_file() {
-                        result = Some(next.path());
-                        break;
-                    }
-                }
-                if let Some(result) = result {
-                    result
-                } else {
-                    first.unwrap()
-                }
-            }
-            false => {
-                return Err(Error::from(
-                    "Couldn't find the currently open file in the directory",
-                ));
-            }
-        };
 
-        Ok((
-            self.load_specific(display, next_filename.to_str().unwrap())?,
-            next_filename.file_name().unwrap().to_owned(),
+        Err(Error::from(
+            "Couldn't find the current file in the the directory",
         ))
     }
 
