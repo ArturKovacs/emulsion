@@ -8,6 +8,8 @@ use std::thread;
 use std::mem;
 use std::ffi::OsString;
 
+use std::iter;
+
 use glium;
 
 use glium::texture::{RawImage2d, SrgbTexture2d};
@@ -138,43 +140,43 @@ impl ImageCache {
     }
 
     pub fn load_next(&mut self, display: &glium::Display) -> Result<(Rc<SrgbTexture2d>, OsString)> {
-        let mut elements = fs::read_dir(self.dir_path.as_path()).unwrap();
-        // some pesky workaround because dir list doesn't support cycle.
-        let mut restarted_elements = fs::read_dir(self.dir_path.as_path()).unwrap();
+        let elements: Vec<_> = fs::read_dir(self.dir_path.as_path()).unwrap().map(|x| x.unwrap()).collect();
+        self.load_iter_next(display, elements.iter().chain(elements.iter()))
+    }
 
-        let mut next_loaded = false;
+    pub fn load_prev(&mut self, display: &glium::Display) -> Result<(Rc<SrgbTexture2d>, OsString)> {
+        let elements: Vec<_> = fs::read_dir(self.dir_path.as_path()).unwrap().map(|x| x.unwrap()).collect();
+        self.load_iter_next(display, elements.iter().chain(elements.iter()).rev())
+    }
 
-        //let mut found = false;
-        let mut first = None;
-        'finding_current: while let Some(curr_file) = elements.next() {
-            let curr_file = curr_file?;
+    ///
+    /// entries_twice should be an iterator of the folder chained with itself.
+    ///
+    fn load_iter_next<'a, IterT>(&mut self, display: &glium::Display, mut entries_twice: IterT) -> Result<(Rc<SrgbTexture2d>, OsString)>
+    where
+        IterT: iter::Iterator<Item = &'a fs::DirEntry>
+    {
+        'finding_current: while let Some(curr_file) = entries_twice.next() {
             if curr_file.file_type()?.is_file() {
-                if first.is_none() {
-                    first = Some(curr_file.path());
-                }
+                //if first.is_none() {
+                //    first = Some(curr_file.path());
+                //}
                 if curr_file.file_name() == self.current_name {
                     // Find next file
-                    let mut dir_lists = [
-                        &mut elements,
-                        &mut restarted_elements
-                    ];
-                    for ref mut curr_dir_list in dir_lists.iter_mut() {
-                        'finding_next: while let Some(next) = curr_dir_list.next() {
-                            let next = next?;
-                            if next.file_type().unwrap().is_file() {
-                                let next_filename = next.path();
-                                match self.load_specific(display, next_filename.to_str().unwrap()) {
-                                    Err(Error(ErrorKind::ImageLoadError(err), ..)) => {
-                                        // Image type not supported, just skip it
-                                        continue 'finding_next;
-                                    },
-                                    Err(err) => {
-                                        // Some other error occured, it is a bad sign, just return the error
-                                        return Err(err);
-                                    }
-                                    Ok(result) => {
-                                        return Ok((result, next_filename.file_name().unwrap().to_owned()));
-                                    }
+                    'finding_next: while let Some(next) = entries_twice.next() {
+                        if next.file_type().unwrap().is_file() {
+                            let next_filename = next.path();
+                            match self.load_specific(display, next_filename.to_str().unwrap()) {
+                                Err(Error(ErrorKind::ImageLoadError(_err), ..)) => {
+                                    // Image type not supported, just skip it
+                                    continue 'finding_next;
+                                },
+                                Err(err) => {
+                                    // Some other error occured, it is a bad sign, just return the error
+                                    return Err(err);
+                                }
+                                Ok(result) => {
+                                    return Ok((result, next_filename.file_name().unwrap().to_owned()));
                                 }
                             }
                         }
@@ -189,6 +191,7 @@ impl ImageCache {
             "Couldn't find the current file in the the directory",
         ))
     }
+
 
     fn load_image(image_path: &Path) -> Result<image::RgbaImage> {
         Ok(image::open(image_path)?.to_rgba())

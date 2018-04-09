@@ -6,6 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="3befee56-0519-440a-8c3c-c96aa9c7baa7" name="Default" comment="">
       <change beforePath="$PROJECT_DIR$/src/image_cache.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/image_cache.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.rs" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -16,20 +17,20 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="main.rs" pinned="false" current-in-tab="false">
+      <file leaf-file-name="main.rs" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/main.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="17">
-              <caret line="142" column="24" selection-start-line="142" selection-start-column="24" selection-end-line="142" selection-end-column="24" />
+            <state relative-caret-position="459">
+              <caret line="168" column="41" lean-forward="true" selection-start-line="168" selection-start-column="41" selection-end-line="168" selection-end-column="41" />
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="image_cache.rs" pinned="false" current-in-tab="true">
+      <file leaf-file-name="image_cache.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/image_cache.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="491">
-              <caret line="187" column="8" selection-start-line="187" selection-start-column="8" selection-end-line="187" selection-end-column="8" />
+            <state relative-caret-position="268">
+              <caret line="145" selection-start-line="145" selection-end-line="145" />
             </state>
           </provider>
         </entry>
@@ -78,8 +79,8 @@
         <option value="$PROJECT_DIR$/src/shaders/fragment_140.glsl" />
         <option value="$PROJECT_DIR$/src/shaders/vertex_140.glsl" />
         <option value="$PROJECT_DIR$/src/errors.rs" />
-        <option value="$PROJECT_DIR$/src/main.rs" />
         <option value="$PROJECT_DIR$/src/image_cache.rs" />
+        <option value="$PROJECT_DIR$/src/main.rs" />
       </list>
     </option>
   </component>
@@ -175,7 +176,7 @@
       <window_info anchor="bottom" id="Event Log" order="7" side_tool="true" />
       <window_info anchor="bottom" id="Version Control" order="7" />
       <window_info anchor="bottom" id="Python Console" order="7" />
-      <window_info active="true" anchor="bottom" id="Run" order="2" visible="true" weight="0.22530521" />
+      <window_info active="true" anchor="bottom" id="Run" order="2" visible="true" weight="0.29078802" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info anchor="bottom" id="Terminal" order="7" weight="0.32963374" />
       <window_info id="Favorites" order="2" side_tool="true" />
@@ -520,17 +521,17 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main.rs">
+    <entry file="file://$PROJECT_DIR$/src/image_cache.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="17">
-          <caret line="142" column="24" selection-start-line="142" selection-start-column="24" selection-end-line="142" selection-end-column="24" />
+        <state relative-caret-position="268">
+          <caret line="145" selection-start-line="145" selection-end-line="145" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/image_cache.rs">
+    <entry file="file://$PROJECT_DIR$/src/main.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="491">
-          <caret line="187" column="8" selection-start-line="187" selection-start-column="8" selection-end-line="187" selection-end-column="8" />
+        <state relative-caret-position="459">
+          <caret line="168" column="41" lean-forward="true" selection-start-line="168" selection-start-column="41" selection-end-line="168" selection-end-column="41" />
         </state>
       </provider>
     </entry>

@@ -151,8 +151,13 @@ impl MainWindow {
                             if let Some(keycode) = input.virtual_keycode {
                                 match keycode {
                                     VirtualKeyCode::Escape => return glutin::ControlFlow::Break,
-                                    VirtualKeyCode::Right => {
-                                        match self.image_cache.load_next(&self.display) {
+                                    VirtualKeyCode::Right | VirtualKeyCode::Left => {
+                                        let result = if keycode == VirtualKeyCode::Right {
+                                            self.image_cache.load_next(&self.display)
+                                        } else {
+                                            self.image_cache.load_prev(&self.display)
+                                        };
+                                        match result {
                                             Ok((texture, filename)) => {
                                                 self.image_texture = Some(texture);
                                                 self.set_title_filename(filename.to_str().unwrap());
