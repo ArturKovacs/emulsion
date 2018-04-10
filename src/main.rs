@@ -6,10 +6,13 @@ extern crate error_chain;
 #[macro_use]
 extern crate glium;
 extern crate image;
+extern crate sys_info;
 
 use std::env;
 use std::rc::Rc;
 use std::ffi::OsString;
+use std::thread;
+use std::io::Write;
 
 use glium::{glutin, Surface};
 use glium::index::PrimitiveType;
@@ -118,9 +121,21 @@ impl MainWindow {
             },
         ).unwrap();
 
+        let cache_capaxity = match sys_info::mem_info() {
+            ::std::result::Result::Ok(value) => {
+                // value originally reported in KiB
+                ((value.total / 8) * 1024) as isize
+            },
+            _ => {
+                println!("Could not get system memory size, using default value");
+                // bytes
+                500_000_000
+            },
+        };
+
         let mut resulting_window = MainWindow {
             display,
-            image_cache: ImageCache::new(5000),
+            image_cache: ImageCache::new(cache_capaxity),
 
             vertex_buffer,
             index_buffer,
@@ -250,14 +265,27 @@ impl MainWindow {
                         self.image_texture = Some(texture);
                         self.set_title_filename(filename.to_str().unwrap());
                     }
-                    _ => {
+                    Err(err) => {
                         self.image_texture = None;
                         self.set_title_filename("[none]");
+                        let stderr = &mut ::std::io::stderr();
+                        let stderr_errmsg = "Error writing to stderr";
+                        writeln!(stderr, "Error occured while loading image: {}", err).expect(stderr_errmsg);
+                        for e in err.iter().skip(1) {
+                            writeln!(stderr, "... caused by: {}", e).expect(stderr_errmsg);
+                        }
+                        if let Some(backtrace) = err.backtrace() {
+                            writeln!(stderr, "backtrace: {:?}", backtrace).expect(stderr_errmsg);
+                        }
+                        writeln!(stderr).expect(stderr_errmsg);
                     }
                 }
                 self.update_projection_transform();
                 self.draw();
             }
+
+            // Let other processes run for a bit.
+            thread::yield_now();
         }
     }
 

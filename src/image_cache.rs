@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 use std::thread;
 use std::mem;
 use std::ffi::OsString;
@@ -42,7 +42,7 @@ pub struct ImageCache {
     current_name: OsString,
 
     running: Arc<AtomicBool>,
-    remaining_capacity: Arc<AtomicUsize>,
+    remaining_capacity: Arc<AtomicIsize>,
     loader_cache: Arc<Mutex<HashMap<PathBuf, (fs::Metadata, LoaderImage)>>>,
     texture_cache: HashMap<PathBuf, (fs::Metadata, Rc<SrgbTexture2d>)>,
     join_handle: Option<thread::JoinHandle<()>>,
@@ -52,10 +52,10 @@ pub struct ImageCache {
 /// The basic idea is to have a few images already in the memory while an image is shown on the screen
 impl ImageCache {
     /// # Arguemnts
-    /// * `capacity` - Kilobytes. The last image loaded will be the one at which the allocated memory reaches or exceeds capacity
-    pub fn new(capacity: usize) -> ImageCache {
+    /// * `capacity` - Number of bytes. The last image loaded will be the one at which the allocated memory reaches or exceeds capacity
+    pub fn new(capacity: isize) -> ImageCache {
         let running = Arc::new(AtomicBool::from(true));
-        let remaining_capacity = Arc::new(AtomicUsize::from(capacity));
+        let remaining_capacity = Arc::new(AtomicIsize::from(capacity));
         let loader_cache = Arc::new(Mutex::new(HashMap::new()));
 
         let join_handle = Some({
@@ -79,6 +79,19 @@ impl ImageCache {
         }
     }
 
+    fn thread_loop(
+        running: Arc<AtomicBool>,
+        remaining_capacity: Arc<AtomicIsize>,
+        cache: Arc<Mutex<HashMap<PathBuf, (fs::Metadata, LoaderImage)>>>,
+    ) {
+        // walk the directory starting from the current item and cache in all the images
+        // do this by stepping in both directions so that the cached images ahead of the file
+        // should never be more than 1 + "cached images before the file"
+        while running.load(Ordering::SeqCst) {
+            thread::yield_now();
+        }
+    }
+
     //
     pub fn load_specific(
         &mut self,
@@ -90,47 +103,121 @@ impl ImageCache {
         let path = Path::new(path).canonicalize()?;
         let metadata = fs::metadata(path.as_path())?;
 
-        self.current_name = path.file_name().unwrap().to_owned();
+        self.current_name = match path.file_name() {
+            Some(filename) => filename.to_owned(),
+            None => bail!(format!("Could not get filename for path '{}'", path.to_str().unwrap())),
+        };
 
+        let mut loader_cache;
         // Check if it is inside the texture cache first
-        let texture_entry = self.texture_cache.entry(path.clone());
-        if let Entry::Occupied(ref entry) = texture_entry {
-            if entry.get().0.modified().unwrap() == metadata.modified().unwrap() {
-                return Ok(entry.get().1.clone());
+        {
+            let texture_entry = self.texture_cache.entry(path.clone());
+            if let Entry::Occupied(ref entry) = texture_entry {
+                if entry.get().0.modified().unwrap() == metadata.modified().unwrap() {
+                    return Ok(entry.get().1.clone());
+                }
+            }
+
+            // requesting exclusive access to the map for the entire scope to save mayself from looking up the entry twice.
+            loader_cache = self.loader_cache.lock().unwrap();
+            if let Entry::Occupied(ref mut entry) = (*loader_cache).entry(path.clone()) {
+                if entry.get().0.modified().unwrap() == metadata.modified().unwrap() {
+                    // Perform conversion from
+                    let mut processed_image = LoaderImage::Processed;
+                    mem::swap(&mut entry.get_mut().1, &mut processed_image);
+                    let texture = Rc::new(Self::texture_from_loader(display, processed_image)?);
+                    match texture_entry {
+                        Entry::Vacant(entry) => {
+                            entry.insert((metadata, texture.clone()));
+                        }
+                        _ => unreachable!(),
+                    }
+                    entry.get_mut().1 = LoaderImage::Processed;
+                    return Ok(texture);
+                }
             }
         }
 
-        // requesting exclusive access to the map for the entire scope to save mayself from looking up the entry twice.
-        let mut loader_cache = self.loader_cache.lock().unwrap();
-        let mut loader_entry = (*loader_cache).entry(path.clone());
-        if let Entry::Occupied(ref mut entry) = loader_entry {
-            if entry.get().0.modified().unwrap() == metadata.modified().unwrap() {
-                // Perform conversion from
-                let mut processed_image = LoaderImage::Processed;
-                mem::swap(&mut entry.get_mut().1, &mut processed_image);
-                let texture = Rc::new(Self::texture_from_loader(display, processed_image)?);
-                match texture_entry {
-                    Entry::Vacant(entry) => {
-                        entry.insert((metadata, texture.clone()));
-                    }
-                    _ => unreachable!(),
-                }
-                entry.get_mut().1 = LoaderImage::Processed;
-                return Ok(texture);
-            }
-        };
         // If it wasn't in any if the caches the parent directory may have changed...
         self.dir_path = path.parent().unwrap().to_owned(); // It absolutely must have a parent if it was a file
 
         let image = Self::load_image(path.as_path())?;
+        let image_size_estimate = Self::get_image_size_estimate((image.width(), image.height())) as isize;
+        if self.remaining_capacity.load(Ordering::SeqCst) < image_size_estimate {
+            // Empty the files furthest from this current one
+            // Collect all the files first in the order they are returned from the OS call
+            let dir_files: Vec<_> = fs::read_dir(self.dir_path.as_path())?
+                .filter_map(|x| {
+                    let entry = x.unwrap();
+                    if entry.file_type().unwrap().is_file() {
+                        Some(entry)
+                    } else {
+                        None
+                    }
+                }).collect();
+
+            // Find the position of the current file in the directory
+            let mut current_pos = 0;
+            let loaded_filename = path.file_name().unwrap();
+            for (i, file_in_dir) in dir_files.iter().enumerate() {
+                if file_in_dir.file_name() == loaded_filename {
+                    current_pos = i as i32;
+                }
+            }
+
+            let mut cached_ordered: Vec<_> = dir_files.iter().filter_map(|file| {
+                let path = file.path();
+                if self.texture_cache.contains_key(&path) || (*loader_cache).contains_key(&path) {
+                    Some(path)
+                } else {
+                    None
+                }
+            }).enumerate().collect();
+
+            cached_ordered.sort_unstable_by(|&(pos_a, _), &(pos_b, _)| {
+                let a_dist = (pos_a as i32 - current_pos).abs();
+                let b_dist = (pos_b as i32 - current_pos).abs();
+                // sort in decreasing order
+                b_dist.cmp(&a_dist)
+            });
+
+            // And there is just one more thing left to do...
+            // Walk through our list of directory entries sorted by their distance from the current
+            // file and in each step remove an entry from the cache until we reach the desired cache
+            // size
+            for (_, file) in cached_ordered.into_iter() {
+                if self.remaining_capacity.load(Ordering::SeqCst) < image_size_estimate {
+                    let mut loader_entry = (*loader_cache).entry(file.clone());
+                    if let Entry::Occupied(entry) = loader_entry {
+                        let size_estimate = match entry.get().1 {
+                            LoaderImage::Image(ref image) => Self::get_image_size_estimate(image.dimensions()) as isize,
+                            LoaderImage::Processed => 0
+                        };
+                        entry.remove();
+                        self.remaining_capacity.fetch_add(size_estimate, Ordering::SeqCst);
+                    }
+                    if self.remaining_capacity.load(Ordering::SeqCst) < image_size_estimate {
+                        if let Entry::Occupied(entry) = self.texture_cache.entry(file) {
+                            let size_estimate = Self::get_image_size_estimate((entry.get().1.width(), entry.get().1.height())) as isize;
+                            entry.remove();
+                            self.remaining_capacity.fetch_add(size_estimate, Ordering::SeqCst);
+                        }
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+        self.remaining_capacity.fetch_sub(image_size_estimate, Ordering::SeqCst);
+
         let result_texture = Rc::new(Self::texture_from_image(display, image)?);
-        match texture_entry {
+        match self.texture_cache.entry(path.clone()) {
             Entry::Vacant(entry) => {
                 entry.insert((metadata.clone(), result_texture.clone()));
             }
             _ => unreachable!(),
         }
-        match loader_entry {
+        match (*loader_cache).entry(path.clone()) {
             Entry::Vacant(entry) => {
                 entry.insert((metadata, LoaderImage::Processed));
             }
@@ -169,9 +256,6 @@ impl ImageCache {
     {
         'finding_current: while let Some(curr_file) = entries_twice.next() {
             if curr_file.file_type()?.is_file() {
-                //if first.is_none() {
-                //    first = Some(curr_file.path());
-                //}
                 if curr_file.file_name() == self.current_name {
                     // Find next file
                     'finding_next: while let Some(next) = entries_twice.next() {
@@ -211,17 +295,6 @@ impl ImageCache {
         Ok(image::open(image_path)?.to_rgba())
     }
 
-    fn thread_loop(
-        running: Arc<AtomicBool>,
-        remaining_capacity: Arc<AtomicUsize>,
-        cache: Arc<Mutex<HashMap<PathBuf, (fs::Metadata, LoaderImage)>>>,
-    ) {
-        // walk the directory starting from the current item and cache in all the images
-        // do this by stepping in both directions so that the cached images ahead of the file
-        // should never be more than 1 + "cached images before the file"
-        while running.load(Ordering::SeqCst) {}
-    }
-
     fn texture_from_loader(display: &glium::Display, image: LoaderImage) -> Result<SrgbTexture2d> {
         match image {
             LoaderImage::Image(image) => {
@@ -246,6 +319,12 @@ impl ImageCache {
             image,
             glium::texture::MipmapsOption::AutoGeneratedMipmapsMax(4),
         )?)
+    }
+
+    fn get_image_size_estimate(dimensions: (u32, u32)) -> u32 {
+        // counting all the mipmaps would add an additionnal multiplier of around ~1.6
+        // but only the gpu textures have mip maps so just multiply by 1.5
+        ((dimensions.0 * dimensions.1 * 4) as f32 * 1.5) as u32
     }
 }
 
