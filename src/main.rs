@@ -9,6 +9,7 @@ extern crate image;
 
 use std::env;
 use std::rc::Rc;
+use std::ffi::OsString;
 
 use glium::{glutin, Surface};
 use glium::index::PrimitiveType;
@@ -140,99 +141,124 @@ impl MainWindow {
     fn start_event_loop(&mut self, events_loop: &mut glutin::EventsLoop) {
         let mut last_mouse_pos = Vector2::new(0.0, 0.0);
 
+        enum LoadRequest {
+            None,
+            LoadNext,
+            LoadPrevious,
+            LoadSpecific(String),
+        }
+
         // the main loop
-        events_loop.run_forever(|event| {
-            match event {
-                glutin::Event::WindowEvent { event, .. } => match event {
-                    // Break from the main loop when the window is closed.
-                    WindowEvent::Closed => return glutin::ControlFlow::Break,
-                    WindowEvent::KeyboardInput { input, .. } => {
-                        if input.state == glutin::ElementState::Pressed {
-                            if let Some(keycode) = input.virtual_keycode {
-                                match keycode {
-                                    VirtualKeyCode::Escape => return glutin::ControlFlow::Break,
-                                    VirtualKeyCode::Right | VirtualKeyCode::Left => {
-                                        let result = if keycode == VirtualKeyCode::Right {
-                                            self.image_cache.load_next(&self.display)
-                                        } else {
-                                            self.image_cache.load_prev(&self.display)
-                                        };
-                                        match result {
-                                            Ok((texture, filename)) => {
-                                                self.image_texture = Some(texture);
-                                                self.set_title_filename(filename.to_str().unwrap());
-                                            }
-                                            _ => {
-                                                self.image_texture = None;
-                                                self.set_title_filename("[none]");
+        let mut running = true;
+        while running {
+            let mut load_request = LoadRequest::None;
+            events_loop.poll_events(|event| {
+                match event {
+                    glutin::Event::WindowEvent { event, .. } => match event {
+                        // Break from the main loop when the window is closed.
+                        WindowEvent::Closed => running = false,
+                        WindowEvent::KeyboardInput { input, .. } => {
+                            if input.state == glutin::ElementState::Pressed {
+                                if let Some(keycode) = input.virtual_keycode {
+                                    match keycode {
+                                        VirtualKeyCode::Escape => running = false,
+                                        VirtualKeyCode::Right | VirtualKeyCode::Left => {
+                                            if keycode == VirtualKeyCode::Right {
+                                                load_request = LoadRequest::LoadNext;
+                                            } else {
+                                                load_request = LoadRequest::LoadPrevious;
                                             }
                                         }
-                                        self.update_projection_transform();
-                                        self.draw();
+                                        _ => (),
                                     }
-                                    _ => (),
                                 }
                             }
                         }
-                    }
-                    WindowEvent::CursorMoved { position, .. } => {
-                        last_mouse_pos.x = position.0 as f32;
-                        last_mouse_pos.y = position.1 as f32;
-                    }
-                    WindowEvent::MouseWheel { delta, .. } => {
-                        use glium::glutin::MouseScrollDelta;
-                        let delta: f32 = match delta {
-                            MouseScrollDelta::LineDelta(_, y) => {
-                                println!("line");
-                                y
-                            }
-                            MouseScrollDelta::PixelDelta(_, y) => {
-                                println!("pixel");
-                                y / 13.0
-                            }
-                        };
-                        let delta = delta * 0.375;
-                        let delta = if delta > 0.0 {
-                            delta + 1.0
-                        } else {
-                            1.0 / (delta.abs() + 1.0)
-                        };
+                        WindowEvent::CursorMoved { position, .. } => {
+                            last_mouse_pos.x = position.0 as f32;
+                            last_mouse_pos.y = position.1 as f32;
+                        }
+                        WindowEvent::MouseWheel { delta, .. } => {
+                            use glium::glutin::MouseScrollDelta;
+                            let delta: f32 = match delta {
+                                MouseScrollDelta::LineDelta(_, y) => {
+                                    println!("line");
+                                    y
+                                }
+                                MouseScrollDelta::PixelDelta(_, y) => {
+                                    println!("pixel");
+                                    y / 13.0
+                                }
+                            };
+                            let delta = delta * 0.375;
+                            let delta = if delta > 0.0 {
+                                delta + 1.0
+                            } else {
+                                1.0 / (delta.abs() + 1.0)
+                            };
 
-                        // Calculate mouse pos in "world space"
-                        let window_size = self.display.gl_window().get_inner_size().unwrap();
-                        let window_center =
-                            Vector2::new(window_size.0 as f32 * 0.5, window_size.1 as f32 * 0.5);
-                        let mut mouse_world = last_mouse_pos - window_center;
-                        mouse_world.y *= -1.0;
-                        mouse_world.div_assign_element_wise(Vector2::new(
-                            window_size.0 as f32 * 0.5,
-                            window_size.1 as f32 * 0.5,
-                        ));
+                            // Calculate mouse pos in "world space"
+                            let window_size = self.display.gl_window().get_inner_size().unwrap();
+                            let window_center = Vector2::new(
+                                window_size.0 as f32 * 0.5,
+                                window_size.1 as f32 * 0.5,
+                            );
+                            let mut mouse_world = last_mouse_pos - window_center;
+                            mouse_world.y *= -1.0;
+                            mouse_world.div_assign_element_wise(Vector2::new(
+                                window_size.0 as f32 * 0.5,
+                                window_size.1 as f32 * 0.5,
+                            ));
 
-                        let transformed = self.projection_transform.invert().unwrap()
-                            * Vector4::new(mouse_world.x, mouse_world.y, 0.0, 1.0);
-                        mouse_world.x = transformed.x;
-                        mouse_world.y = transformed.y;
+                            let transformed = self.projection_transform.invert().unwrap()
+                                * Vector4::new(mouse_world.x, mouse_world.y, 0.0, 1.0);
+                            mouse_world.x = transformed.x;
+                            mouse_world.y = transformed.y;
 
-                        self.cam_pos += mouse_world * (1.0 - 1.0 / delta);
-                        self.zoom_scale *= delta;
+                            self.cam_pos += mouse_world * (1.0 - 1.0 / delta);
+                            self.zoom_scale *= delta;
 
-                        self.update_projection_transform();
+                            self.update_projection_transform();
 
-                        //println!("zoom_scale set to {}", self.zoom_scale);
-                        self.draw();
-                    }
-                    WindowEvent::Resized(..) => {
-                        self.update_projection_transform();
+                            //println!("zoom_scale set to {}", self.zoom_scale);
+                            self.draw();
+                        }
+                        WindowEvent::Resized(..) => {
+                            self.update_projection_transform();
 
-                        self.draw()
-                    }
+                            self.draw()
+                        }
+                        _ => (),
+                    },
                     _ => (),
-                },
-                _ => (),
+                }
+            });
+            // Process long operations here
+            let load_result = match load_request {
+                LoadRequest::LoadNext => Some(self.image_cache.load_next(&self.display)),
+                LoadRequest::LoadPrevious => Some(self.image_cache.load_prev(&self.display)),
+                LoadRequest::LoadSpecific(filename) => Some(
+                    self.image_cache
+                        .load_specific(&self.display, filename.as_str())
+                        .map(|x| (x, OsString::from(filename))),
+                ),
+                LoadRequest::None => None,
+            };
+            if let Some(result) = load_result {
+                match result {
+                    Ok((texture, filename)) => {
+                        self.image_texture = Some(texture);
+                        self.set_title_filename(filename.to_str().unwrap());
+                    }
+                    _ => {
+                        self.image_texture = None;
+                        self.set_title_filename("[none]");
+                    }
+                }
+                self.update_projection_transform();
+                self.draw();
             }
-            glutin::ControlFlow::Continue
-        });
+        }
     }
 
     fn update_projection_transform(&mut self) {

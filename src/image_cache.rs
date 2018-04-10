@@ -79,6 +79,7 @@ impl ImageCache {
         }
     }
 
+    //
     pub fn load_specific(
         &mut self,
         display: &glium::Display,
@@ -140,21 +141,31 @@ impl ImageCache {
     }
 
     pub fn load_next(&mut self, display: &glium::Display) -> Result<(Rc<SrgbTexture2d>, OsString)> {
-        let elements: Vec<_> = fs::read_dir(self.dir_path.as_path()).unwrap().map(|x| x.unwrap()).collect();
+        let elements: Vec<_> = fs::read_dir(self.dir_path.as_path())
+            .unwrap()
+            .map(|x| x.unwrap())
+            .collect();
         self.load_iter_next(display, elements.iter().chain(elements.iter()))
     }
 
     pub fn load_prev(&mut self, display: &glium::Display) -> Result<(Rc<SrgbTexture2d>, OsString)> {
-        let elements: Vec<_> = fs::read_dir(self.dir_path.as_path()).unwrap().map(|x| x.unwrap()).collect();
+        let elements: Vec<_> = fs::read_dir(self.dir_path.as_path())
+            .unwrap()
+            .map(|x| x.unwrap())
+            .collect();
         self.load_iter_next(display, elements.iter().chain(elements.iter()).rev())
     }
 
     ///
     /// entries_twice should be an iterator of the folder chained with itself.
     ///
-    fn load_iter_next<'a, IterT>(&mut self, display: &glium::Display, mut entries_twice: IterT) -> Result<(Rc<SrgbTexture2d>, OsString)>
+    fn load_iter_next<'a, IterT>(
+        &mut self,
+        display: &glium::Display,
+        mut entries_twice: IterT,
+    ) -> Result<(Rc<SrgbTexture2d>, OsString)>
     where
-        IterT: iter::Iterator<Item = &'a fs::DirEntry>
+        IterT: iter::Iterator<Item = &'a fs::DirEntry>,
     {
         'finding_current: while let Some(curr_file) = entries_twice.next() {
             if curr_file.file_type()?.is_file() {
@@ -170,13 +181,17 @@ impl ImageCache {
                                 Err(Error(ErrorKind::ImageLoadError(_err), ..)) => {
                                     // Image type not supported, just skip it
                                     continue 'finding_next;
-                                },
+                                }
                                 Err(err) => {
-                                    // Some other error occured, it is a bad sign, just return the error
+                                    // Some other error occured, it is a bad sign,
+                                    // just return the error
                                     return Err(err);
                                 }
                                 Ok(result) => {
-                                    return Ok((result, next_filename.file_name().unwrap().to_owned()));
+                                    return Ok((
+                                        result,
+                                        next_filename.file_name().unwrap().to_owned(),
+                                    ));
                                 }
                             }
                         }
@@ -191,7 +206,6 @@ impl ImageCache {
             "Couldn't find the current file in the the directory",
         ))
     }
-
 
     fn load_image(image_path: &Path) -> Result<image::RgbaImage> {
         Ok(image::open(image_path)?.to_rgba())
