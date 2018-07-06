@@ -157,6 +157,23 @@ impl MainWindow {
 
     fn start_event_loop(&mut self, events_loop: &mut glutin::EventsLoop) {
         let mut last_mouse_pos = Vector2::new(0.0, 0.0);
+        let mut left_mouse_down = false;
+
+        let get_mouse_proj = |mouse_screen: Vector2<f32>, window_size: (u32, u32)| {
+            // Calculate mouse pos in "world space"
+            //let window_size = self.display.gl_window().get_inner_size().unwrap();
+            let window_center = Vector2::new(
+                window_size.0 as f32 * 0.5,
+                window_size.1 as f32 * 0.5,
+            );
+            let mut mouse_world = mouse_screen - window_center;
+            mouse_world.y *= -1.0;
+            mouse_world.div_assign_element_wise(Vector2::new(
+                window_size.0 as f32 * 0.5,
+                window_size.1 as f32 * 0.5,
+            ));
+            mouse_world
+        };
 
         #[derive(PartialEq)]
         enum LoadRequest {
@@ -174,6 +191,9 @@ impl MainWindow {
             let mut load_request = LoadRequest::None;
             events_loop.poll_events(|event| {
                 match event {
+                    glutin::Event::Awakened => {
+                        self.draw();
+                    }
                     glutin::Event::WindowEvent { event, .. } => {
                         //update_screen = true; // in case of any event at all, update the screen
                         match event {
@@ -196,9 +216,35 @@ impl MainWindow {
                                     }
                                 }
                             }
+                            WindowEvent::MouseInput {state, button, ..} => {
+                                if button == glutin::MouseButton::Left {
+                                    left_mouse_down = state == glutin::ElementState::Pressed;
+                                }
+                            }
                             WindowEvent::CursorMoved { position, .. } => {
-                                last_mouse_pos.x = position.0 as f32;
-                                last_mouse_pos.y = position.1 as f32;
+                                let pos_vec = Vector2::new(position.0 as f32, position.1 as f32);
+                                // Update transform
+                                if left_mouse_down {
+                                    let inv_projection_transform = self.projection_transform.invert().unwrap();
+
+                                    let window_size = self.display.gl_window().get_inner_size().unwrap();
+                                    let mut last_world_pos = get_mouse_proj(last_mouse_pos, window_size);
+                                    let mut curr_world_pos = get_mouse_proj(pos_vec, window_size);
+
+                                    let tmp = inv_projection_transform * Vector4::new(last_world_pos.x, last_world_pos.y, 0f32, 1f32);
+                                    last_world_pos.x = tmp.x;
+                                    last_world_pos.y = tmp.y;
+                                    let tmp = inv_projection_transform * Vector4::new(curr_world_pos.x, curr_world_pos.y, 0f32, 1f32);
+                                    curr_world_pos.x = tmp.x;
+                                    curr_world_pos.y = tmp.y;
+
+                                    self.cam_pos += last_world_pos - curr_world_pos;
+
+                                    self.update_projection_transform();
+                                    self.draw();
+                                }
+
+                                last_mouse_pos = pos_vec;
                             }
                             WindowEvent::MouseWheel { delta, .. } => {
                                 use glium::glutin::MouseScrollDelta;
@@ -219,18 +265,7 @@ impl MainWindow {
                                     1.0 / (delta.abs() + 1.0)
                                 };
 
-                                // Calculate mouse pos in "world space"
-                                let window_size = self.display.gl_window().get_inner_size().unwrap();
-                                let window_center = Vector2::new(
-                                    window_size.0 as f32 * 0.5,
-                                    window_size.1 as f32 * 0.5,
-                                );
-                                let mut mouse_world = last_mouse_pos - window_center;
-                                mouse_world.y *= -1.0;
-                                mouse_world.div_assign_element_wise(Vector2::new(
-                                    window_size.0 as f32 * 0.5,
-                                    window_size.1 as f32 * 0.5,
-                                ));
+                                let mut mouse_world = get_mouse_proj(last_mouse_pos, self.display.gl_window().get_inner_size().unwrap());
 
                                 let transformed = self.projection_transform.invert().unwrap()
                                     * Vector4::new(mouse_world.x, mouse_world.y, 0.0, 1.0);
