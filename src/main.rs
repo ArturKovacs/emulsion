@@ -12,6 +12,7 @@ use std::env;
 use std::rc::Rc;
 use std::ffi::OsString;
 use std::thread;
+use std::time;
 use std::io::Write;
 
 use glium::{glutin, Surface};
@@ -34,9 +35,9 @@ struct Vertex {
 implement_vertex!(Vertex, position, tex_coords);
 
 struct MainWindow {
-    display: glium::Display,
-
     image_cache: ImageCache,
+
+    display: glium::Display,
 
     vertex_buffer: glium::VertexBuffer<Vertex>,
     index_buffer: glium::IndexBuffer<u16>,
@@ -134,8 +135,9 @@ impl MainWindow {
         };
 
         let mut resulting_window = MainWindow {
-            display,
             image_cache: ImageCache::new(cache_capaxity),
+            display,
+            
 
             vertex_buffer,
             index_buffer,
@@ -156,12 +158,15 @@ impl MainWindow {
     fn start_event_loop(&mut self, events_loop: &mut glutin::EventsLoop) {
         let mut last_mouse_pos = Vector2::new(0.0, 0.0);
 
+        #[derive(PartialEq)]
         enum LoadRequest {
             None,
             LoadNext,
             LoadPrevious,
             LoadSpecific(String),
         }
+        
+        let mut update_screen = false;
 
         // the main loop
         let mut running = true;
@@ -169,85 +174,89 @@ impl MainWindow {
             let mut load_request = LoadRequest::None;
             events_loop.poll_events(|event| {
                 match event {
-                    glutin::Event::WindowEvent { event, .. } => match event {
-                        // Break from the main loop when the window is closed.
-                        WindowEvent::Closed => running = false,
-                        WindowEvent::KeyboardInput { input, .. } => {
-                            if input.state == glutin::ElementState::Pressed {
-                                if let Some(keycode) = input.virtual_keycode {
-                                    match keycode {
-                                        VirtualKeyCode::Escape => running = false,
-                                        VirtualKeyCode::Right | VirtualKeyCode::Left => {
-                                            if keycode == VirtualKeyCode::Right {
-                                                load_request = LoadRequest::LoadNext;
-                                            } else {
-                                                load_request = LoadRequest::LoadPrevious;
+                    glutin::Event::WindowEvent { event, .. } => {
+                        //update_screen = true; // in case of any event at all, update the screen
+                        match event {
+                            // Break from the main loop when the window is closed.
+                            WindowEvent::Closed => running = false,
+                            WindowEvent::KeyboardInput { input, .. } => {
+                                if input.state == glutin::ElementState::Pressed {
+                                    if let Some(keycode) = input.virtual_keycode {
+                                        match keycode {
+                                            VirtualKeyCode::Escape => running = false,
+                                            VirtualKeyCode::Right | VirtualKeyCode::Left => {
+                                                if keycode == VirtualKeyCode::Right {
+                                                    load_request = LoadRequest::LoadNext;
+                                                } else {
+                                                    load_request = LoadRequest::LoadPrevious;
+                                                }
                                             }
+                                            _ => (),
                                         }
-                                        _ => (),
                                     }
                                 }
                             }
+                            WindowEvent::CursorMoved { position, .. } => {
+                                last_mouse_pos.x = position.0 as f32;
+                                last_mouse_pos.y = position.1 as f32;
+                            }
+                            WindowEvent::MouseWheel { delta, .. } => {
+                                use glium::glutin::MouseScrollDelta;
+                                let delta: f32 = match delta {
+                                    MouseScrollDelta::LineDelta(_, y) => {
+                                        println!("line");
+                                        y
+                                    }
+                                    MouseScrollDelta::PixelDelta(_, y) => {
+                                        println!("pixel");
+                                        y / 13.0
+                                    }
+                                };
+                                let delta = delta * 0.375;
+                                let delta = if delta > 0.0 {
+                                    delta + 1.0
+                                } else {
+                                    1.0 / (delta.abs() + 1.0)
+                                };
+
+                                // Calculate mouse pos in "world space"
+                                let window_size = self.display.gl_window().get_inner_size().unwrap();
+                                let window_center = Vector2::new(
+                                    window_size.0 as f32 * 0.5,
+                                    window_size.1 as f32 * 0.5,
+                                );
+                                let mut mouse_world = last_mouse_pos - window_center;
+                                mouse_world.y *= -1.0;
+                                mouse_world.div_assign_element_wise(Vector2::new(
+                                    window_size.0 as f32 * 0.5,
+                                    window_size.1 as f32 * 0.5,
+                                ));
+
+                                let transformed = self.projection_transform.invert().unwrap()
+                                    * Vector4::new(mouse_world.x, mouse_world.y, 0.0, 1.0);
+                                mouse_world.x = transformed.x;
+                                mouse_world.y = transformed.y;
+
+                                self.cam_pos += mouse_world * (1.0 - 1.0 / delta);
+                                self.zoom_scale *= delta;
+
+                                self.update_projection_transform();
+
+                                //println!("zoom_scale set to {}", self.zoom_scale);
+                                self.draw();
+                            }
+                            WindowEvent::Resized(..) => {
+                                self.update_projection_transform();
+
+                                self.draw()
+                            }
+                            _ => (),
                         }
-                        WindowEvent::CursorMoved { position, .. } => {
-                            last_mouse_pos.x = position.0 as f32;
-                            last_mouse_pos.y = position.1 as f32;
-                        }
-                        WindowEvent::MouseWheel { delta, .. } => {
-                            use glium::glutin::MouseScrollDelta;
-                            let delta: f32 = match delta {
-                                MouseScrollDelta::LineDelta(_, y) => {
-                                    println!("line");
-                                    y
-                                }
-                                MouseScrollDelta::PixelDelta(_, y) => {
-                                    println!("pixel");
-                                    y / 13.0
-                                }
-                            };
-                            let delta = delta * 0.375;
-                            let delta = if delta > 0.0 {
-                                delta + 1.0
-                            } else {
-                                1.0 / (delta.abs() + 1.0)
-                            };
-
-                            // Calculate mouse pos in "world space"
-                            let window_size = self.display.gl_window().get_inner_size().unwrap();
-                            let window_center = Vector2::new(
-                                window_size.0 as f32 * 0.5,
-                                window_size.1 as f32 * 0.5,
-                            );
-                            let mut mouse_world = last_mouse_pos - window_center;
-                            mouse_world.y *= -1.0;
-                            mouse_world.div_assign_element_wise(Vector2::new(
-                                window_size.0 as f32 * 0.5,
-                                window_size.1 as f32 * 0.5,
-                            ));
-
-                            let transformed = self.projection_transform.invert().unwrap()
-                                * Vector4::new(mouse_world.x, mouse_world.y, 0.0, 1.0);
-                            mouse_world.x = transformed.x;
-                            mouse_world.y = transformed.y;
-
-                            self.cam_pos += mouse_world * (1.0 - 1.0 / delta);
-                            self.zoom_scale *= delta;
-
-                            self.update_projection_transform();
-
-                            //println!("zoom_scale set to {}", self.zoom_scale);
-                            self.draw();
-                        }
-                        WindowEvent::Resized(..) => {
-                            self.update_projection_transform();
-
-                            self.draw()
-                        }
-                        _ => (),
                     },
                     _ => (),
                 }
             });
+            let should_sleep = load_request == LoadRequest::None && running;
             // Process long operations here
             let load_result = match load_request {
                 LoadRequest::LoadNext => Some(self.image_cache.load_next(&self.display)),
@@ -280,12 +289,16 @@ impl MainWindow {
                         writeln!(stderr).expect(stderr_errmsg);
                     }
                 }
+                
                 self.update_projection_transform();
                 self.draw();
             }
-
+            
             // Let other processes run for a bit.
-            thread::yield_now();
+            //thread::yield_now();
+            if should_sleep {
+                thread::sleep(time::Duration::from_millis(1));
+            }
         }
     }
 

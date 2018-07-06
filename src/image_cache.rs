@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 use std::thread;
+use std::time;
 use std::mem;
 use std::ffi::OsString;
 
@@ -88,7 +89,8 @@ impl ImageCache {
         // do this by stepping in both directions so that the cached images ahead of the file
         // should never be more than 1 + "cached images before the file"
         while running.load(Ordering::SeqCst) {
-            thread::yield_now();
+            //thread::yield_now();
+            thread::sleep(time::Duration::from_millis(1));
         }
     }
 
