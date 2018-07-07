@@ -192,7 +192,7 @@ impl MainWindow {
             events_loop.poll_events(|event| {
                 match event {
                     glutin::Event::Awakened => {
-                        self.draw();
+                        update_screen = true;
                     }
                     glutin::Event::WindowEvent { event, .. } => {
                         //update_screen = true; // in case of any event at all, update the screen
@@ -241,7 +241,7 @@ impl MainWindow {
                                     self.cam_pos += last_world_pos - curr_world_pos;
 
                                     self.update_projection_transform();
-                                    self.draw();
+                                    update_screen = true;
                                 }
 
                                 last_mouse_pos = pos_vec;
@@ -250,11 +250,11 @@ impl MainWindow {
                                 use glium::glutin::MouseScrollDelta;
                                 let delta: f32 = match delta {
                                     MouseScrollDelta::LineDelta(_, y) => {
-                                        println!("line");
+                                        //println!("line");
                                         y
                                     }
                                     MouseScrollDelta::PixelDelta(_, y) => {
-                                        println!("pixel");
+                                        //println!("pixel");
                                         y / 13.0
                                     }
                                 };
@@ -278,12 +278,12 @@ impl MainWindow {
                                 self.update_projection_transform();
 
                                 //println!("zoom_scale set to {}", self.zoom_scale);
-                                self.draw();
+                                update_screen = true;
                             }
                             WindowEvent::Resized(..) => {
                                 self.update_projection_transform();
 
-                                self.draw()
+                                update_screen = true;
                             }
                             _ => (),
                         }
@@ -291,7 +291,7 @@ impl MainWindow {
                     _ => (),
                 }
             });
-            let should_sleep = load_request == LoadRequest::None && running;
+            let should_sleep = load_request == LoadRequest::None && running && !update_screen;
             // Process long operations here
             let load_result = match load_request {
                 LoadRequest::LoadNext => Some(self.image_cache.load_next(&self.display)),
@@ -326,6 +326,10 @@ impl MainWindow {
                 }
                 
                 self.update_projection_transform();
+                update_screen = true;
+            }
+
+            if update_screen {
                 self.draw();
             }
             
