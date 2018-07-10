@@ -183,12 +183,12 @@ impl MainWindow {
             LoadSpecific(String),
         }
         
-        let mut update_screen = false;
-
         // the main loop
         let mut running = true;
         while running {
             let mut load_request = LoadRequest::None;
+            let mut update_screen = false;
+            let mut should_sleep = true;
             events_loop.poll_events(|event| {
                 match event {
                     glutin::Event::Awakened => {
@@ -242,6 +242,7 @@ impl MainWindow {
 
                                     self.update_projection_transform();
                                     update_screen = true;
+                                    should_sleep = false;
                                 }
 
                                 last_mouse_pos = pos_vec;
@@ -282,8 +283,7 @@ impl MainWindow {
                             }
                             WindowEvent::Resized(..) => {
                                 self.update_projection_transform();
-
-                                update_screen = true;
+                                self.draw(); // Update immediately on resize.
                             }
                             _ => (),
                         }
@@ -291,7 +291,7 @@ impl MainWindow {
                     _ => (),
                 }
             });
-            let should_sleep = load_request == LoadRequest::None && running && !update_screen;
+            //let should_sleep = load_request == LoadRequest::None && running && !update_screen;
             // Process long operations here
             let load_result = match load_request {
                 LoadRequest::LoadNext => Some(self.image_cache.load_next(&self.display)),
@@ -327,6 +327,7 @@ impl MainWindow {
                 
                 self.update_projection_transform();
                 update_screen = true;
+                should_sleep = false;
             }
 
             if update_screen {
