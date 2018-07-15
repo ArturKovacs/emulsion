@@ -438,4 +438,7 @@ fn main() {
     let mut events_loop = glutin::EventsLoop::new();
     let mut main_window = MainWindow::init(&events_loop);
     main_window.start_event_loop(&mut events_loop);
+
+    // Just let the OS do the cleanup :D
+    //std::mem::forget(main_window);
 }
