@@ -9,19 +9,20 @@ extern crate image;
 extern crate sys_info;
 
 use std::env;
-use std::rc::Rc;
 use std::ffi::OsString;
+use std::io::Write;
+use std::rc::Rc;
 use std::thread;
 use std::time;
-use std::io::Write;
+use std::time::{Duration, Instant};
 
-use glium::{glutin, Surface};
-use glium::index::PrimitiveType;
 use glium::glutin::{VirtualKeyCode, WindowEvent};
+use glium::index::PrimitiveType;
+use glium::{glutin, Surface};
 
-use cgmath::{Matrix4, Vector2, Vector4};
-use cgmath::SquareMatrix;
 use cgmath::ElementWise;
+use cgmath::SquareMatrix;
+use cgmath::{Matrix4, Vector2, Vector4};
 
 mod image_cache;
 use image_cache::ImageCache;
@@ -126,27 +127,22 @@ impl MainWindow {
             Ok(value) => {
                 // value originally reported in KiB
                 ((value.total / 8) * 1024) as isize
-            },
+            }
             _ => {
                 println!("Could not get system memory size, using default value");
                 // bytes
                 500_000_000
-            },
+            }
         };
 
         let thread_count = match sys_info::cpu_num() {
-            Ok(value) => {
-                value.max(2).min(4)
-            }
-            _ => {
-                4
-            }
+            Ok(value) => value.max(2).min(4),
+            _ => 4,
         };
 
         let mut resulting_window = MainWindow {
             image_cache: ImageCache::new(cache_capaxity, thread_count),
             display,
-            
 
             vertex_buffer,
             index_buffer,
@@ -171,10 +167,8 @@ impl MainWindow {
         let get_mouse_proj = |mouse_screen: Vector2<f32>, window_size: (u32, u32)| {
             // Calculate mouse pos in "world space"
             //let window_size = self.display.gl_window().get_inner_size().unwrap();
-            let window_center = Vector2::new(
-                window_size.0 as f32 * 0.5,
-                window_size.1 as f32 * 0.5,
-            );
+            let window_center =
+                Vector2::new(window_size.0 as f32 * 0.5, window_size.1 as f32 * 0.5);
             let mut mouse_world = mouse_screen - window_center;
             mouse_world.y *= -1.0;
             mouse_world.div_assign_element_wise(Vector2::new(
@@ -190,8 +184,26 @@ impl MainWindow {
             LoadNext,
             LoadPrevious,
             LoadSpecific(String),
+            Jump(i32)
         }
-        
+
+        #[derive(PartialEq)]
+        enum PlaybackState {
+            Paused,
+            Forward,
+            //Backward,
+        }
+
+        let mut playback_state = PlaybackState::Paused;
+        //let mut last_frame_time = Instant::now();
+        let mut playback_start_time = Instant::now();
+        let mut frame_count_since_playback_start = 0;
+
+        //let framerate = 29.97;
+        let framerate = 25.0;
+        const NANOS_PER_SEC: u64 = 1000_000_000;
+        let mut frame_delta_time_nanos = (NANOS_PER_SEC as f64 / framerate) as u64;
+
         // the main loop
         let mut running = true;
         while running {
@@ -209,8 +221,8 @@ impl MainWindow {
                             // Break from the main loop when the window is closed.
                             WindowEvent::Closed => running = false,
                             WindowEvent::KeyboardInput { input, .. } => {
-                                if input.state == glutin::ElementState::Pressed {
-                                    if let Some(keycode) = input.virtual_keycode {
+                                if let Some(keycode) = input.virtual_keycode {
+                                    if input.state == glutin::ElementState::Pressed {
                                         match keycode {
                                             VirtualKeyCode::Escape => running = false,
                                             VirtualKeyCode::Right | VirtualKeyCode::Left => {
@@ -220,12 +232,23 @@ impl MainWindow {
                                                     load_request = LoadRequest::LoadPrevious;
                                                 }
                                             }
+                                            VirtualKeyCode::Space => {
+                                                playback_state =
+                                                    if playback_state == PlaybackState::Forward {
+                                                        PlaybackState::Paused
+                                                    } else {
+                                                        playback_start_time = Instant::now();
+                                                        frame_count_since_playback_start = 0;
+                                                        PlaybackState::Forward
+                                                    };
+                                            }
                                             _ => (),
                                         }
+                                    } else {
                                     }
                                 }
                             }
-                            WindowEvent::MouseInput {state, button, ..} => {
+                            WindowEvent::MouseInput { state, button, .. } => {
                                 if button == glutin::MouseButton::Left {
                                     left_mouse_down = state == glutin::ElementState::Pressed;
                                 }
@@ -234,16 +257,31 @@ impl MainWindow {
                                 let pos_vec = Vector2::new(position.0 as f32, position.1 as f32);
                                 // Update transform
                                 if left_mouse_down {
-                                    let inv_projection_transform = self.projection_transform.invert().unwrap();
+                                    let inv_projection_transform =
+                                        self.projection_transform.invert().unwrap();
 
-                                    let window_size = self.display.gl_window().get_inner_size().unwrap();
-                                    let mut last_world_pos = get_mouse_proj(last_mouse_pos, window_size);
+                                    let window_size =
+                                        self.display.gl_window().get_inner_size().unwrap();
+                                    let mut last_world_pos =
+                                        get_mouse_proj(last_mouse_pos, window_size);
                                     let mut curr_world_pos = get_mouse_proj(pos_vec, window_size);
 
-                                    let tmp = inv_projection_transform * Vector4::new(last_world_pos.x, last_world_pos.y, 0f32, 1f32);
+                                    let tmp = inv_projection_transform
+                                        * Vector4::new(
+                                            last_world_pos.x,
+                                            last_world_pos.y,
+                                            0f32,
+                                            1f32,
+                                        );
                                     last_world_pos.x = tmp.x;
                                     last_world_pos.y = tmp.y;
-                                    let tmp = inv_projection_transform * Vector4::new(curr_world_pos.x, curr_world_pos.y, 0f32, 1f32);
+                                    let tmp = inv_projection_transform
+                                        * Vector4::new(
+                                            curr_world_pos.x,
+                                            curr_world_pos.y,
+                                            0f32,
+                                            1f32,
+                                        );
                                     curr_world_pos.x = tmp.x;
                                     curr_world_pos.y = tmp.y;
 
@@ -275,7 +313,10 @@ impl MainWindow {
                                     1.0 / (delta.abs() + 1.0)
                                 };
 
-                                let mut mouse_world = get_mouse_proj(last_mouse_pos, self.display.gl_window().get_inner_size().unwrap());
+                                let mut mouse_world = get_mouse_proj(
+                                    last_mouse_pos,
+                                    self.display.gl_window().get_inner_size().unwrap(),
+                                );
 
                                 let transformed = self.projection_transform.invert().unwrap()
                                     * Vector4::new(mouse_world.x, mouse_world.y, 0.0, 1.0);
@@ -296,10 +337,34 @@ impl MainWindow {
                             }
                             _ => (),
                         }
-                    },
+                    }
                     _ => (),
                 }
             });
+
+            if playback_state != PlaybackState::Paused {
+                let elapsed = playback_start_time.elapsed();
+                let elapsed_nanos = elapsed.as_secs() * NANOS_PER_SEC + elapsed.subsec_nanos() as u64;
+                let frame_step = ((elapsed_nanos / frame_delta_time_nanos) - frame_count_since_playback_start);
+                if frame_step > 0 {
+                    load_request = match playback_state {
+                        PlaybackState::Forward => LoadRequest::Jump(frame_step as i32),
+                        //PlaybackState::Backward => LoadRequest::Jump(-(frame_step as i32)),
+                        PlaybackState::Paused => unreachable!(),
+                    };
+                    frame_count_since_playback_start += frame_step;
+                }
+                else {
+                    self.image_cache.process_prefetched(&self.display);
+
+                    let nanos_since_last = elapsed_nanos % frame_delta_time_nanos;
+                    if nanos_since_last > (frame_delta_time_nanos as f64 * 0.8) as u64 {
+                        // Just buisy wait if we are getting very close to the next frame swap
+                        should_sleep = false;
+                    }
+                }
+            }
+
             //let should_sleep = load_request == LoadRequest::None && running && !update_screen;
             // Process long operations here
             let load_result = match load_request {
@@ -310,6 +375,7 @@ impl MainWindow {
                         .load_specific(&self.display, filename.as_str())
                         .map(|x| (x, OsString::from(filename))),
                 ),
+                LoadRequest::Jump(jump_count) => Some(self.image_cache.load_jump(&self.display, jump_count)),
                 LoadRequest::None => None,
             };
             if let Some(result) = load_result {
@@ -323,7 +389,8 @@ impl MainWindow {
                         self.set_title_filename("[none]");
                         let stderr = &mut ::std::io::stderr();
                         let stderr_errmsg = "Error writing to stderr";
-                        writeln!(stderr, "Error occured while loading image: {}", err).expect(stderr_errmsg);
+                        writeln!(stderr, "Error occured while loading image: {}", err)
+                            .expect(stderr_errmsg);
                         for e in err.iter().skip(1) {
                             writeln!(stderr, "... caused by: {}", e).expect(stderr_errmsg);
                         }
@@ -333,7 +400,7 @@ impl MainWindow {
                         writeln!(stderr).expect(stderr_errmsg);
                     }
                 }
-                
+
                 self.update_projection_transform();
                 update_screen = true;
                 should_sleep = false;
@@ -342,11 +409,11 @@ impl MainWindow {
             if update_screen {
                 self.draw();
             }
-            
+
             // Let other processes run for a bit.
             //thread::yield_now();
             if should_sleep {
-                thread::sleep(time::Duration::from_millis(1));
+                thread::sleep(Duration::from_millis(1));
             }
         }
     }

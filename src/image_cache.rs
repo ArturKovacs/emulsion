@@ -1,14 +1,14 @@
-use std::fs;
-use std::path::{Path, PathBuf};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use std::sync::mpsc::{Sender, Receiver, channel};
+use std::ffi::OsString;
+use std::fs;
+use std::mem;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time;
-use std::mem;
-use std::ffi::OsString;
 
 use std::iter;
 
@@ -19,9 +19,9 @@ use glium::texture::{RawImage2d, SrgbTexture2d};
 use image;
 
 pub mod errors {
-    use std::io;
     use glium::texture;
     use image;
+    use std::io;
 
     error_chain!{
         foreign_links {
@@ -52,7 +52,7 @@ pub struct ImageCache {
     join_handles: Option<Vec<thread::JoinHandle<()>>>,
 
     image_rx: Receiver<(PathBuf, fs::Metadata, image::RgbaImage)>,
-    path_tx: Sender<PathBuf>
+    path_tx: Sender<PathBuf>,
 }
 
 /// This is a store for the supported images loaded from a folder
@@ -94,14 +94,14 @@ impl ImageCache {
             join_handles: Some(join_handles),
 
             image_rx: loaded_img_rx,
-            path_tx: load_request_tx
+            path_tx: load_request_tx,
         }
     }
 
     fn thread_loop(
         running: Arc<AtomicBool>,
         load_request_rx: Arc<Mutex<Receiver<PathBuf>>>,
-        loaded_img_tx: Sender<(PathBuf, fs::Metadata, image::RgbaImage)>
+        loaded_img_tx: Sender<(PathBuf, fs::Metadata, image::RgbaImage)>,
     ) {
         // walk the directory starting from the current item and cache in all the images
         // do this by stepping in both directions so that the cached images ahead of the file
@@ -111,8 +111,7 @@ impl ImageCache {
                 let load_request = load_request_rx.lock().unwrap();
                 if let Some(path) = load_request.recv().ok() {
                     path
-                }
-                else {
+                } else {
                     return;
                 }
             };
@@ -134,14 +133,15 @@ impl ImageCache {
         }
     }
 
-    fn process_from_channel(&mut self, display: &glium::Display) -> Result<()> {
+    pub fn process_prefetched(&mut self, display: &glium::Display) -> Result<()> {
         use std::collections::hash_map::Entry;
         use std::sync::mpsc::TryRecvError;
 
         loop {
             match self.image_rx.try_recv() {
                 Ok((path, metadata, image)) => {
-                    let size_estimate = Self::get_image_size_estimate((image.width(), image.height())) as isize;
+                    let size_estimate =
+                        Self::get_image_size_estimate((image.width(), image.height())) as isize;
                     match self.texture_cache.entry(path) {
                         Entry::Vacant(entry) => {
                             let texture = Rc::new(Self::texture_from_image(display, image)?);
@@ -152,7 +152,10 @@ impl ImageCache {
                             if entry.get().0.modified().unwrap() < metadata.modified().unwrap() {
                                 let old_size_estimate = {
                                     let old_image = &entry.get().1;
-                                    Self::get_image_size_estimate((old_image.width(), old_image.height())) as isize
+                                    Self::get_image_size_estimate((
+                                        old_image.width(),
+                                        old_image.height(),
+                                    )) as isize
                                 };
                                 let texture = Rc::new(Self::texture_from_image(display, image)?);
                                 entry.get_mut().0 = metadata;
@@ -189,13 +192,18 @@ impl ImageCache {
         while estimated_remaining_cap > self.curr_est_size as isize {
             // Send a load request for the closest file not in the cache or outdated
             if let Some(file) = iter.next() {
-                match self.texture_cache.entry(file.path()) {
+                let file_path = file.path();
+                match self.texture_cache.entry(file_path.clone()) {
                     Entry::Vacant(_) => {
-                        self.path_tx.send(file.path()).unwrap();
-                    },
-                    Entry::Occupied(entry) => {
-                        if entry.get().0.modified().unwrap() != file.metadata().unwrap().modified().unwrap() {
+                        if Self::is_file_supported(file_path.as_ref()) {
                             self.path_tx.send(file.path()).unwrap();
+                        }
+                    }
+                    Entry::Occupied(entry) => {
+                        if entry.get().0.modified().unwrap()
+                            != file.metadata().unwrap().modified().unwrap()
+                        {
+                            self.path_tx.send(file_path).unwrap();
                         }
                     }
                 }
@@ -204,8 +212,7 @@ impl ImageCache {
                 if requested_images >= Self::MAX_BULK_PREFETCH_REQUEST {
                     break;
                 }
-            }
-            else {
+            } else {
                 break;
             }
         }
@@ -223,11 +230,14 @@ impl ImageCache {
 
         self.current_name = match path.file_name() {
             Some(filename) => filename.to_owned(),
-            None => bail!(format!("Could not get filename for path '{}'", path.to_str().unwrap())),
+            None => bail!(format!(
+                "Could not get filename for path '{}'",
+                path.to_str().unwrap()
+            )),
         };
 
         // Lets just process incoming images
-        self.process_from_channel(display)?;
+        self.process_prefetched(display)?;
 
         // Check if it is inside the texture cache first
         {
@@ -243,7 +253,8 @@ impl ImageCache {
         self.dir_path = path.parent().unwrap().to_owned(); // It absolutely must have a parent if it was a file
 
         let image = Self::load_image(path.as_path())?;
-        self.curr_est_size = Self::get_image_size_estimate((image.width(), image.height())) as usize;
+        self.curr_est_size =
+            Self::get_image_size_estimate((image.width(), image.height())) as usize;
         let image_size_estimate = self.curr_est_size as isize;
         let dir_files: Vec<_> = fs::read_dir(self.dir_path.as_path())?
             .filter_map(|x| {
@@ -253,7 +264,8 @@ impl ImageCache {
                 } else {
                     None
                 }
-            }).collect();
+            })
+            .collect();
         if self.remaining_capacity < image_size_estimate {
             // Find the position of the current file in the directory
             let mut current_pos = 0;
@@ -265,24 +277,30 @@ impl ImageCache {
                 }
             }
 
-            let mut cached_ordered: Vec<_> = dir_files.iter().filter_map(|file| {
-                let path = file.path();
-                if self.texture_cache.contains_key(&path) {
-                    Some(path)
-                } else {
-                    None
-                }
-            }).enumerate().collect();
+            let mut cached_ordered: Vec<_> = dir_files
+                .iter()
+                .filter_map(|file| {
+                    let path = file.path();
+                    if self.texture_cache.contains_key(&path) {
+                        Some(path)
+                    } else {
+                        None
+                    }
+                })
+                .enumerate()
+                .collect();
 
             // And there is just one more thing left to do...
             // Walk through our list of directory entries sorted by their distance from the current
             // file and in each step remove an entry from the cache until we reach the desired cache
             // size
             for (file_pos, file) in cached_ordered.into_iter() {
-                if self.remaining_capacity < image_size_estimate &&
-                    file_pos < current_pos {
+                if self.remaining_capacity < image_size_estimate && file_pos < current_pos {
                     if let Entry::Occupied(entry) = self.texture_cache.entry(file) {
-                        let size_estimate = Self::get_image_size_estimate((entry.get().1.width(), entry.get().1.height())) as isize;
+                        let size_estimate = Self::get_image_size_estimate((
+                            entry.get().1.width(),
+                            entry.get().1.height(),
+                        )) as isize;
                         entry.remove();
                         self.remaining_capacity += size_estimate;
                     }
@@ -320,6 +338,98 @@ impl ImageCache {
             .map(|x| x.unwrap())
             .collect();
         self.load_iter_next(display, elements.iter().chain(elements.iter()).rev())
+    }
+
+    pub fn load_jump(
+        &mut self,
+        display: &glium::Display,
+        jump_count: i32,
+    ) -> Result<(Rc<SrgbTexture2d>, OsString)> {
+        if jump_count == 0 {
+            return Ok((
+                self.texture_cache
+                    .get(self.dir_path.join(self.current_name.clone()).as_path())
+                    .ok_or(Error::from("Could not find current file in cache."))?
+                    .1
+                    .clone(),
+                self.current_name.clone(),
+            ));
+        }
+
+        let elements: Vec<_> = fs::read_dir(self.dir_path.as_path())
+            .unwrap()
+            .map(|x| x.unwrap())
+            .collect();
+
+        if jump_count < 0 {
+            return self.load_iter_jump(
+                display,
+                elements.iter().chain(elements.iter()).rev(),
+                -jump_count as u32,
+            );
+        }
+
+        return self.load_iter_jump(
+            display,
+            elements.iter().chain(elements.iter()),
+            jump_count as u32,
+        );
+    }
+
+    fn load_iter_jump<'a, IterT>(
+        &mut self,
+        display: &glium::Display,
+        mut entries_twice: IterT,
+        jump_count: u32,
+    ) -> Result<(Rc<SrgbTexture2d>, OsString)>
+    where
+        IterT: iter::Iterator<Item = &'a fs::DirEntry>,
+    {
+        let mut jump_remaining = jump_count;
+        'finding_current: while let Some(curr_file) = entries_twice.next() {
+            if curr_file.file_type()?.is_file() {
+                if curr_file.file_name() == self.current_name {
+                    // Find next file
+                    'finding_target: while let Some(next) = entries_twice.next() {
+                        if next.file_type().unwrap().is_file() {
+                            let next_filepath = next.path();
+                            if Self::is_file_supported(next_filepath.as_ref()) {
+                                if jump_remaining == 0 {
+                                    let next_filepath_str = next_filepath.to_str().unwrap();
+                                    match self.load_specific(display, next_filepath_str) {
+                                        Err(Error(ErrorKind::ImageLoadError(err), ..)) => {
+                                            // The file has to be supported at this point
+                                            return Err(Error::from(
+                                                format!("Image file should have been supported but it is not. ('{}')", next_filepath_str),
+                                            ));
+                                        }
+                                        Err(err) => {
+                                            // Some other error occured, it is a bad sign,
+                                            // just return the error
+                                            return Err(err);
+                                        }
+                                        Ok(result) => {
+                                            return Ok((
+                                                result,
+                                                next_filepath.file_name().unwrap().to_owned(),
+                                            ));
+                                        }
+                                    }
+                                } else {
+                                    jump_remaining -= 1;
+                                }
+                            }
+                        }
+                    }
+
+                    return Err(Error::from("Couldn't jump to the requested file."));
+                }
+            }
+        }
+
+        Err(Error::from(
+            "Couldn't find the current file in the the directory",
+        ))
     }
 
     ///
@@ -405,6 +515,22 @@ impl ImageCache {
         // but only the gpu textures have mip maps so just multiply by 1.5
         ((dimensions.0 * dimensions.1 * 4) as f32 * 1.5) as u32
     }
+
+    fn is_file_supported(filename: &Path) -> bool {
+        if let Some(ext) = filename.extension() {
+            if let Some(ext) = ext.to_str() {
+                let ext = ext.to_lowercase();
+                match ext.as_str() {
+                    "png" | "jpg" | "bmp" | "gif" | "tiff" | "webp" | "pnm" => {
+                        return true;
+                    }
+                    _ => (),
+                }
+            }
+        }
+
+        false
+    }
 }
 
 impl Drop for ImageCache {
@@ -420,10 +546,10 @@ impl Drop for ImageCache {
                 for mut handle in join_handles.into_iter() {
                     match handle.join() {
                         Err(err) => eprintln!("Error occured while joining handle {:?}", err),
-                        _ => ()
+                        _ => (),
                     }
                 }
-            },
+            }
             _ => (),
         }
     }
