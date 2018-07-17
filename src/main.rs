@@ -123,7 +123,7 @@ impl MainWindow {
         ).unwrap();
 
         let cache_capaxity = match sys_info::mem_info() {
-            ::std::result::Result::Ok(value) => {
+            Ok(value) => {
                 // value originally reported in KiB
                 ((value.total / 8) * 1024) as isize
             },
@@ -134,8 +134,17 @@ impl MainWindow {
             },
         };
 
+        let thread_count = match sys_info::cpu_num() {
+            Ok(value) => {
+                value.max(2).min(4)
+            }
+            _ => {
+                4
+            }
+        };
+
         let mut resulting_window = MainWindow {
-            image_cache: ImageCache::new(cache_capaxity),
+            image_cache: ImageCache::new(cache_capaxity, thread_count),
             display,
             
 

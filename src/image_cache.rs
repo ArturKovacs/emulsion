@@ -49,7 +49,7 @@ pub struct ImageCache {
     remaining_capacity: isize,
     //loader_cache: HashMap<PathBuf, (fs::Metadata, LoaderImage)>,
     texture_cache: HashMap<PathBuf, (fs::Metadata, Rc<SrgbTexture2d>)>,
-    join_handle: Option<thread::JoinHandle<()>>,
+    join_handles: Option<Vec<thread::JoinHandle<()>>>,
 
     image_rx: Receiver<(PathBuf, fs::Metadata, image::RgbaImage)>,
     path_tx: Sender<PathBuf>
@@ -58,9 +58,11 @@ pub struct ImageCache {
 /// This is a store for the supported images loaded from a folder
 /// The basic idea is to have a few images already in the memory while an image is shown on the screen
 impl ImageCache {
+    const MAX_BULK_PREFETCH_REQUEST: i32 = 4;
+
     /// # Arguemnts
     /// * `capacity` - Number of bytes. The last image loaded will be the one at which the allocated memory reaches or exceeds capacity
-    pub fn new(capacity: isize) -> ImageCache {
+    pub fn new(capacity: isize, threads: u32) -> ImageCache {
         let running = Arc::new(AtomicBool::from(true));
         //let loader_cache = HashMap::new();
 
@@ -69,15 +71,16 @@ impl ImageCache {
 
         let (loaded_img_tx, loaded_img_rx) = channel();
 
-        let join_handle = Some({
+        let mut join_handles = Vec::new();
+        for _ in 0..threads {
             let mut running = running.clone();
-            //let mut cache = loader_cache.clone();
             let mut load_request_rx = load_request_rx.clone();
+            let mut loaded_img_tx = loaded_img_tx.clone();
 
-            thread::spawn(move || {
-                Self::thread_loop(running, load_request_rx, loaded_img_tx.clone());
-            })
-        });
+            join_handles.push(thread::spawn(move || {
+                Self::thread_loop(running, load_request_rx, loaded_img_tx);
+            }));
+        }
 
         ImageCache {
             dir_path: PathBuf::new(),
@@ -88,7 +91,7 @@ impl ImageCache {
             remaining_capacity: capacity,
             //loader_cache,
             texture_cache: HashMap::new(),
-            join_handle,
+            join_handles: Some(join_handles),
 
             image_rx: loaded_img_rx,
             path_tx: load_request_tx
@@ -198,7 +201,7 @@ impl ImageCache {
                 }
                 estimated_remaining_cap -= self.curr_est_size as isize;
                 requested_images += 1;
-                if requested_images >= 6 {
+                if requested_images >= Self::MAX_BULK_PREFETCH_REQUEST {
                     break;
                 }
             }
@@ -407,15 +410,21 @@ impl ImageCache {
 impl Drop for ImageCache {
     fn drop(&mut self) {
         self.running.store(false, Ordering::SeqCst);
-        self.path_tx.send(PathBuf::from("")).unwrap();
-        match self.join_handle.take() {
-            Some(handle) => {
-                match handle.join() {
-                    Err(err) => eprintln!("Error occured while joining handle {:?}", err),
-                    _ => ()
+
+        match self.join_handles.take() {
+            Some(mut join_handles) => {
+                for _ in join_handles.iter() {
+                    self.path_tx.send(PathBuf::from("")).unwrap();
+                }
+
+                for mut handle in join_handles.into_iter() {
+                    match handle.join() {
+                        Err(err) => eprintln!("Error occured while joining handle {:?}", err),
+                        _ => ()
+                    }
                 }
             },
-            None => (),
+            _ => (),
         }
     }
 }
