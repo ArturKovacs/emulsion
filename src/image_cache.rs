@@ -394,6 +394,10 @@ impl ImageCache {
                         if next.file_type().unwrap().is_file() {
                             let next_filepath = next.path();
                             if Self::is_file_supported(next_filepath.as_ref()) {
+                                if jump_remaining > 0 {
+                                    jump_remaining -= 1;
+                                }
+                                
                                 if jump_remaining == 0 {
                                     let next_filepath_str = next_filepath.to_str().unwrap();
                                     match self.load_specific(display, next_filepath_str) {
@@ -415,8 +419,6 @@ impl ImageCache {
                                             ));
                                         }
                                     }
-                                } else {
-                                    jump_remaining -= 1;
                                 }
                             }
                         }
