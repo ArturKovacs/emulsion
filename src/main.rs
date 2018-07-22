@@ -184,7 +184,7 @@ impl MainWindow {
             LoadNext,
             LoadPrevious,
             LoadSpecific(String),
-            Jump(i32)
+            Jump(i32),
         }
 
         #[derive(PartialEq)]
@@ -241,6 +241,12 @@ impl MainWindow {
                                                         frame_count_since_playback_start = 0;
                                                         PlaybackState::Forward
                                                     };
+                                            }
+                                            VirtualKeyCode::R => {
+                                                self.zoom_scale = 1.0;
+                                                self.cam_pos = Vector2::new(0.0, 0.0);
+                                                self.update_projection_transform();
+                                                update_screen = true;
                                             }
                                             _ => (),
                                         }
@@ -342,10 +348,15 @@ impl MainWindow {
                 }
             });
 
-            if playback_state != PlaybackState::Paused {
+            if playback_state == PlaybackState::Paused {
+                self.image_cache.process_prefetched(&self.display).unwrap();
+                self.image_cache.send_load_requests();
+            } else {
                 let elapsed = playback_start_time.elapsed();
-                let elapsed_nanos = elapsed.as_secs() * NANOS_PER_SEC + elapsed.subsec_nanos() as u64;
-                let frame_step = ((elapsed_nanos / frame_delta_time_nanos) - frame_count_since_playback_start);
+                let elapsed_nanos =
+                    elapsed.as_secs() * NANOS_PER_SEC + elapsed.subsec_nanos() as u64;
+                let frame_step =
+                    ((elapsed_nanos / frame_delta_time_nanos) - frame_count_since_playback_start);
                 if frame_step > 0 {
                     load_request = match playback_state {
                         PlaybackState::Forward => LoadRequest::Jump(frame_step as i32),
@@ -353,14 +364,18 @@ impl MainWindow {
                         PlaybackState::Paused => unreachable!(),
                     };
                     frame_count_since_playback_start += frame_step;
-                }
-                else {
-                    self.image_cache.process_prefetched(&self.display);
+                } else {
+                    self.image_cache.process_prefetched(&self.display).unwrap();
 
                     let nanos_since_last = elapsed_nanos % frame_delta_time_nanos;
-                    if nanos_since_last > (frame_delta_time_nanos as f64 * 0.8) as u64 {
+                    const BUISY_WAIT_TRESHOLD: f32 = 0.8;
+                    if nanos_since_last
+                        > (frame_delta_time_nanos as f32 * BUISY_WAIT_TRESHOLD) as u64
+                    {
                         // Just buisy wait if we are getting very close to the next frame swap
                         should_sleep = false;
+                    } else {
+                        self.image_cache.send_load_requests();
                     }
                 }
             }
@@ -370,12 +385,14 @@ impl MainWindow {
             let load_result = match load_request {
                 LoadRequest::LoadNext => Some(self.image_cache.load_next(&self.display)),
                 LoadRequest::LoadPrevious => Some(self.image_cache.load_prev(&self.display)),
-                LoadRequest::LoadSpecific(filename) => Some(
+                LoadRequest::LoadSpecific(ref filename) => Some(
                     self.image_cache
                         .load_specific(&self.display, filename.as_str())
                         .map(|x| (x, OsString::from(filename))),
                 ),
-                LoadRequest::Jump(jump_count) => Some(self.image_cache.load_jump(&self.display, jump_count)),
+                LoadRequest::Jump(jump_count) => {
+                    Some(self.image_cache.load_jump(&self.display, jump_count))
+                }
                 LoadRequest::None => None,
             };
             if let Some(result) = load_result {
@@ -408,6 +425,10 @@ impl MainWindow {
 
             if update_screen {
                 self.draw();
+            }
+
+            if load_request != LoadRequest::None {
+                self.image_cache.update_directory().unwrap();
             }
 
             // Let other processes run for a bit.

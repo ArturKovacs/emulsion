@@ -5,6 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="3befee56-0519-440a-8c3c-c96aa9c7baa7" name="Default" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/image_cache.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/image_cache.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.rs" afterDir="false" />
     </list>
@@ -20,11 +21,11 @@
       <file leaf-file-name="main.rs" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/main.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="344">
-              <caret line="363" column="21" lean-forward="true" selection-start-line="363" selection-start-column="21" selection-end-line="363" selection-end-column="21" />
+            <state relative-caret-position="416">
+              <caret line="252" column="44" lean-forward="true" selection-start-line="252" selection-start-column="44" selection-end-line="252" selection-end-column="44" />
               <folding>
-                <element signature="e#15987#15988#0" expanded="true" />
-                <element signature="e#16041#16042#0" expanded="true" />
+                <element signature="e#19452#19453#0" expanded="true" />
+                <element signature="e#19506#19507#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -33,8 +34,8 @@
       <file leaf-file-name="image_cache.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/image_cache.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="448">
-              <caret line="140" column="21" selection-start-line="140" selection-start-column="21" selection-end-line="140" selection-end-column="21" />
+            <state relative-caret-position="389">
+              <caret line="638" selection-start-line="638" selection-end-line="638" />
             </state>
           </provider>
         </entry>
@@ -59,8 +60,11 @@
       <find>AtomicI64</find>
       <find>result</find>
       <find>get_image_size_estimate</find>
-      <find>current_name</find>
       <find>load_specific</find>
+      <find>send_load_requests</find>
+      <find>texture_cache</find>
+      <find>dir_path</find>
+      <find>current_name</find>
     </findStrings>
     <replaceStrings>
       <replace>AtomicIsize</replace>
@@ -85,8 +89,8 @@
     </option>
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="375" />
-    <option name="y" value="27" />
+    <option name="x" value="246" />
+    <option name="y" value="52" />
     <option name="width" value="1540" />
     <option name="height" value="1017" />
   </component>
@@ -99,7 +103,6 @@
     </navigator>
     <panes>
       <pane id="Scope" />
-      <pane id="PackagesPane" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -116,11 +119,13 @@
           <select />
         </subPane>
       </pane>
+      <pane id="PackagesPane" />
     </panes>
   </component>
   <component name="PropertiesComponent">
     <property name="last_opened_file_path" value="$PROJECT_DIR$/Cargo.toml" />
     <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
+    <property name="settings.editor.selected.configurable" value="preferences.lookFeel" />
   </component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
@@ -192,30 +197,30 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="375" y="27" width="1540" height="1017" extended-state="0" />
+    <frame x="246" y="52" width="1540" height="1017" extended-state="0" />
     <editor active="true" />
     <layout>
       <window_info id="Designer" order="2" />
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.24297188" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.24631861" />
       <window_info anchor="bottom" id="TODO" order="6" />
       <window_info anchor="right" id="Cargo" order="3" weight="0.32931727" />
       <window_info anchor="right" id="Palette&#9;" order="3" />
-      <window_info anchor="bottom" id="Event Log" order="7" side_tool="true" weight="0.32963374" />
-      <window_info active="true" anchor="bottom" id="Run" order="2" visible="true" weight="0.23603192" />
+      <window_info anchor="bottom" id="Event Log" order="7" side_tool="true" weight="0.3211111" />
       <window_info anchor="bottom" id="Version Control" order="7" />
+      <window_info anchor="bottom" id="Run" order="2" weight="0.22120866" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
-      <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info id="Favorites" order="2" side_tool="true" />
+      <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="right" id="Commander" order="0" weight="0.4" />
       <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
-      <window_info anchor="bottom" id="Messages" order="7" />
+      <window_info anchor="bottom" id="Terminal" order="7" weight="0.32768363" />
+      <window_info anchor="bottom" id="Python Console" order="7" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Find" order="1" />
-      <window_info anchor="bottom" id="Terminal" order="7" weight="0.32768363" />
-      <window_info anchor="bottom" id="Python Console" order="7" />
+      <window_info anchor="bottom" id="Messages" order="7" />
     </layout>
   </component>
   <component name="VcsContentAnnotationSettings">
@@ -525,18 +530,18 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/image_cache.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="448">
-          <caret line="140" column="21" selection-start-line="140" selection-start-column="21" selection-end-line="140" selection-end-column="21" />
+        <state relative-caret-position="389">
+          <caret line="638" selection-start-line="638" selection-end-line="638" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/main.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="344">
-          <caret line="363" column="21" lean-forward="true" selection-start-line="363" selection-start-column="21" selection-end-line="363" selection-end-column="21" />
+        <state relative-caret-position="416">
+          <caret line="252" column="44" lean-forward="true" selection-start-line="252" selection-start-column="44" selection-end-line="252" selection-end-column="44" />
           <folding>
-            <element signature="e#15987#15988#0" expanded="true" />
-            <element signature="e#16041#16042#0" expanded="true" />
+            <element signature="e#19452#19453#0" expanded="true" />
+            <element signature="e#19506#19507#0" expanded="true" />
           </folding>
         </state>
       </provider>
