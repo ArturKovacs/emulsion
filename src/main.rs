@@ -11,14 +11,15 @@ extern crate sys_info;
 use std::env;
 use std::ffi::OsString;
 use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::thread;
-use std::time;
 use std::time::{Duration, Instant};
 
 use glium::glutin::{VirtualKeyCode, WindowEvent};
 use glium::index::PrimitiveType;
 use glium::{glutin, Surface};
+use glium::glutin::dpi::LogicalSize;
 
 use cgmath::ElementWise;
 use cgmath::SquareMatrix;
@@ -64,7 +65,7 @@ impl MainWindow {
 
         let window = glutin::WindowBuilder::new()
             .with_title(title)
-            .with_dimensions(512, 512)
+            .with_dimensions(LogicalSize::new(512.0, 512.0))
             .with_fullscreen(None)
             //.with_decorations(true)
             .with_visibility(true);
@@ -164,16 +165,16 @@ impl MainWindow {
         let mut last_mouse_pos = Vector2::new(0.0, 0.0);
         let mut left_mouse_down = false;
 
-        let get_mouse_proj = |mouse_screen: Vector2<f32>, window_size: (u32, u32)| {
+        let get_mouse_proj = |mouse_screen: Vector2<f32>, window_size: LogicalSize| {
             // Calculate mouse pos in "world space"
             //let window_size = self.display.gl_window().get_inner_size().unwrap();
             let window_center =
-                Vector2::new(window_size.0 as f32 * 0.5, window_size.1 as f32 * 0.5);
+                Vector2::new(window_size.width as f32 * 0.5, window_size.height as f32 * 0.5);
             let mut mouse_world = mouse_screen - window_center;
             mouse_world.y *= -1.0;
             mouse_world.div_assign_element_wise(Vector2::new(
-                window_size.0 as f32 * 0.5,
-                window_size.1 as f32 * 0.5,
+                window_size.width as f32 * 0.5,
+                window_size.height as f32 * 0.5,
             ));
             mouse_world
         };
@@ -183,7 +184,7 @@ impl MainWindow {
             None,
             LoadNext,
             LoadPrevious,
-            LoadSpecific(String),
+            LoadSpecific(PathBuf),
             Jump(i32),
         }
 
@@ -194,7 +195,13 @@ impl MainWindow {
             //Backward,
         }
 
+        enum FileHoverState {
+            Idle,
+            HoveredFile{prev_file: PathBuf}
+        }
+
         let mut playback_state = PlaybackState::Paused;
+        let mut file_hover_state = FileHoverState::Idle;
         //let mut last_frame_time = Instant::now();
         let mut playback_start_time = Instant::now();
         let mut frame_count_since_playback_start = 0;
@@ -202,7 +209,7 @@ impl MainWindow {
         //let framerate = 29.97;
         let framerate = 25.0;
         const NANOS_PER_SEC: u64 = 1000_000_000;
-        let mut frame_delta_time_nanos = (NANOS_PER_SEC as f64 / framerate) as u64;
+        let frame_delta_time_nanos = (NANOS_PER_SEC as f64 / framerate) as u64;
 
         // the main loop
         let mut running = true;
@@ -219,7 +226,7 @@ impl MainWindow {
                         //update_screen = true; // in case of any event at all, update the screen
                         match event {
                             // Break from the main loop when the window is closed.
-                            WindowEvent::Closed => running = false,
+                            WindowEvent::CloseRequested => running = false,
                             WindowEvent::KeyboardInput { input, .. } => {
                                 if let Some(keycode) = input.virtual_keycode {
                                     if input.state == glutin::ElementState::Pressed {
@@ -260,7 +267,7 @@ impl MainWindow {
                                 }
                             }
                             WindowEvent::CursorMoved { position, .. } => {
-                                let pos_vec = Vector2::new(position.0 as f32, position.1 as f32);
+                                let pos_vec = Vector2::new(position.x as f32, position.y as f32);
                                 // Update transform
                                 if left_mouse_down {
                                     let inv_projection_transform =
@@ -307,9 +314,9 @@ impl MainWindow {
                                         //println!("line");
                                         y
                                     }
-                                    MouseScrollDelta::PixelDelta(_, y) => {
+                                    MouseScrollDelta::PixelDelta(pos) => {
                                         //println!("pixel");
-                                        y / 13.0
+                                        (pos.y / 13.0) as f32
                                     }
                                 };
                                 let delta = delta * 0.375;
@@ -341,6 +348,23 @@ impl MainWindow {
                                 self.update_projection_transform();
                                 self.draw(); // Update immediately on resize.
                             }
+                            WindowEvent::Focused(..) => {
+                                update_screen = true;
+                            }
+                            WindowEvent::Refresh => {
+                                self.draw();
+                            }
+                            WindowEvent::HoveredFile(file_name) => {
+                                file_hover_state = FileHoverState::HoveredFile{prev_file: self.image_cache.current_file_path()};
+                                load_request = LoadRequest::LoadSpecific(file_name);
+                            }
+                            WindowEvent::HoveredFileCancelled => {
+                                let mut tmp_hover_state = FileHoverState::Idle;
+                                std::mem::swap(&mut file_hover_state, &mut tmp_hover_state);
+                                if let FileHoverState::HoveredFile{prev_file} = tmp_hover_state {
+                                    load_request = LoadRequest::LoadSpecific(prev_file);
+                                }
+                            }
                             _ => (),
                         }
                     }
@@ -351,12 +375,12 @@ impl MainWindow {
             if playback_state == PlaybackState::Paused {
                 self.image_cache.process_prefetched(&self.display).unwrap();
                 self.image_cache.send_load_requests();
-            } else {
+            } else if load_request == LoadRequest::None {
                 let elapsed = playback_start_time.elapsed();
                 let elapsed_nanos =
                     elapsed.as_secs() * NANOS_PER_SEC + elapsed.subsec_nanos() as u64;
                 let frame_step =
-                    ((elapsed_nanos / frame_delta_time_nanos) - frame_count_since_playback_start);
+                    (elapsed_nanos / frame_delta_time_nanos) - frame_count_since_playback_start;
                 if frame_step > 0 {
                     load_request = match playback_state {
                         PlaybackState::Forward => LoadRequest::Jump(frame_step as i32),
@@ -387,7 +411,7 @@ impl MainWindow {
                 LoadRequest::LoadPrevious => Some(self.image_cache.load_prev(&self.display)),
                 LoadRequest::LoadSpecific(ref filename) => Some(
                     self.image_cache
-                        .load_specific(&self.display, filename.as_str())
+                        .load_specific(&self.display, filename.as_ref())
                         .map(|x| (x, OsString::from(filename))),
                 ),
                 LoadRequest::Jump(jump_count) => {
@@ -445,8 +469,8 @@ impl MainWindow {
             let img_h = texture.height() as f32;
             let img_aspect = img_w / img_h;
             // Projection tranform
-            let (window_w, window_h) = self.display.gl_window().get_inner_size().unwrap();
-            let window_aspect = window_w as f32 / window_h as f32;
+            let window_size = self.display.gl_window().get_inner_size().unwrap();
+            let window_aspect = window_size.width as f32 / window_size.height as f32;
             let (camera_width, camera_height) = if img_aspect < window_aspect {
                 // Window is wider than image relatively
                 (img_h * window_aspect, img_h)
@@ -471,7 +495,7 @@ impl MainWindow {
         format!("E M U L S I O N  ⬕  {}", name)
     }
 
-    fn load_image(&mut self, path: &str) {
+    fn load_image(&mut self, path: &Path) {
         self.image_texture = Some(self.image_cache.load_specific(&self.display, path).unwrap());
     }
 
@@ -519,9 +543,9 @@ impl MainWindow {
     fn get_texel_size(&self) -> f32 {
         if let Some(ref image_texture) = self.image_texture {
             let window = self.display.gl_window();
-            let (window_w, window_h) = window.get_inner_size().unwrap();
+            let window_size = window.get_inner_size().unwrap();
 
-            (window_w.min(window_h) as f32
+            (window_size.width.min(window_size.height) as f32
                 / image_texture.width().max(image_texture.height()) as f32)
                 * self.zoom_scale
         } else {
