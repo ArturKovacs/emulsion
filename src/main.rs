@@ -365,6 +365,14 @@ impl MainWindow {
                                     load_request = LoadRequest::LoadSpecific(prev_file);
                                 }
                             }
+                            WindowEvent::DroppedFile(file_name) => {
+                                match file_hover_state {
+                                    FileHoverState::Idle => {
+                                        load_request = LoadRequest::LoadSpecific(file_name);
+                                    }
+                                    _ => (),
+                                }
+                            }
                             _ => (),
                         }
                     }
