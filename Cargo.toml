@@ -2,11 +2,13 @@
 name = "emulsion"
 version = "0.1.0"
 authors = ["Artur Barnabas <kovacs.artur.barnabas@gmail.com>"]
+build = "build.rs"
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1"
 
 [dependencies]
-#glium = "0.20"
 glium = "0.22"
-#glutin = "0.13"
 glutin = "0.17"
 image = "0.19"
 cgmath = "0.16"
