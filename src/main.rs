@@ -1,4 +1,4 @@
-#![windows_subsystem = "windows"]
+//#![windows_subsystem = "windows"]
 
 extern crate cgmath;
 #[macro_use]
@@ -206,6 +206,12 @@ impl MainWindow {
         let mut playback_start_time = Instant::now();
         let mut frame_count_since_playback_start = 0;
 
+        /// On Windows there is a bug that the cursor moved event will get
+        /// triggered with 0, 0 corrdinates when the window regains focus by
+        /// the user clicking into it.
+        /// To work around this we ignore the first mose move event after the window gains focus.
+        let mut ignore_one_mouse_move = false;
+
         //let framerate = 29.97;
         let framerate = 25.0;
         const NANOS_PER_SEC: u64 = 1000_000_000;
@@ -267,45 +273,49 @@ impl MainWindow {
                                 }
                             }
                             WindowEvent::CursorMoved { position, .. } => {
-                                let pos_vec = Vector2::new(position.x as f32, position.y as f32);
-                                // Update transform
-                                if left_mouse_down {
-                                    let inv_projection_transform =
-                                        self.projection_transform.invert().unwrap();
+                                if ignore_one_mouse_move {
+                                    ignore_one_mouse_move = false;
+                                } else {
+                                    let pos_vec = Vector2::new(position.x as f32, position.y as f32);
+                                    // Update transform
+                                    if left_mouse_down {
+                                        let inv_projection_transform =
+                                            self.projection_transform.invert().unwrap();
 
-                                    let window_size =
-                                        self.display.gl_window().get_inner_size().unwrap();
-                                    let mut last_world_pos =
-                                        get_mouse_proj(last_mouse_pos, window_size);
-                                    let mut curr_world_pos = get_mouse_proj(pos_vec, window_size);
+                                        let window_size =
+                                            self.display.gl_window().get_inner_size().unwrap();
+                                        let mut last_world_pos =
+                                            get_mouse_proj(last_mouse_pos, window_size);
+                                        let mut curr_world_pos = get_mouse_proj(pos_vec, window_size);
 
-                                    let tmp = inv_projection_transform
-                                        * Vector4::new(
-                                            last_world_pos.x,
-                                            last_world_pos.y,
-                                            0f32,
-                                            1f32,
-                                        );
-                                    last_world_pos.x = tmp.x;
-                                    last_world_pos.y = tmp.y;
-                                    let tmp = inv_projection_transform
-                                        * Vector4::new(
-                                            curr_world_pos.x,
-                                            curr_world_pos.y,
-                                            0f32,
-                                            1f32,
-                                        );
-                                    curr_world_pos.x = tmp.x;
-                                    curr_world_pos.y = tmp.y;
+                                        let tmp = inv_projection_transform
+                                            * Vector4::new(
+                                                last_world_pos.x,
+                                                last_world_pos.y,
+                                                0f32,
+                                                1f32,
+                                            );
+                                        last_world_pos.x = tmp.x;
+                                        last_world_pos.y = tmp.y;
+                                        let tmp = inv_projection_transform
+                                            * Vector4::new(
+                                                curr_world_pos.x,
+                                                curr_world_pos.y,
+                                                0f32,
+                                                1f32,
+                                            );
+                                        curr_world_pos.x = tmp.x;
+                                        curr_world_pos.y = tmp.y;
 
-                                    self.cam_pos += last_world_pos - curr_world_pos;
+                                        self.cam_pos += last_world_pos - curr_world_pos;
 
-                                    self.update_projection_transform();
-                                    update_screen = true;
-                                    should_sleep = false;
+                                        self.update_projection_transform();
+                                        update_screen = true;
+                                        should_sleep = false;
+                                    }
+
+                                    last_mouse_pos = pos_vec;
                                 }
-
-                                last_mouse_pos = pos_vec;
                             }
                             WindowEvent::MouseWheel { delta, .. } => {
                                 use glium::glutin::MouseScrollDelta;
@@ -348,7 +358,10 @@ impl MainWindow {
                                 self.update_projection_transform();
                                 self.draw(); // Update immediately on resize.
                             }
-                            WindowEvent::Focused(..) => {
+                            WindowEvent::Focused(gained_focus) => {
+                                if gained_focus {
+                                    ignore_one_mouse_move = true;
+                                }
                                 update_screen = true;
                             }
                             WindowEvent::Refresh => {
@@ -431,6 +444,7 @@ impl MainWindow {
                 match result {
                     Ok((texture, filename)) => {
                         self.image_texture = Some(texture);
+                        // FIXME the following line causes the program to hang when resizing during playback
                         self.set_title_filename(filename.to_str().unwrap());
                     }
                     Err(err) => {
