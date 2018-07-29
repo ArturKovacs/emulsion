@@ -51,6 +51,10 @@ impl ImageCache {
         }
     }
 
+    pub fn current_file_name<'a>(&'a self) -> &'a OsString {
+        &self.current_name
+    }
+
     pub fn current_file_path(&self) -> PathBuf {
         self.dir_path.join(self.current_name.clone()).to_owned()
     }

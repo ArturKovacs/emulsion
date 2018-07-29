@@ -102,7 +102,7 @@ impl TextureLoader {
         // walk the directory starting from the current item and cache in all the images
         // do this by stepping in both directions so that the cached images ahead of the file
         // should never be more than 1 + "cached images before the file"
-        while running.load(Ordering::SeqCst) {
+        while running.load(Ordering::Acquire) {
             let img_path = {
                 let load_request = load_request_rx.lock().unwrap();
                 if let Some(path) = load_request.recv().ok() {
@@ -520,7 +520,7 @@ impl TextureLoader {
 
 impl Drop for TextureLoader {
     fn drop(&mut self) {
-        self.running.store(false, Ordering::SeqCst);
+        self.running.store(false, Ordering::Release);
 
         match self.join_handles.take() {
             Some(join_handles) => {

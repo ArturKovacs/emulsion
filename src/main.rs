@@ -228,166 +228,168 @@ impl MainWindow {
                     glutin::Event::Awakened => {
                         update_screen = true;
                     }
-                    glutin::Event::WindowEvent { event, .. } => {
-                        //update_screen = true; // in case of any event at all, update the screen
-                        match event {
-                            // Break from the main loop when the window is closed.
-                            WindowEvent::CloseRequested => running = false,
-                            WindowEvent::KeyboardInput { input, .. } => {
-                                if let Some(keycode) = input.virtual_keycode {
-                                    if input.state == glutin::ElementState::Pressed {
-                                        match keycode {
-                                            VirtualKeyCode::Escape => running = false,
-                                            VirtualKeyCode::Right | VirtualKeyCode::Left => {
-                                                if keycode == VirtualKeyCode::Right {
-                                                    load_request = LoadRequest::LoadNext;
-                                                } else {
-                                                    load_request = LoadRequest::LoadPrevious;
-                                                }
+                    glutin::Event::WindowEvent { event, .. } => match event {
+                        // Break from the main loop when the window is closed.
+                        WindowEvent::CloseRequested => running = false,
+                        WindowEvent::KeyboardInput { input, .. } => {
+                            if let Some(keycode) = input.virtual_keycode {
+                                if input.state == glutin::ElementState::Pressed {
+                                    match keycode {
+                                        VirtualKeyCode::Escape => running = false,
+                                        VirtualKeyCode::Right | VirtualKeyCode::Left => {
+                                            if keycode == VirtualKeyCode::Right {
+                                                load_request = LoadRequest::LoadNext;
+                                            } else {
+                                                load_request = LoadRequest::LoadPrevious;
                                             }
-                                            VirtualKeyCode::Space => {
-                                                playback_state =
-                                                    if playback_state == PlaybackState::Forward {
-                                                        PlaybackState::Paused
-                                                    } else {
-                                                        playback_start_time = Instant::now();
-                                                        frame_count_since_playback_start = 0;
-                                                        PlaybackState::Forward
-                                                    };
-                                            }
-                                            VirtualKeyCode::R => {
-                                                self.zoom_scale = 1.0;
-                                                self.cam_pos = Vector2::new(0.0, 0.0);
-                                                self.update_projection_transform();
-                                                update_screen = true;
-                                            }
-                                            _ => (),
                                         }
-                                    } else {
+                                        VirtualKeyCode::Space => {
+                                            playback_state =
+                                                if playback_state == PlaybackState::Forward {
+                                                    let filename = self
+                                                        .image_cache
+                                                        .current_file_name().to_str().unwrap().to_owned();
+                                                    self.set_title_filename(filename.as_ref());
+                                                    PlaybackState::Paused
+                                                } else {
+                                                    self.set_title_filename("PLAYING");
+                                                    playback_start_time = Instant::now();
+                                                    frame_count_since_playback_start = 0;
+                                                    PlaybackState::Forward
+                                                };
+                                        }
+                                        VirtualKeyCode::R => {
+                                            self.zoom_scale = 1.0;
+                                            self.cam_pos = Vector2::new(0.0, 0.0);
+                                            self.update_projection_transform();
+                                            update_screen = true;
+                                        }
+                                        _ => (),
                                     }
-                                }
-                            }
-                            WindowEvent::MouseInput { state, button, .. } => {
-                                if button == glutin::MouseButton::Left {
-                                    left_mouse_down = state == glutin::ElementState::Pressed;
-                                }
-                            }
-                            WindowEvent::CursorMoved { position, .. } => {
-                                if ignore_one_mouse_move {
-                                    ignore_one_mouse_move = false;
                                 } else {
-                                    let pos_vec = Vector2::new(position.x as f32, position.y as f32);
-                                    // Update transform
-                                    if left_mouse_down {
-                                        let inv_projection_transform =
-                                            self.projection_transform.invert().unwrap();
-
-                                        let window_size =
-                                            self.display.gl_window().get_inner_size().unwrap();
-                                        let mut last_world_pos =
-                                            get_mouse_proj(last_mouse_pos, window_size);
-                                        let mut curr_world_pos = get_mouse_proj(pos_vec, window_size);
-
-                                        let tmp = inv_projection_transform
-                                            * Vector4::new(
-                                                last_world_pos.x,
-                                                last_world_pos.y,
-                                                0f32,
-                                                1f32,
-                                            );
-                                        last_world_pos.x = tmp.x;
-                                        last_world_pos.y = tmp.y;
-                                        let tmp = inv_projection_transform
-                                            * Vector4::new(
-                                                curr_world_pos.x,
-                                                curr_world_pos.y,
-                                                0f32,
-                                                1f32,
-                                            );
-                                        curr_world_pos.x = tmp.x;
-                                        curr_world_pos.y = tmp.y;
-
-                                        self.cam_pos += last_world_pos - curr_world_pos;
-
-                                        self.update_projection_transform();
-                                        update_screen = true;
-                                        should_sleep = false;
-                                    }
-
-                                    last_mouse_pos = pos_vec;
                                 }
                             }
-                            WindowEvent::MouseWheel { delta, .. } => {
-                                use glium::glutin::MouseScrollDelta;
-                                let delta: f32 = match delta {
-                                    MouseScrollDelta::LineDelta(_, y) => {
-                                        //println!("line");
-                                        y
-                                    }
-                                    MouseScrollDelta::PixelDelta(pos) => {
-                                        //println!("pixel");
-                                        (pos.y / 13.0) as f32
-                                    }
-                                };
-                                let delta = delta * 0.375;
-                                let delta = if delta > 0.0 {
-                                    delta + 1.0
-                                } else {
-                                    1.0 / (delta.abs() + 1.0)
-                                };
-
-                                let mut mouse_world = get_mouse_proj(
-                                    last_mouse_pos,
-                                    self.display.gl_window().get_inner_size().unwrap(),
-                                );
-
-                                let transformed = self.projection_transform.invert().unwrap()
-                                    * Vector4::new(mouse_world.x, mouse_world.y, 0.0, 1.0);
-                                mouse_world.x = transformed.x;
-                                mouse_world.y = transformed.y;
-
-                                self.cam_pos += mouse_world * (1.0 - 1.0 / delta);
-                                self.zoom_scale *= delta;
-
-                                self.update_projection_transform();
-
-                                //println!("zoom_scale set to {}", self.zoom_scale);
-                                update_screen = true;
-                            }
-                            WindowEvent::Resized(..) => {
-                                self.update_projection_transform();
-                                self.draw(); // Update immediately on resize.
-                            }
-                            WindowEvent::Focused(gained_focus) => {
-                                if gained_focus {
-                                    ignore_one_mouse_move = true;
-                                }
-                                update_screen = true;
-                            }
-                            WindowEvent::Refresh => {
-                                self.draw();
-                            }
-                            WindowEvent::HoveredFile(file_name) => {
-                                file_hover_state = FileHoverState::HoveredFile{prev_file: self.image_cache.current_file_path()};
-                                load_request = LoadRequest::LoadSpecific(file_name);
-                            }
-                            WindowEvent::HoveredFileCancelled => {
-                                let mut tmp_hover_state = FileHoverState::Idle;
-                                std::mem::swap(&mut file_hover_state, &mut tmp_hover_state);
-                                if let FileHoverState::HoveredFile{prev_file} = tmp_hover_state {
-                                    load_request = LoadRequest::LoadSpecific(prev_file);
-                                }
-                            }
-                            WindowEvent::DroppedFile(file_name) => {
-                                match file_hover_state {
-                                    FileHoverState::Idle => {
-                                        load_request = LoadRequest::LoadSpecific(file_name);
-                                    }
-                                    _ => (),
-                                }
-                            }
-                            _ => (),
                         }
+                        WindowEvent::MouseInput { state, button, .. } => {
+                            if button == glutin::MouseButton::Left {
+                                left_mouse_down = state == glutin::ElementState::Pressed;
+                            }
+                        }
+                        WindowEvent::CursorMoved { position, .. } => {
+                            if ignore_one_mouse_move {
+                                ignore_one_mouse_move = false;
+                            } else {
+                                let pos_vec = Vector2::new(position.x as f32, position.y as f32);
+                                // Update transform
+                                if left_mouse_down {
+                                    let inv_projection_transform =
+                                        self.projection_transform.invert().unwrap();
+
+                                    let window_size =
+                                        self.display.gl_window().get_inner_size().unwrap();
+                                    let mut last_world_pos =
+                                        get_mouse_proj(last_mouse_pos, window_size);
+                                    let mut curr_world_pos = get_mouse_proj(pos_vec, window_size);
+
+                                    let tmp = inv_projection_transform
+                                        * Vector4::new(
+                                            last_world_pos.x,
+                                            last_world_pos.y,
+                                            0f32,
+                                            1f32,
+                                        );
+                                    last_world_pos.x = tmp.x;
+                                    last_world_pos.y = tmp.y;
+                                    let tmp = inv_projection_transform
+                                        * Vector4::new(
+                                            curr_world_pos.x,
+                                            curr_world_pos.y,
+                                            0f32,
+                                            1f32,
+                                        );
+                                    curr_world_pos.x = tmp.x;
+                                    curr_world_pos.y = tmp.y;
+
+                                    self.cam_pos += last_world_pos - curr_world_pos;
+
+                                    self.update_projection_transform();
+                                    update_screen = true;
+                                    should_sleep = false;
+                                }
+
+                                last_mouse_pos = pos_vec;
+                            }
+                        }
+                        WindowEvent::MouseWheel { delta, .. } => {
+                            use glium::glutin::MouseScrollDelta;
+                            let delta: f32 = match delta {
+                                MouseScrollDelta::LineDelta(_, y) => {
+                                    //println!("line");
+                                    y
+                                }
+                                MouseScrollDelta::PixelDelta(pos) => {
+                                    //println!("pixel");
+                                    (pos.y / 13.0) as f32
+                                }
+                            };
+                            let delta = delta * 0.375;
+                            let delta = if delta > 0.0 {
+                                delta + 1.0
+                            } else {
+                                1.0 / (delta.abs() + 1.0)
+                            };
+
+                            let mut mouse_world = get_mouse_proj(
+                                last_mouse_pos,
+                                self.display.gl_window().get_inner_size().unwrap(),
+                            );
+
+                            let transformed = self.projection_transform.invert().unwrap()
+                                * Vector4::new(mouse_world.x, mouse_world.y, 0.0, 1.0);
+                            mouse_world.x = transformed.x;
+                            mouse_world.y = transformed.y;
+
+                            self.cam_pos += mouse_world * (1.0 - 1.0 / delta);
+                            self.zoom_scale *= delta;
+
+                            self.update_projection_transform();
+
+                            //println!("zoom_scale set to {}", self.zoom_scale);
+                            update_screen = true;
+                        }
+                        WindowEvent::Resized(..) => {
+                            self.update_projection_transform();
+                            self.draw(); // Update immediately on resize.
+                        }
+                        WindowEvent::Focused(gained_focus) => {
+                            if gained_focus {
+                                ignore_one_mouse_move = true;
+                            }
+                            update_screen = true;
+                        }
+                        WindowEvent::Refresh => {
+                            self.draw();
+                        }
+                        WindowEvent::HoveredFile(file_name) => {
+                            file_hover_state = FileHoverState::HoveredFile{prev_file: self.image_cache.current_file_path()};
+                            load_request = LoadRequest::LoadSpecific(file_name);
+                        }
+                        WindowEvent::HoveredFileCancelled => {
+                            let mut tmp_hover_state = FileHoverState::Idle;
+                            std::mem::swap(&mut file_hover_state, &mut tmp_hover_state);
+                            if let FileHoverState::HoveredFile{prev_file} = tmp_hover_state {
+                                load_request = LoadRequest::LoadSpecific(prev_file);
+                            }
+                        }
+                        WindowEvent::DroppedFile(file_name) => {
+                            match file_hover_state {
+                                FileHoverState::Idle => {
+                                    load_request = LoadRequest::LoadSpecific(file_name);
+                                }
+                                _ => (),
+                            }
+                        }
+                        _ => (),
                     }
                     _ => (),
                 }
@@ -430,10 +432,14 @@ impl MainWindow {
             let load_result = match load_request {
                 LoadRequest::LoadNext => Some(self.image_cache.load_next(&self.display)),
                 LoadRequest::LoadPrevious => Some(self.image_cache.load_prev(&self.display)),
-                LoadRequest::LoadSpecific(ref filename) => Some(
-                    self.image_cache
-                        .load_specific(&self.display, filename.as_ref())
-                        .map(|x| (x, OsString::from(filename))),
+                LoadRequest::LoadSpecific(ref file_path) => Some(
+                    if let Some(file_name) = file_path.file_name() {
+                        self.image_cache
+                            .load_specific(&self.display, file_path.as_ref())
+                            .map(|x| (x, OsString::from(file_name)))
+                    } else {
+                        Err(String::from("Could not extract filename").into())
+                    }
                 ),
                 LoadRequest::Jump(jump_count) => {
                     Some(self.image_cache.load_jump(&self.display, jump_count))
@@ -444,8 +450,15 @@ impl MainWindow {
                 match result {
                     Ok((texture, filename)) => {
                         self.image_texture = Some(texture);
-                        // FIXME the following line causes the program to hang when resizing during playback
-                        self.set_title_filename(filename.to_str().unwrap());
+                        // FIXME the program hangs when the title is set during a resize
+                        // this is due to the way glutin/winit is architected.
+                        // An issu already exists in winit proposing to redesign
+                        // the even loop.
+                        // Until that is implemented the title is simply not updated during
+                        // playback.
+                        if playback_state == PlaybackState::Paused {
+                            self.set_title_filename(filename.to_str().unwrap());
+                        }
                     }
                     Err(err) => {
                         self.image_texture = None;
@@ -514,7 +527,10 @@ impl MainWindow {
     }
 
     fn create_title_filename(name: &str) -> String {
-        format!("E M U L S I O N  ⬕  {}", name)
+        // Separator character used to be ⬕
+        // But that one does not display correctly on Ubuntu 18.04
+
+        format!("E M U L S I O N / {}", name)
     }
 
     fn load_image(&mut self, path: &Path) {
