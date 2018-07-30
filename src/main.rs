@@ -7,6 +7,7 @@ extern crate error_chain;
 extern crate glium;
 extern crate image;
 extern crate sys_info;
+extern crate backtrace;
 
 use std::env;
 use std::ffi::OsString;
@@ -27,6 +28,8 @@ use cgmath::{Matrix4, Vector2, Vector4};
 
 mod image_cache;
 use image_cache::ImageCache;
+
+mod handle_panic;
 
 #[derive(Copy, Clone)]
 struct Vertex {
@@ -69,6 +72,7 @@ impl MainWindow {
             .with_fullscreen(None)
             //.with_decorations(true)
             .with_visibility(true);
+
         //let context = glutin::ContextBuilder::new().with_gl(GlRequest::Specific(Api::OpenGl, (3, 1)));
         let context = glutin::ContextBuilder::new().with_gl_profile(glutin::GlProfile::Core);
         let display = glium::Display::new(window, context, events_loop).unwrap();
@@ -206,13 +210,12 @@ impl MainWindow {
         let mut playback_start_time = Instant::now();
         let mut frame_count_since_playback_start = 0;
 
-        /// On Windows there is a bug that the cursor moved event will get
-        /// triggered with 0, 0 corrdinates when the window regains focus by
-        /// the user clicking into it.
-        /// To work around this we ignore the first mose move event after the window gains focus.
+        // On Windows there is a bug that the cursor moved event will get
+        // triggered with 0, 0 corrdinates when the window regains focus by
+        // the user clicking into it.
+        // To work around this we ignore the first mose move event after the window gains focus.
         let mut ignore_one_mouse_move = false;
 
-        //let framerate = 29.97;
         let framerate = 25.0;
         const NANOS_PER_SEC: u64 = 1000_000_000;
         let frame_delta_time_nanos = (NANOS_PER_SEC as f64 / framerate) as u64;
@@ -592,7 +595,13 @@ impl MainWindow {
     }
 }
 
+
 fn main() {
+    use std::panic;
+    use std::boxed::Box;
+
+    panic::set_hook(Box::new(handle_panic::handle_panic));
+
     // I don't know how to Rust
     let mut events_loop = glutin::EventsLoop::new();
     let mut main_window = MainWindow::init(&events_loop);
