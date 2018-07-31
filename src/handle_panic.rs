@@ -18,8 +18,9 @@ pub fn handle_panic(info: &panic::PanicInfo) {
         payload.downcast_ref::<&str>().map(|s| *s)
         .or(payload.downcast_ref::<String>().map(|s| s.as_str()));
 
+    msg.push('\n');
     if let Some(panic_message) = payload_string {
-        msg.push_str(&format!("\n--\n{}\n--\n", panic_message));
+        msg.push_str(&format!("\n--\n{}\n--\n\n", panic_message));
     }
     if let Some(location) = info.location() {
         msg.push_str(&format!(
@@ -31,7 +32,7 @@ pub fn handle_panic(info: &panic::PanicInfo) {
         msg.push(ch);
     }
 
-    eprintln!("\nPanic happened\n{}", &msg);
+    eprintln!("\nPanic happened{}", &msg);
     write_to_file(&msg).expect("Could not write panic to file.");
 }
 
