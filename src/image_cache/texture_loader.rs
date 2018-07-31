@@ -467,20 +467,6 @@ impl TextureLoader {
         Ok(image::open(image_path)?.to_rgba())
     }
 
-    /*
-    fn texture_from_loader(display: &glium::Display, image: LoaderImage) -> Result<SrgbTexture2d> {
-        match image {
-            LoaderImage::Image(image) => {
-                let result = Self::texture_from_image(display, image)?;
-                Ok(result)
-            }
-            LoaderImage::Processed => Err(Error::from(
-                "Loader image was requested to be converted but it has already been processed",
-            )),
-        }
-    }
-    */
-
     fn texture_from_image(
         display: &glium::Display,
         image: image::RgbaImage,

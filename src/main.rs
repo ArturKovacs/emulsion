@@ -55,6 +55,8 @@ struct MainWindow {
 
 impl MainWindow {
     fn init(events_loop: &glutin::EventsLoop) -> MainWindow {
+        use glium::glutin::Icon;
+
         let img_path = env::args().skip(1).next();
         let img_name = match img_path {
             Some(ref img_path) => {
@@ -66,10 +68,15 @@ impl MainWindow {
 
         let title = Self::create_title_filename(if let Some(name) = img_name { name } else { "" });
 
+        let icon_name = "./emulsion32.png";
+        let icon = Icon::from_path(icon_name)
+            .unwrap_or_else(|_| panic!(format!("Could not load icon '{}'", icon_name)));
+
         let window = glutin::WindowBuilder::new()
             .with_title(title)
             .with_dimensions(LogicalSize::new(512.0, 512.0))
             .with_fullscreen(None)
+            .with_window_icon(Some(icon))
             //.with_decorations(true)
             .with_visibility(true);
 
