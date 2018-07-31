@@ -54,6 +54,8 @@ struct MainWindow {
 }
 
 impl MainWindow {
+    const BOTTOM_PANEL_HEIGHT: u32 = 32;
+
     fn init(events_loop: &glutin::EventsLoop) -> MainWindow {
         use glium::glutin::Icon;
 
@@ -84,8 +86,8 @@ impl MainWindow {
         let context = glutin::ContextBuilder::new().with_gl_profile(glutin::GlProfile::Core);
         let display = glium::Display::new(window, context, events_loop).unwrap();
 
-        // Clear the screen right at the start so that the user sees a black window instead
-        // of white while the image is loading.
+        // Clear the screen right at the start so that the user sees the background color
+        // whilst the image is loading.
         {
             let mut target = display.draw();
             target.clear_color(0.9, 0.9, 0.9, 0.0);
@@ -515,7 +517,8 @@ impl MainWindow {
             let img_aspect = img_w / img_h;
             // Projection tranform
             let window_size = self.display.gl_window().get_inner_size().unwrap();
-            let window_aspect = window_size.width as f32 / window_size.height as f32;
+            let main_panel_size = self.get_main_panel_size(window_size);
+            let window_aspect = main_panel_size.width as f32 / main_panel_size.height as f32;
             let (camera_width, camera_height) = if img_aspect < window_aspect {
                 // Window is wider than image relatively
                 (img_h * window_aspect, img_h)
@@ -548,6 +551,8 @@ impl MainWindow {
     }
 
     fn draw(&self) {
+        let window = self.display.gl_window();
+        let window_size = window.get_inner_size().unwrap();
         // drawing a frame
         let mut target = self.display.draw();
         target.clear_color(0.9, 0.9, 0.9, 0.0);
@@ -575,16 +580,26 @@ impl MainWindow {
                 matrix: Into::<[[f32; 4]; 4]>::into(transform),
                 tex: sampler
             };
+            let image_draw_params = glium::DrawParameters {
+                viewport: Some(glium::Rect {
+                    left: 0,
+                    bottom: Self::BOTTOM_PANEL_HEIGHT,
+                    width: window_size.width as u32,
+                    height: window_size.height as u32 - Self::BOTTOM_PANEL_HEIGHT
+                }),
+                .. Default::default()
+            };
             target
                 .draw(
                     &self.vertex_buffer,
                     &self.index_buffer,
                     &self.program,
                     &uniforms,
-                    &Default::default(),
+                    &image_draw_params,
                 )
                 .unwrap();
         }
+
         target.finish().unwrap();
     }
 
@@ -593,11 +608,20 @@ impl MainWindow {
             let window = self.display.gl_window();
             let window_size = window.get_inner_size().unwrap();
 
-            (window_size.width.min(window_size.height) as f32
+            let main_panel_size = self.get_main_panel_size(window_size);
+
+            (main_panel_size.width.min(main_panel_size.height) as f32
                 / image_texture.width().max(image_texture.height()) as f32)
                 * self.zoom_scale
         } else {
             0f32
+        }
+    }
+
+    fn get_main_panel_size(&self, window_size: LogicalSize) -> LogicalSize {
+        LogicalSize {
+            width: window_size.width,
+            height: (window_size.height - Self::BOTTOM_PANEL_HEIGHT as f64).max(0.0),
         }
     }
 }
