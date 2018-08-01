@@ -5,6 +5,7 @@ use std::io;
 use std::io::Write;
 use std::string::String;
 use std::iter;
+use std::env;
 
 use backtrace::Backtrace;
 
@@ -37,7 +38,17 @@ pub fn handle_panic(info: &panic::PanicInfo) {
 }
 
 fn write_to_file(msg: &String) -> io::Result<()> {
-    let mut file = OpenOptions::new().create(true).append(true).open("./panic.txt")?;
+    let curr_exe = env::current_exe()?;
+    let curr_exe_dir =
+        curr_exe.parent()
+        .ok_or(io::Error::new(io::ErrorKind::Other, "Could not get exe parent folder!"))?;
+
+    let mut file =
+        OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(curr_exe_dir.join("panic.txt"))?;
+
     write!(file, "{}", msg)?;
     Ok(())
 }
