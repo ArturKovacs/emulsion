@@ -21,6 +21,7 @@ use glium::glutin::{VirtualKeyCode, WindowEvent};
 use glium::index::PrimitiveType;
 use glium::{glutin, Surface};
 use glium::glutin::dpi::LogicalSize;
+use glium::texture::{RawImage2d, SrgbTexture2d};
 
 use cgmath::ElementWise;
 use cgmath::SquareMatrix;
@@ -30,6 +31,8 @@ mod image_cache;
 use image_cache::ImageCache;
 
 mod handle_panic;
+mod ui;
+mod shaders;
 
 #[derive(Copy, Clone)]
 struct Vertex {
@@ -43,6 +46,8 @@ struct MainWindow {
     image_cache: ImageCache,
 
     display: glium::Display,
+
+    ui: ui::Ui,
 
     vertex_buffer: glium::VertexBuffer<Vertex>,
     index_buffer: glium::IndexBuffer<u16>,
@@ -127,13 +132,13 @@ impl MainWindow {
         // compiling shaders and linking them together
         let program = program!(&display,
             140 => {
-                vertex: include_str!("shaders/vertex_140.glsl"),
-                fragment: include_str!("shaders/fragment_140.glsl")
+                vertex: shaders::VERTEX_140,
+                fragment: shaders::FRAGMENT_140
             },
 
             110 => {
-                vertex: include_str!("shaders/vertex_110.glsl"),
-                fragment: include_str!("shaders/fragment_110.glsl")
+                vertex: shaders::VERTEX_110,
+                fragment: shaders::FRAGMENT_110
             },
         ).unwrap();
 
@@ -154,10 +159,13 @@ impl MainWindow {
             _ => 4,
         };
 
+        // TODO UI INITIALIZATION SHOLD BE MOVED AFTER THE IMAGE IS VISIBLE
+        let ui = ui::Ui::new(&display, Self::BOTTOM_PANEL_HEIGHT);
+
         let mut resulting_window = MainWindow {
             image_cache: ImageCache::new(cache_capaxity, thread_count),
             display,
-
+            ui,
             vertex_buffer,
             index_buffer,
             program,
@@ -170,6 +178,16 @@ impl MainWindow {
         if let Some(img_path) = env::args().skip(1).next() {
             resulting_window.load_image(img_path.as_ref());
         };
+
+        // set up ui elements here just for now
+        let button_texture = Rc::new(
+            Self::load_texture_without_cache(
+                &resulting_window.display,
+                Path::new("./cogs.png")
+            )
+        );
+
+        let mut button = resulting_window.ui.create_button(button_texture, || println!("Clicked!"));
 
         resulting_window
     }
@@ -240,168 +258,170 @@ impl MainWindow {
                     glutin::Event::Awakened => {
                         update_screen = true;
                     }
-                    glutin::Event::WindowEvent { event, .. } => match event {
-                        // Break from the main loop when the window is closed.
-                        WindowEvent::CloseRequested => running = false,
-                        WindowEvent::KeyboardInput { input, .. } => {
-                            if let Some(keycode) = input.virtual_keycode {
-                                if input.state == glutin::ElementState::Pressed {
-                                    match keycode {
-                                        VirtualKeyCode::Escape => running = false,
-                                        VirtualKeyCode::Right | VirtualKeyCode::Left => {
-                                            if keycode == VirtualKeyCode::Right {
-                                                load_request = LoadRequest::LoadNext;
-                                            } else {
-                                                load_request = LoadRequest::LoadPrevious;
-                                            }
-                                        }
-                                        VirtualKeyCode::Space => {
-                                            playback_state =
-                                                if playback_state == PlaybackState::Forward {
-                                                    let filename = self
-                                                        .image_cache
-                                                        .current_file_name().to_str().unwrap().to_owned();
-                                                    self.set_title_filename(filename.as_ref());
-                                                    PlaybackState::Paused
+                    glutin::Event::WindowEvent { event, .. } => {
+                        let window_size = self.display.gl_window().get_inner_size().unwrap();
+                        self.ui.window_event(&event, window_size.height as u32);
+                        match event {
+                            // Break from the main loop when the window is closed.
+                            WindowEvent::CloseRequested => running = false,
+                            WindowEvent::KeyboardInput { input, .. } => {
+                                if let Some(keycode) = input.virtual_keycode {
+                                    if input.state == glutin::ElementState::Pressed {
+                                        match keycode {
+                                            VirtualKeyCode::Escape => running = false,
+                                            VirtualKeyCode::Right | VirtualKeyCode::Left => {
+                                                if keycode == VirtualKeyCode::Right {
+                                                    load_request = LoadRequest::LoadNext;
                                                 } else {
-                                                    self.set_title_filename("PLAYING");
-                                                    playback_start_time = Instant::now();
-                                                    frame_count_since_playback_start = 0;
-                                                    PlaybackState::Forward
-                                                };
+                                                    load_request = LoadRequest::LoadPrevious;
+                                                }
+                                            }
+                                            VirtualKeyCode::Space => {
+                                                playback_state =
+                                                    if playback_state == PlaybackState::Forward {
+                                                        let filename = self
+                                                            .image_cache
+                                                            .current_file_name().to_str().unwrap().to_owned();
+                                                        self.set_title_filename(filename.as_ref());
+                                                        PlaybackState::Paused
+                                                    } else {
+                                                        self.set_title_filename("PLAYING");
+                                                        playback_start_time = Instant::now();
+                                                        frame_count_since_playback_start = 0;
+                                                        PlaybackState::Forward
+                                                    };
+                                            }
+                                            VirtualKeyCode::R => {
+                                                self.zoom_scale = 1.0;
+                                                self.cam_pos = Vector2::new(0.0, 0.0);
+                                                self.update_projection_transform();
+                                                update_screen = true;
+                                            }
+                                            _ => (),
                                         }
-                                        VirtualKeyCode::R => {
-                                            self.zoom_scale = 1.0;
-                                            self.cam_pos = Vector2::new(0.0, 0.0);
-                                            self.update_projection_transform();
-                                            update_screen = true;
-                                        }
-                                        _ => (),
+                                    } else {
                                     }
+                                }
+                            }
+                            WindowEvent::MouseInput { state, button, .. } => {
+                                if button == glutin::MouseButton::Left {
+                                    left_mouse_down = state == glutin::ElementState::Pressed;
+                                }
+                            }
+                            WindowEvent::CursorMoved { position, .. } => {
+                                if ignore_one_mouse_move {
+                                    ignore_one_mouse_move = false;
                                 } else {
+                                    let pos_vec = Vector2::new(position.x as f32, position.y as f32);
+                                    // Update transform
+                                    if left_mouse_down {
+                                        let inv_projection_transform =
+                                            self.projection_transform.invert().unwrap();
+
+                                        let mut last_world_pos =
+                                            get_mouse_proj(last_mouse_pos, window_size);
+                                        let mut curr_world_pos = get_mouse_proj(pos_vec, window_size);
+
+                                        let tmp = inv_projection_transform
+                                            * Vector4::new(
+                                                last_world_pos.x,
+                                                last_world_pos.y,
+                                                0f32,
+                                                1f32,
+                                            );
+                                        last_world_pos.x = tmp.x;
+                                        last_world_pos.y = tmp.y;
+                                        let tmp = inv_projection_transform
+                                            * Vector4::new(
+                                                curr_world_pos.x,
+                                                curr_world_pos.y,
+                                                0f32,
+                                                1f32,
+                                            );
+                                        curr_world_pos.x = tmp.x;
+                                        curr_world_pos.y = tmp.y;
+
+                                        self.cam_pos += last_world_pos - curr_world_pos;
+
+                                        self.update_projection_transform();
+                                        update_screen = true;
+                                        should_sleep = false;
+                                    }
+
+                                    last_mouse_pos = pos_vec;
                                 }
                             }
-                        }
-                        WindowEvent::MouseInput { state, button, .. } => {
-                            if button == glutin::MouseButton::Left {
-                                left_mouse_down = state == glutin::ElementState::Pressed;
+                            WindowEvent::MouseWheel { delta, .. } => {
+                                use glium::glutin::MouseScrollDelta;
+                                let delta: f32 = match delta {
+                                    MouseScrollDelta::LineDelta(_, y) => {
+                                        //println!("line");
+                                        y
+                                    }
+                                    MouseScrollDelta::PixelDelta(pos) => {
+                                        //println!("pixel");
+                                        (pos.y / 13.0) as f32
+                                    }
+                                };
+                                let delta = delta * 0.375;
+                                let delta = if delta > 0.0 {
+                                    delta + 1.0
+                                } else {
+                                    1.0 / (delta.abs() + 1.0)
+                                };
+
+                                let mut mouse_world = get_mouse_proj(
+                                    last_mouse_pos,
+                                    self.display.gl_window().get_inner_size().unwrap(),
+                                );
+
+                                let transformed = self.projection_transform.invert().unwrap()
+                                    * Vector4::new(mouse_world.x, mouse_world.y, 0.0, 1.0);
+                                mouse_world.x = transformed.x;
+                                mouse_world.y = transformed.y;
+
+                                self.cam_pos += mouse_world * (1.0 - 1.0 / delta);
+                                self.zoom_scale *= delta;
+
+                                self.update_projection_transform();
+
+                                //println!("zoom_scale set to {}", self.zoom_scale);
+                                update_screen = true;
                             }
-                        }
-                        WindowEvent::CursorMoved { position, .. } => {
-                            if ignore_one_mouse_move {
-                                ignore_one_mouse_move = false;
-                            } else {
-                                let pos_vec = Vector2::new(position.x as f32, position.y as f32);
-                                // Update transform
-                                if left_mouse_down {
-                                    let inv_projection_transform =
-                                        self.projection_transform.invert().unwrap();
-
-                                    let window_size =
-                                        self.display.gl_window().get_inner_size().unwrap();
-                                    let mut last_world_pos =
-                                        get_mouse_proj(last_mouse_pos, window_size);
-                                    let mut curr_world_pos = get_mouse_proj(pos_vec, window_size);
-
-                                    let tmp = inv_projection_transform
-                                        * Vector4::new(
-                                            last_world_pos.x,
-                                            last_world_pos.y,
-                                            0f32,
-                                            1f32,
-                                        );
-                                    last_world_pos.x = tmp.x;
-                                    last_world_pos.y = tmp.y;
-                                    let tmp = inv_projection_transform
-                                        * Vector4::new(
-                                            curr_world_pos.x,
-                                            curr_world_pos.y,
-                                            0f32,
-                                            1f32,
-                                        );
-                                    curr_world_pos.x = tmp.x;
-                                    curr_world_pos.y = tmp.y;
-
-                                    self.cam_pos += last_world_pos - curr_world_pos;
-
-                                    self.update_projection_transform();
-                                    update_screen = true;
-                                    should_sleep = false;
+                            WindowEvent::Resized(..) => {
+                                self.update_projection_transform();
+                                self.draw(); // Update immediately on resize.
+                            }
+                            WindowEvent::Focused(gained_focus) => {
+                                if gained_focus {
+                                    ignore_one_mouse_move = true;
                                 }
-
-                                last_mouse_pos = pos_vec;
+                                update_screen = true;
                             }
-                        }
-                        WindowEvent::MouseWheel { delta, .. } => {
-                            use glium::glutin::MouseScrollDelta;
-                            let delta: f32 = match delta {
-                                MouseScrollDelta::LineDelta(_, y) => {
-                                    //println!("line");
-                                    y
+                            WindowEvent::Refresh => {
+                                self.draw();
+                            }
+                            WindowEvent::HoveredFile(file_name) => {
+                                file_hover_state = FileHoverState::HoveredFile{prev_file: self.image_cache.current_file_path()};
+                                load_request = LoadRequest::LoadSpecific(file_name);
+                            }
+                            WindowEvent::HoveredFileCancelled => {
+                                let mut tmp_hover_state = FileHoverState::Idle;
+                                std::mem::swap(&mut file_hover_state, &mut tmp_hover_state);
+                                if let FileHoverState::HoveredFile{prev_file} = tmp_hover_state {
+                                    load_request = LoadRequest::LoadSpecific(prev_file);
                                 }
-                                MouseScrollDelta::PixelDelta(pos) => {
-                                    //println!("pixel");
-                                    (pos.y / 13.0) as f32
+                            }
+                            WindowEvent::DroppedFile(file_name) => {
+                                match file_hover_state {
+                                    FileHoverState::Idle => {
+                                        load_request = LoadRequest::LoadSpecific(file_name);
+                                    }
+                                    _ => (),
                                 }
-                            };
-                            let delta = delta * 0.375;
-                            let delta = if delta > 0.0 {
-                                delta + 1.0
-                            } else {
-                                1.0 / (delta.abs() + 1.0)
-                            };
-
-                            let mut mouse_world = get_mouse_proj(
-                                last_mouse_pos,
-                                self.display.gl_window().get_inner_size().unwrap(),
-                            );
-
-                            let transformed = self.projection_transform.invert().unwrap()
-                                * Vector4::new(mouse_world.x, mouse_world.y, 0.0, 1.0);
-                            mouse_world.x = transformed.x;
-                            mouse_world.y = transformed.y;
-
-                            self.cam_pos += mouse_world * (1.0 - 1.0 / delta);
-                            self.zoom_scale *= delta;
-
-                            self.update_projection_transform();
-
-                            //println!("zoom_scale set to {}", self.zoom_scale);
-                            update_screen = true;
-                        }
-                        WindowEvent::Resized(..) => {
-                            self.update_projection_transform();
-                            self.draw(); // Update immediately on resize.
-                        }
-                        WindowEvent::Focused(gained_focus) => {
-                            if gained_focus {
-                                ignore_one_mouse_move = true;
                             }
-                            update_screen = true;
+                            _ => (),
                         }
-                        WindowEvent::Refresh => {
-                            self.draw();
-                        }
-                        WindowEvent::HoveredFile(file_name) => {
-                            file_hover_state = FileHoverState::HoveredFile{prev_file: self.image_cache.current_file_path()};
-                            load_request = LoadRequest::LoadSpecific(file_name);
-                        }
-                        WindowEvent::HoveredFileCancelled => {
-                            let mut tmp_hover_state = FileHoverState::Idle;
-                            std::mem::swap(&mut file_hover_state, &mut tmp_hover_state);
-                            if let FileHoverState::HoveredFile{prev_file} = tmp_hover_state {
-                                load_request = LoadRequest::LoadSpecific(prev_file);
-                            }
-                        }
-                        WindowEvent::DroppedFile(file_name) => {
-                            match file_hover_state {
-                                FileHoverState::Idle => {
-                                    load_request = LoadRequest::LoadSpecific(file_name);
-                                }
-                                _ => (),
-                            }
-                        }
-                        _ => (),
                     }
                     _ => (),
                 }
@@ -494,9 +514,7 @@ impl MainWindow {
                 should_sleep = false;
             }
 
-            if update_screen {
-                self.draw();
-            }
+            self.draw();
 
             if load_request != LoadRequest::None {
                 self.image_cache.update_directory().unwrap();
@@ -600,6 +618,8 @@ impl MainWindow {
                 .unwrap();
         }
 
+        self.ui.draw(&mut target);
+
         target.finish().unwrap();
     }
 
@@ -623,6 +643,29 @@ impl MainWindow {
             width: window_size.width,
             height: (window_size.height - Self::BOTTOM_PANEL_HEIGHT as f64).max(0.0),
         }
+    }
+
+    fn load_texture_without_cache(
+        display: &glium::Display,
+        image_path: &Path,
+    ) -> SrgbTexture2d {
+        let image = image::open(image_path).unwrap().to_rgba();
+
+        Self::texture_from_image(display, image)
+    }
+
+    fn texture_from_image(
+        display: &glium::Display,
+        image: image::RgbaImage,
+    ) -> SrgbTexture2d {
+        let image_dimensions = image.dimensions();
+        let image = RawImage2d::from_raw_rgba(image.into_raw(), image_dimensions);
+
+        SrgbTexture2d::with_mipmaps(
+            display,
+            image,
+            glium::texture::MipmapsOption::NoMipmap,
+        ).unwrap()
     }
 }
 
