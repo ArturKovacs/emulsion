@@ -75,7 +75,9 @@ impl MainWindow {
 
         let title = Self::create_title_filename(if let Some(name) = img_name { name } else { "" });
 
-        let icon_path = std::env::current_exe().unwrap().parent().unwrap().join("./emulsion32.png");
+        let exe_parent = std::env::current_exe().unwrap().parent().unwrap().to_owned();
+
+        let icon_path = exe_parent.join("emulsion32.png");
         let icon = Icon::from_path(icon_path.clone())
             .unwrap_or_else(|_| panic!(format!("Could not load icon '{}'", icon_path.to_str().unwrap())));
 
@@ -183,11 +185,11 @@ impl MainWindow {
         let button_texture = Rc::new(
             Self::load_texture_without_cache(
                 &resulting_window.display,
-                Path::new("./cogs.png")
+                &exe_parent.join("cogs.png")
             )
         );
 
-        let mut button = resulting_window.ui.create_button(button_texture, || println!("Clicked!"));
+        let _button = resulting_window.ui.create_button(button_texture, || println!("Clicked!"));
 
         resulting_window
     }
@@ -251,13 +253,9 @@ impl MainWindow {
         let mut running = true;
         while running {
             let mut load_request = LoadRequest::None;
-            let mut update_screen = false;
             let mut should_sleep = true;
             events_loop.poll_events(|event| {
                 match event {
-                    glutin::Event::Awakened => {
-                        update_screen = true;
-                    }
                     glutin::Event::WindowEvent { event, .. } => {
                         let window_size = self.display.gl_window().get_inner_size().unwrap();
                         self.ui.window_event(&event, window_size.height as u32);
@@ -295,7 +293,6 @@ impl MainWindow {
                                                 self.zoom_scale = 1.0;
                                                 self.cam_pos = Vector2::new(0.0, 0.0);
                                                 self.update_projection_transform();
-                                                update_screen = true;
                                             }
                                             _ => (),
                                         }
@@ -344,7 +341,6 @@ impl MainWindow {
                                         self.cam_pos += last_world_pos - curr_world_pos;
 
                                         self.update_projection_transform();
-                                        update_screen = true;
                                         should_sleep = false;
                                     }
 
@@ -386,7 +382,6 @@ impl MainWindow {
                                 self.update_projection_transform();
 
                                 //println!("zoom_scale set to {}", self.zoom_scale);
-                                update_screen = true;
                             }
                             WindowEvent::Resized(..) => {
                                 self.update_projection_transform();
@@ -396,7 +391,6 @@ impl MainWindow {
                                 if gained_focus {
                                     ignore_one_mouse_move = true;
                                 }
-                                update_screen = true;
                             }
                             WindowEvent::Refresh => {
                                 self.draw();
@@ -510,7 +504,6 @@ impl MainWindow {
                 }
 
                 self.update_projection_transform();
-                update_screen = true;
                 should_sleep = false;
             }
 

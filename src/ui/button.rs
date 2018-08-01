@@ -3,7 +3,7 @@ use std::rc::Rc;
 use std::boxed::Box;
 
 use glium;
-use glium::{Rect, Surface, Frame};
+use glium::{Surface, Frame};
 use glium::texture::SrgbTexture2d;
 use glium::glutin;
 
