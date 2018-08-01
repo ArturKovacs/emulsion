@@ -75,9 +75,9 @@ impl MainWindow {
 
         let title = Self::create_title_filename(if let Some(name) = img_name { name } else { "" });
 
-        let icon_name = "./emulsion32.png";
-        let icon = Icon::from_path(icon_name)
-            .unwrap_or_else(|_| panic!(format!("Could not load icon '{}'", icon_name)));
+        let icon_path = std::env::current_exe().unwrap().parent().unwrap().join("./emulsion32.png");
+        let icon = Icon::from_path(icon_path.clone())
+            .unwrap_or_else(|_| panic!(format!("Could not load icon '{}'", icon_path.to_str().unwrap())));
 
         let window = glutin::WindowBuilder::new()
             .with_title(title)
