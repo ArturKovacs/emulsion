@@ -48,6 +48,7 @@ struct MainWindow {
     display: glium::Display,
 
     ui: ui::Ui,
+    options_button: ui::ButtonId,
 
     vertex_buffer: glium::VertexBuffer<Vertex>,
     index_buffer: glium::IndexBuffer<u16>,
@@ -162,12 +163,22 @@ impl MainWindow {
         };
 
         // TODO UI INITIALIZATION SHOLD BE MOVED AFTER THE IMAGE IS VISIBLE
-        let ui = ui::Ui::new(&display, Self::BOTTOM_PANEL_HEIGHT);
+        let mut ui = ui::Ui::new(&display, Self::BOTTOM_PANEL_HEIGHT);
+
+        let button_texture = Rc::new(
+            Self::load_texture_without_cache(
+                &display,
+                &exe_parent.join("cogs.png")
+            )
+        );
+
+        let button = ui.create_button(button_texture, ||());
 
         let mut resulting_window = MainWindow {
             image_cache: ImageCache::new(cache_capaxity, thread_count),
             display,
             ui,
+            options_button: button,
             vertex_buffer,
             index_buffer,
             program,
@@ -180,16 +191,6 @@ impl MainWindow {
         if let Some(img_path) = env::args().skip(1).next() {
             resulting_window.load_image(img_path.as_ref());
         };
-
-        // set up ui elements here just for now
-        let button_texture = Rc::new(
-            Self::load_texture_without_cache(
-                &resulting_window.display,
-                &exe_parent.join("cogs.png")
-            )
-        );
-
-        let _button = resulting_window.ui.create_button(button_texture, || println!("Clicked!"));
 
         resulting_window
     }
@@ -248,6 +249,10 @@ impl MainWindow {
         let framerate = 25.0;
         const NANOS_PER_SEC: u64 = 1000_000_000;
         let frame_delta_time_nanos = (NANOS_PER_SEC as f64 / framerate) as u64;
+
+        if let Some(button) = self.ui.get_button_mut(self.options_button) {
+            button.set_callback(Box::new(|| println!("Clicked!")));
+        }
 
         // the main loop
         let mut running = true;

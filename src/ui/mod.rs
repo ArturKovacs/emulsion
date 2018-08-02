@@ -12,6 +12,9 @@ use cgmath::{Matrix4, Vector2};
 mod button;
 use ui::button::Button;
 
+mod label;
+use ui::label::Label;
+
 use shaders;
 
 #[derive(Copy, Clone)]
@@ -42,14 +45,25 @@ pub enum Event {
     }
 }
 
-pub trait Element {
+pub trait ElementFunctions {
     fn draw(&self, target: &mut Frame, context: &DrawContext);
     fn handle_event(&mut self, event: &Event);
 }
 
+
+enum Element {
+    Button(Button),
+    Label(Label)
+}
+
+#[derive(Copy, Clone)]
+pub struct ButtonId {
+    ptr: *mut Button
+}
+
 pub struct Ui {
     height: u32,
-    elements: Vec<Rc<RefCell<dyn Element>>>,
+    elements: Vec<Box<Element>>,
     unit_quad_vertices: VertexBuffer<Vertex>,
     unit_quad_indices: IndexBuffer<u16>,
     program: Program,
@@ -134,7 +148,10 @@ impl Ui {
         };
 
         for element in self.elements.iter_mut() {
-            element.borrow_mut().handle_event(&event);
+            match **element {
+                Element::Button(ref mut button) => button.handle_event(&event),
+                Element::Label(_) => /*TODO*/ (),
+            }
         }
     }
 
@@ -165,21 +182,45 @@ impl Ui {
         };
 
         for element in self.elements.iter() {
-            element.borrow().draw(target, &context);
+            match **element {
+                Element::Button(ref button) => button.draw(target, &context),
+                Element::Label(_) => /*TODO*/ (),
+            }
         }
+    }
+
+    pub fn get_button_mut<'a>(&'a mut self, id: ButtonId) -> Option<&'a mut Button> {
+        for element in self.elements.iter_mut() {
+            if let Element::Button(ref mut button) = **element {
+                let ptr = button as *mut Button;
+                if ptr == id.ptr {
+                    return Some(button);
+                }
+            }
+        }
+
+        None
     }
 
     pub fn create_button(
         &mut self,
         texture: Rc<SrgbTexture2d>,
         callback: fn() -> ()
-    ) -> Rc<RefCell<Button>> {
-        let result = Rc::new(RefCell::new(Button::new(
+    ) -> ButtonId {
+        let mut result = Box::new(Element::Button(Button::new(
             texture, Box::new(callback), Vector2::new(0.0, 0.0),
         )));
 
-        self.elements.push(result.clone());
+        let ptr = if let Element::Button(ref mut button) = *result {
+            button as *mut Button
+        } else {
+            unreachable!()
+        };
 
-        result
+        self.elements.push(result);
+
+        ButtonId {
+            ptr
+        }
     }
 }

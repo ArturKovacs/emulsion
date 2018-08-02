@@ -9,7 +9,7 @@ use glium::glutin;
 
 use cgmath::{Matrix4, Vector2};
 
-use ui::{Element, DrawContext, Event};
+use ui::{ElementFunctions, DrawContext, Event};
 
 
 pub struct Button {
@@ -33,6 +33,10 @@ impl Button {
         }
     }
 
+    pub fn set_callback(&mut self, callback: Box<Fn() -> ()>) {
+        self.callback = callback;
+    }
+
     fn cursor_above(&self, cursor_position: &glutin::dpi::LogicalPosition) -> bool {
         let cursor_x = cursor_position.x as f32;
         let cursor_y = cursor_position.y as f32;
@@ -45,8 +49,7 @@ impl Button {
     }
 }
 
-impl Element for Button {
-
+impl ElementFunctions for Button {
     fn draw(&self, target: &mut Frame, context: &DrawContext) {
         use glium::{Blend, BlendingFunction, LinearBlendingFactor};
 
