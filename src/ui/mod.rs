@@ -126,12 +126,11 @@ impl Ui {
         }
     }
 
-    pub fn window_event(&mut self, event: &glutin::WindowEvent, window_height: u32) {
-
+    pub fn window_event(&mut self, event: &glutin::WindowEvent, window_size: glutin::dpi::LogicalSize) {
         let event = match event {
             glutin::WindowEvent::CursorMoved {position, ..} => {
                 self.cursor_pos.x = position.x;
-                self.cursor_pos.y = window_height as f64 - position.y;
+                self.cursor_pos.y = window_size.height as f64 - position.y;
 
                 Event::MouseMove {
                     position: self.cursor_pos
