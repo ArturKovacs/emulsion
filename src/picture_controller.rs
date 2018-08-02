@@ -135,6 +135,10 @@ impl PictureController {
         }
     }
 
+    pub fn pre_events(&mut self) {
+        self.should_sleep = true;
+    }
+
     pub fn should_sleep(&self) -> bool {
         self.should_sleep
     }
@@ -178,7 +182,6 @@ impl PictureController {
                                     VirtualKeyCode::R => {
                                         self.zoom_scale = 1.0;
                                         self.cam_pos = Vector2::new(0.0, 0.0);
-                                        self.update_projection_transform(panel_size);
                                     }
                                     _ => (),
                                 }
@@ -226,7 +229,6 @@ impl PictureController {
 
                                 self.cam_pos += last_world_pos - curr_world_pos;
 
-                                self.update_projection_transform(panel_size);
                                 self.should_sleep = false;
                             }
 
@@ -265,12 +267,7 @@ impl PictureController {
                         self.cam_pos += mouse_world * (1.0 - 1.0 / delta);
                         self.zoom_scale *= delta;
 
-                        self.update_projection_transform(panel_size);
-
                         //println!("zoom_scale set to {}", self.zoom_scale);
-                    }
-                    WindowEvent::Resized(..) => {
-                        self.update_projection_transform(panel_size);
                     }
                     WindowEvent::Focused(gained_focus) => {
                         if *gained_focus {
@@ -304,9 +301,11 @@ impl PictureController {
     }
 
 
-    pub fn draw(&self, target: &mut Frame, window: &Window) {
+    pub fn draw(&mut self, target: &mut Frame, window: &Window) {
         let window_size = window.display.gl_window().get_inner_size().unwrap();
         let panel_size = Self::get_panel_size(window_size);
+
+        self.update_projection_transform(panel_size);
 
         if let Some(ref texture) = self.image_texture {
             let img_w = texture.width() as f32;

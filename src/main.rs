@@ -126,6 +126,10 @@ impl Program {
                     }
                 }
 
+                // Pre events
+                self.window.pre_events();
+                self.picture_controller.pre_events();
+
                 // Dispatch event
                 self.picture_controller.handle_event(&event, &mut self.window);
                 if let Event::WindowEvent { ref event, .. } = event {
@@ -159,7 +163,12 @@ impl Program {
                 self.window.image_cache.update_directory().unwrap();
             }
 
-            let should_sleep = self.window.should_sleep() && self.picture_controller.should_sleep();
+            let should_sleep = {
+                self.window.should_sleep()
+                && self.picture_controller.should_sleep()
+                && self.window.load_request == LoadRequest::None
+            };
+
 
             // Let other processes run for a bit.
             //thread::yield_now();

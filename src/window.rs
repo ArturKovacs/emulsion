@@ -139,6 +139,9 @@ impl Window {
         resulting_window
     }
 
+    pub fn pre_events(&mut self) {
+        self.should_sleep = true;
+    }
 
     pub fn should_sleep(&self) -> bool {
         self.should_sleep
