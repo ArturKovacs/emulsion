@@ -10,33 +10,26 @@ extern crate sys_info;
 extern crate backtrace;
 
 use std::env;
-use std::ffi::OsString;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::cell::RefCell;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use glium::glutin::{VirtualKeyCode, WindowEvent};
 use glium::{glutin, Surface};
-use glium::glutin::dpi::LogicalSize;
 use glium::texture::{RawImage2d, SrgbTexture2d};
 
-use glium::glutin::EventsLoop;
-
-use cgmath::ElementWise;
-use cgmath::SquareMatrix;
-use cgmath::{Matrix4, Vector2, Vector4};
-
 mod image_cache;
-use image_cache::ImageCache;
-
 mod handle_panic;
 mod ui;
 mod shaders;
 
-mod picture_controller;
-use picture_controller::PictureController;
+mod picture_panel;
+use picture_panel::PicturePanel;
+
+mod playback_manager;
+use playback_manager::{PlaybackManager, LoadRequest};
 
 mod window;
 use window::*;
@@ -64,24 +57,63 @@ fn texture_from_image(
     ).unwrap()
 }
 
+
+trait OptionRefClone {
+    fn ref_clone(&self) -> Self;
+}
+
+impl OptionRefClone for Option<Rc<glium::texture::SrgbTexture2d>> {
+    fn ref_clone(&self) -> Option<Rc<glium::texture::SrgbTexture2d>> {
+        match *self {
+            Some(ref image) => Some(image.clone()),
+            None => None,
+        }
+    }
+}
+
+
 struct Program {
     window: Window,
     ui: ui::Ui,
-    picture_controller: PictureController,
+    picture_panel: PicturePanel,
+    playback_manager: RefCell<PlaybackManager>,
 }
 
 impl Program {
+    fn draw_picture(window: &mut Window, picture_controller: &mut PicturePanel) {
+        let mut target = window.display().draw();
+
+        target.clear_color(0.9, 0.9, 0.9, 0.0);
+        picture_controller.draw(&mut target, window);
+        target.finish().unwrap();
+    }
+
     fn start() {
         let mut events_loop = glutin::EventsLoop::new();
         let mut window = Window::init(&events_loop);
+        let mut picture_panel = PicturePanel::new(window.display());
+        let playback_manager = RefCell::new(PlaybackManager::new());
 
-        // TODO INITIALIZE THE UI AFTER THE IMAGE IS VISIBLE ON THE SCREEN.
-        let mut ui = ui::Ui::new(&window.display, Window::BOTTOM_PANEL_HEIGHT);
+        // Load image
+        if let Some(img_path) = env::args().skip(1).next() {
+            let img_path = PathBuf::from(img_path);
+            let mut playback_manager = playback_manager.borrow_mut();
+            playback_manager.request_load(LoadRequest::LoadSpecific(img_path));
+            playback_manager.update_image(&mut window);
+            picture_panel.set_image(playback_manager.image_texture().ref_clone());
+        } else {
+            window.set_title_filename("Drag and drop an image on the window.");
+        }
+
+        // Just quickly display the loaded image here before we load the remaining parts of the program
+        Self::draw_picture(&mut window, &mut picture_panel);
+        
+        let mut ui = ui::Ui::new(window.display(), Window::BOTTOM_PANEL_HEIGHT);
         let exe_parent = std::env::current_exe().unwrap().parent().unwrap().to_owned();
 
         let button_texture = Rc::new(
             load_texture_without_cache(
-                &window.display,
+                window.display(),
                 &exe_parent.join("cogs.png")
             )
         );
@@ -89,18 +121,25 @@ impl Program {
         let button = ui.create_button(button_texture, ||());
         
         if let Some(button) = ui.get_button_mut(button) {
-            button.set_callback(Box::new(|| println!("Clicked!")));
+            button.set_callback(Box::new(|| {
+                // TODO I want to write something like this:
+                // playback_manager.borrow_mut().request_load(LoadRequest::LoadNext);
+                println!("Clicked!");
+            }));
         }
-
-        let mut picture_controller = PictureController::new(&window.display);
-
+        
         let mut program = Program {
             window,
             ui,
-            picture_controller
+            picture_panel,
+            playback_manager
         };
 
         program.start_event_loop(&mut events_loop);
+    }
+
+    fn load_ui(&mut self) {
+        
     }
 
     fn start_event_loop(&mut self, events_loop: &mut glutin::EventsLoop) {
@@ -127,13 +166,12 @@ impl Program {
                 }
 
                 // Pre events
-                self.window.pre_events();
-                self.picture_controller.pre_events();
+                self.picture_panel.pre_events();
 
                 // Dispatch event
-                self.picture_controller.handle_event(&event, &mut self.window);
+                self.picture_panel.handle_event(&event, &mut self.window, &mut self.playback_manager.borrow_mut());
                 if let Event::WindowEvent { ref event, .. } = event {
-                    let window_size = self.window.display.gl_window().get_inner_size().unwrap();
+                    let window_size = self.window.display().gl_window().get_inner_size().unwrap();
                     self.ui.window_event(&event, window_size);
                 }
 
@@ -146,29 +184,26 @@ impl Program {
                 }
             });
 
-            self.window.update_playback();
+            let load_requested = {
+                let mut playback_manager = self.playback_manager.borrow_mut();
+                playback_manager.update_image(&mut self.window);
+                self.picture_panel.set_image(playback_manager.image_texture().ref_clone());
 
-            if self.window.load_request != LoadRequest::None {
-                let image = match self.window.image_texture {
-                    Some(ref image) => Some(image.clone()),
-                    None => None,
-                };
-                self.picture_controller.set_image(image);
-            }
-
+                *playback_manager.load_request() != LoadRequest::None
+            };
             self.draw();
 
-            // Update dirctory only after draw
-            if self.window.load_request != LoadRequest::None {
-                self.window.image_cache.update_directory().unwrap();
+            let mut playback_manager = self.playback_manager.borrow_mut();
+            // Update dirctory after draw
+            if load_requested {
+                playback_manager.update_directory().unwrap();
             }
 
             let should_sleep = {
-                self.window.should_sleep()
-                && self.picture_controller.should_sleep()
-                && self.window.load_request == LoadRequest::None
+                playback_manager.should_sleep()
+                && self.picture_panel.should_sleep()
+                && !load_requested
             };
-
 
             // Let other processes run for a bit.
             //thread::yield_now();
@@ -179,11 +214,11 @@ impl Program {
     }
 
     fn draw(&mut self) {
-        let mut target = self.window.display.draw();
+        let mut target = self.window.display().draw();
 
         target.clear_color(0.9, 0.9, 0.9, 0.0);
 
-        self.picture_controller.draw(&mut target, &self.window);
+        self.picture_panel.draw(&mut target, &self.window);
         self.ui.draw(&mut target);
 
         target.finish().unwrap();

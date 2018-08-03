@@ -27,6 +27,7 @@ pub mod errors {
 }
 
 use self::errors::*;
+pub use self::errors::Result;
 
 pub struct ImageCache {
     dir_path: PathBuf,
@@ -37,6 +38,7 @@ pub struct ImageCache {
 }
 
 /// This is a store for the supported images loaded from a folder
+/// 
 /// The basic idea is to have a few images already in the memory while an image is shown on the screen
 impl ImageCache {
     /// # Arguemnts
@@ -51,7 +53,7 @@ impl ImageCache {
         }
     }
 
-    pub fn current_file_name<'a>(&'a self) -> &'a OsString {
+    pub fn current_filename<'a>(&'a self) -> &'a OsString {
         &self.current_name
     }
 

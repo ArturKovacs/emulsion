@@ -1,20 +1,14 @@
 
-use std::env;
-use std::ffi::OsString;
-use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::rc::Rc;
-use std::thread;
-use std::time::{Duration, Instant};
 use std::mem;
 
 use glium;
 use glium::glutin::{VirtualKeyCode, WindowEvent};
 use glium::glutin::dpi::LogicalSize;
-use glium::texture::{RawImage2d, SrgbTexture2d};
 use glium::index::PrimitiveType;
 
-use glium::{Display, Rect, Frame, Surface, VertexBuffer, IndexBuffer, Program};
+use glium::{Frame, Surface};
 use glium::glutin;
 
 
@@ -25,6 +19,7 @@ use cgmath::{Matrix4, Vector2, Vector4};
 use shaders;
 
 use window::*;
+use playback_manager::*;
 
 #[derive(Copy, Clone)]
 struct Vertex {
@@ -39,7 +34,7 @@ enum FileHoverState {
     HoveredFile{prev_file: PathBuf}
 }
 
-pub struct PictureController {
+pub struct PicturePanel {
     vertex_buffer: glium::VertexBuffer<Vertex>,
     index_buffer: glium::IndexBuffer<u16>,
     program: glium::Program,
@@ -62,8 +57,8 @@ pub struct PictureController {
     should_sleep: bool,
 }
 
-impl PictureController {
-    pub fn new(display: &glium::Display) -> PictureController {
+impl PicturePanel {
+    pub fn new(display: &glium::Display) -> PicturePanel {
         // Clear the screen right at the start so that the user sees the background color
         // whilst the image is loading.
         {
@@ -115,7 +110,7 @@ impl PictureController {
             },
         ).unwrap();
 
-        PictureController {
+        PicturePanel {
             vertex_buffer,
             index_buffer,
             program,
@@ -147,10 +142,15 @@ impl PictureController {
         self.image_texture = image_texture;
     }
 
-    pub fn handle_event(&mut self, event: &glutin::Event, window: &mut Window) {
+    pub fn handle_event(
+        &mut self,
+        event: &glutin::Event,
+        window: &mut Window,
+        playback_manager: &mut PlaybackManager
+    ) {
         match event {
             glutin::Event::WindowEvent { event, .. } => {
-                let window_size = window.display.gl_window().get_inner_size().unwrap();
+                let window_size = window.display().gl_window().get_inner_size().unwrap();
                 let panel_size = Self::get_panel_size(window_size);
                 match event {
                     WindowEvent::KeyboardInput { input, .. } => {
@@ -159,25 +159,21 @@ impl PictureController {
                                 match keycode {
                                     VirtualKeyCode::Right | VirtualKeyCode::Left => {
                                         if keycode == VirtualKeyCode::Right {
-                                            window.request_load(LoadRequest::LoadNext);
+                                            playback_manager.request_load(LoadRequest::LoadNext);
                                         } else {
-                                            window.request_load(LoadRequest::LoadPrevious);
+                                            playback_manager.request_load(LoadRequest::LoadPrevious);
                                         }
                                     }
                                     VirtualKeyCode::Space => {
-                                        window.playback_state =
-                                            if window.playback_state == PlaybackState::Forward {
-                                                let filename = window
-                                                    .image_cache
-                                                    .current_file_name().to_str().unwrap().to_owned();
-                                                window.set_title_filename(filename.as_ref());
-                                                PlaybackState::Paused
-                                            } else {
-                                                window.set_title_filename("PLAYING");
-                                                window.playback_start_time = Instant::now();
-                                                window.frame_count_since_playback_start = 0;
-                                                PlaybackState::Forward
-                                            };
+                                        if playback_manager.playback_state() == PlaybackState::Forward {
+                                            playback_manager.pause_playback();
+                                            let filename = playback_manager
+                                                .current_filename().to_str().unwrap().to_owned();
+                                            window.set_title_filename(filename.as_ref());
+                                        } else {
+                                            playback_manager.start_playback_forward();
+                                            window.set_title_filename("PLAYING");
+                                        };
                                     }
                                     VirtualKeyCode::R => {
                                         self.zoom_scale = 1.0;
@@ -275,20 +271,20 @@ impl PictureController {
                         }
                     }
                     WindowEvent::HoveredFile(file_name) => {
-                        self.file_hover_state = FileHoverState::HoveredFile{prev_file: window.image_cache.current_file_path()};
-                        window.load_request = LoadRequest::LoadSpecific(file_name.clone());
+                        self.file_hover_state = FileHoverState::HoveredFile{prev_file: playback_manager.current_file_path()};
+                        playback_manager.request_load(LoadRequest::LoadSpecific(file_name.clone()));
                     }
                     WindowEvent::HoveredFileCancelled => {
                         let mut tmp_hover_state = FileHoverState::Idle;
                         mem::swap(&mut self.file_hover_state, &mut tmp_hover_state);
                         if let FileHoverState::HoveredFile{prev_file} = tmp_hover_state {
-                            window.load_request = LoadRequest::LoadSpecific(prev_file);
+                            playback_manager.request_load(LoadRequest::LoadSpecific(prev_file));
                         }
                     }
                     WindowEvent::DroppedFile(file_name) => {
                         match self.file_hover_state {
                             FileHoverState::Idle => {
-                                window.load_request = LoadRequest::LoadSpecific(file_name.clone());
+                                playback_manager.request_load(LoadRequest::LoadSpecific(file_name.clone()));
                             }
                             _ => (),
                         }
@@ -302,7 +298,7 @@ impl PictureController {
 
 
     pub fn draw(&mut self, target: &mut Frame, window: &Window) {
-        let window_size = window.display.gl_window().get_inner_size().unwrap();
+        let window_size = window.display().gl_window().get_inner_size().unwrap();
         let panel_size = Self::get_panel_size(window_size);
 
         self.update_projection_transform(panel_size);
