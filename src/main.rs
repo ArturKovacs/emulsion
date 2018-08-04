@@ -34,6 +34,21 @@ use playback_manager::{PlaybackManager, LoadRequest};
 mod window;
 use window::*;
 
+
+// ========================================================
+// Glorious main function
+// ========================================================
+fn main() {
+    use std::panic;
+    use std::boxed::Box;
+
+    panic::set_hook(Box::new(handle_panic::handle_panic));
+
+    Program::start();
+}
+// ========================================================
+
+
 fn load_texture_without_cache(
     display: &glium::Display,
     image_path: &Path,
@@ -72,14 +87,14 @@ impl OptionRefClone for Option<Rc<glium::texture::SrgbTexture2d>> {
 }
 
 
-struct Program {
-    window: Window,
-    ui: ui::Ui,
-    picture_panel: PicturePanel,
-    playback_manager: RefCell<PlaybackManager>,
+struct Program<'a, 'b: 'a> {
+    window: &'a mut Window,
+    picture_panel: &'a mut PicturePanel,
+    playback_manager: &'a RefCell<PlaybackManager>,
+    ui: &'a mut ui::Ui<'b>,
 }
 
-impl Program {
+impl<'a, 'b: 'a> Program<'a, 'b> {
     fn draw_picture(window: &mut Window, picture_controller: &mut PicturePanel) {
         let mut target = window.display().draw();
 
@@ -109,6 +124,7 @@ impl Program {
         Self::draw_picture(&mut window, &mut picture_panel);
         
         let mut ui = ui::Ui::new(window.display(), Window::BOTTOM_PANEL_HEIGHT);
+
         let exe_parent = std::env::current_exe().unwrap().parent().unwrap().to_owned();
 
         let button_texture = Rc::new(
@@ -119,27 +135,22 @@ impl Program {
         );
 
         let button = ui.create_button(button_texture, ||());
-        
-        if let Some(button) = ui.get_button_mut(button) {
-            button.set_callback(Box::new(|| {
-                // TODO I want to write something like this:
-                // playback_manager.borrow_mut().request_load(LoadRequest::LoadNext);
-                println!("Clicked!");
-            }));
+        {
+            if let Some(button) = ui.get_button_mut(button) {
+                button.set_callback(Box::new(|| {
+                    playback_manager.borrow_mut().request_load(LoadRequest::LoadNext);
+                }));
+            }
         }
         
         let mut program = Program {
-            window,
-            ui,
-            picture_panel,
-            playback_manager
+            window: &mut window,
+            picture_panel: &mut picture_panel,
+            playback_manager: &playback_manager,
+            ui: &mut ui,
         };
 
         program.start_event_loop(&mut events_loop);
-    }
-
-    fn load_ui(&mut self) {
-        
     }
 
     fn start_event_loop(&mut self, events_loop: &mut glutin::EventsLoop) {
@@ -225,11 +236,3 @@ impl Program {
     }
 }
 
-fn main() {
-    use std::panic;
-    use std::boxed::Box;
-
-    panic::set_hook(Box::new(handle_panic::handle_panic));
-
-    Program::start();
-}

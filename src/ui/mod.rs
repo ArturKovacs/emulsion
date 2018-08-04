@@ -51,27 +51,22 @@ pub trait ElementFunctions {
 }
 
 
-enum Element {
-    Button(Button),
-    Label(Label)
-}
-
 #[derive(Copy, Clone)]
-pub struct ButtonId {
-    ptr: *mut Button
+pub struct ButtonId<'a> {
+    ptr: *mut Button<'a>
 }
 
-pub struct Ui {
+pub struct Ui<'a> {
     height: u32,
-    elements: Vec<Box<Element>>,
+    elements: Vec<Box<Button<'a>>>,
     unit_quad_vertices: VertexBuffer<Vertex>,
     unit_quad_indices: IndexBuffer<u16>,
     program: Program,
     cursor_pos: glutin::dpi::LogicalPosition
 }
 
-impl Ui {
-    pub fn new(display: &Display, height: u32) -> Ui {
+impl<'button, 'a: 'button> Ui<'a> {
+    pub fn new(display: &Display, height: u32) -> Self {
         use glium::index::PrimitiveType;
 
         let vertex_buffer = {
@@ -147,10 +142,7 @@ impl Ui {
         };
 
         for element in self.elements.iter_mut() {
-            match **element {
-                Element::Button(ref mut button) => button.handle_event(&event),
-                Element::Label(_) => /*TODO*/ (),
-            }
+            element.handle_event(&event);
         }
     }
 
@@ -181,20 +173,16 @@ impl Ui {
         };
 
         for element in self.elements.iter() {
-            match **element {
-                Element::Button(ref button) => button.draw(target, &context),
-                Element::Label(_) => /*TODO*/ (),
-            }
+            element.draw(target, &context);
         }
     }
 
-    pub fn get_button_mut<'a>(&'a mut self, id: ButtonId) -> Option<&'a mut Button> {
+    pub fn get_button_mut(&'button mut self, id: ButtonId<'a>) -> Option<&'button mut Button<'a>> {
         for element in self.elements.iter_mut() {
-            if let Element::Button(ref mut button) = **element {
-                let ptr = button as *mut Button;
-                if ptr == id.ptr {
-                    return Some(button);
-                }
+            let element = &mut (**element);
+            let ptr = element as *mut Button;
+            if ptr == id.ptr {
+                return Some(element);
             }
         }
 
@@ -205,16 +193,12 @@ impl Ui {
         &mut self,
         texture: Rc<SrgbTexture2d>,
         callback: fn() -> ()
-    ) -> ButtonId {
-        let mut result = Box::new(Element::Button(Button::new(
+    ) -> ButtonId<'a> {
+        let mut result = Box::new(Button::new(
             texture, Box::new(callback), Vector2::new(0.0, 0.0),
-        )));
+        ));
 
-        let ptr = if let Element::Button(ref mut button) = *result {
-            button as *mut Button
-        } else {
-            unreachable!()
-        };
+        let ptr = &mut (*result) as *mut Button;
 
         self.elements.push(result);
 

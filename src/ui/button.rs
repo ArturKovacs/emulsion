@@ -12,19 +12,19 @@ use cgmath::{Matrix4, Vector2};
 use ui::{ElementFunctions, DrawContext, Event};
 
 
-pub struct Button {
+pub struct Button<'a> {
     texture: Rc<SrgbTexture2d>,
-    callback: Box<Fn() -> ()>,
+    callback: Box<Fn() -> () + 'a>,
     position: Vector2<f32>,
     hover: bool
 }
 
-impl Button {
+impl<'a> Button<'a> {
     pub fn new(
         texture: Rc<SrgbTexture2d>,
-        callback: Box<Fn() -> ()>,
+        callback: Box<Fn() -> () + 'a>,
         position: Vector2<f32>,
-    ) -> Button {
+    ) -> Self {
         Button {
             texture,
             callback,
@@ -33,7 +33,7 @@ impl Button {
         }
     }
 
-    pub fn set_callback(&mut self, callback: Box<Fn() -> ()>) {
+    pub fn set_callback(&mut self, callback: Box<Fn() -> () + 'a>) {
         self.callback = callback;
     }
 
@@ -49,7 +49,7 @@ impl Button {
     }
 }
 
-impl ElementFunctions for Button {
+impl<'a> ElementFunctions for Button<'a> {
     fn draw(&self, target: &mut Frame, context: &DrawContext) {
         use glium::{Blend, BlendingFunction, LinearBlendingFactor};
 

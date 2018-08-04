@@ -48,7 +48,7 @@ pub struct PlaybackManager {
 
 
 impl PlaybackManager {
-    pub fn new() -> PlaybackManager {
+    pub fn new() -> Self {
         let cache_capaxity = match sys_info::mem_info() {
             Ok(value) => {
                 // value originally reported in KiB

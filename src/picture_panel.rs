@@ -58,7 +58,7 @@ pub struct PicturePanel {
 }
 
 impl PicturePanel {
-    pub fn new(display: &glium::Display) -> PicturePanel {
+    pub fn new(display: &glium::Display) -> Self {
         // Clear the screen right at the start so that the user sees the background color
         // whilst the image is loading.
         {
