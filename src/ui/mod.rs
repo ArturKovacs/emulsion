@@ -1,4 +1,5 @@
 
+use std::mem;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::boxed::Box;
@@ -11,6 +12,9 @@ use cgmath::{Matrix4, Vector2};
 
 mod button;
 use ui::button::Button;
+
+mod toggle;
+use ui::toggle::Toggle;
 
 mod label;
 use ui::label::Label;
@@ -56,17 +60,22 @@ pub struct ButtonId<'a> {
     ptr: *mut Button<'a>
 }
 
+#[derive(Copy, Clone)]
+pub struct ToggleId<'a> {
+    ptr: *mut Toggle<'a>
+}
+
 pub struct Ui<'a> {
-    height: u32,
-    elements: Vec<Box<Button<'a>>>,
+    buttons: Vec<Box<Button<'a>>>,
+    toggles: Vec<Box<Toggle<'a>>>,
     unit_quad_vertices: VertexBuffer<Vertex>,
     unit_quad_indices: IndexBuffer<u16>,
     program: Program,
     cursor_pos: glutin::dpi::LogicalPosition
 }
 
-impl<'button, 'a: 'button> Ui<'a> {
-    pub fn new(display: &Display, height: u32) -> Self {
+impl<'reference, 'element: 'reference> Ui<'element> {
+    pub fn new(display: &Display) -> Self {
         use glium::index::PrimitiveType;
 
         let vertex_buffer = {
@@ -112,14 +121,15 @@ impl<'button, 'a: 'button> Ui<'a> {
         ).unwrap();
 
         Ui {
-            height,
-            elements: Vec::new(),
+            buttons: Vec::new(),
+            toggles: Vec::new(),
             unit_quad_vertices: vertex_buffer,
             unit_quad_indices: index_buffer,
             program,
             cursor_pos: glutin::dpi::LogicalPosition::new(0.0, 0.0)
         }
     }
+
 
     pub fn window_event(&mut self, event: &glutin::WindowEvent, window_size: glutin::dpi::LogicalSize) {
         let event = match event {
@@ -141,10 +151,14 @@ impl<'button, 'a: 'button> Ui<'a> {
             _ => return,
         };
 
-        for element in self.elements.iter_mut() {
-            element.handle_event(&event);
+        for button in self.buttons.iter_mut() {
+            button.handle_event(&event);
+        }
+        for toggle in self.toggles.iter_mut() {
+            toggle.handle_event(&event);
         }
     }
+
 
     pub fn draw(&self, target: &mut Frame) {
         use cgmath::ortho;
@@ -172,38 +186,78 @@ impl<'button, 'a: 'button> Ui<'a> {
             projection_transform: &projection_transform,
         };
 
-        for element in self.elements.iter() {
-            element.draw(target, &context);
+        for button in self.buttons.iter() {
+            button.draw(target, &context);
+        }
+        for toggle in self.toggles.iter() {
+            toggle.draw(target, &context);
         }
     }
 
-    pub fn get_button_mut(&'button mut self, id: ButtonId<'a>) -> Option<&'button mut Button<'a>> {
-        for element in self.elements.iter_mut() {
-            let element = &mut (**element);
-            let ptr = element as *mut Button;
+
+    pub fn get_button_mut(&'reference mut self, id: ButtonId<'element>)
+    -> Option<&'reference mut Button<'element>> {
+        for button in self.buttons.iter_mut() {
+            let button = &mut (**button);
+            let ptr = button as *mut Button;
             if ptr == id.ptr {
-                return Some(element);
+                return Some(button);
             }
         }
-
         None
     }
+
+
+    pub fn get_toggle_mut(&'reference mut self, id: ToggleId<'element>)
+    -> Option<&'reference mut Toggle<'element>> {
+        for toggle in self.toggles.iter_mut() {
+            let mut toggle = &mut (**toggle);
+            let ptr = toggle as *mut Toggle;
+            if ptr == id.ptr {
+                return Some(toggle);
+            }
+        }
+        None
+    }
+
 
     pub fn create_button(
         &mut self,
         texture: Rc<SrgbTexture2d>,
         position: Vector2<f32>,
-        callback: fn() -> ()
-    ) -> ButtonId<'a> {
+        callback: Box<Fn() -> () + 'element>
+    ) -> ButtonId<'element> {
         let mut result = Box::new(Button::new(
-            texture, Box::new(callback), position,
+            texture, callback, position,
         ));
 
         let ptr = &mut (*result) as *mut Button;
 
-        self.elements.push(result);
+        self.buttons.push(result);
 
         ButtonId {
+            ptr
+        }
+    }
+
+
+    pub fn create_toggle(
+        &mut self,
+        texture_on: Rc<SrgbTexture2d>,
+        texture_off: Rc<SrgbTexture2d>,
+        position: Vector2<f32>,
+        is_on: bool,
+        callback: Box<Fn(bool) -> () + 'element>
+    ) -> ToggleId<'element> {
+        let mut result = Box::new(Toggle::new(
+            texture_on, texture_off, callback, position, is_on
+        ));
+
+        let ptr = &mut (*result) as *mut Toggle;
+
+        self.toggles.push(result);
+
+        ToggleId {
             ptr
         }
     }

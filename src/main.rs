@@ -89,15 +89,15 @@ impl OptionRefClone for Option<Rc<glium::texture::SrgbTexture2d>> {
 }
 
 
-struct Program<'a, 'b: 'a> {
+struct Program<'a> {
     bottom_panel_height: f64,
     window: &'a mut Window,
     picture_panel: &'a mut PicturePanel,
     playback_manager: &'a RefCell<PlaybackManager>,
-    ui: &'a mut ui::Ui<'b>,
+    ui: ui::Ui<'a>,
 }
 
-impl<'a, 'b: 'a> Program<'a, 'b> {
+impl<'a> Program<'a> {
     fn draw_picture(window: &mut Window, picture_controller: &mut PicturePanel) {
         let mut target = window.display().draw();
 
@@ -128,36 +128,59 @@ impl<'a, 'b: 'a> Program<'a, 'b> {
         // Just quickly display the loaded image here before we load the remaining parts of the program
         Self::draw_picture(&mut window, &mut picture_panel);
         
-        let mut ui = ui::Ui::new(window.display(), bottom_panel_height);
+        let mut ui = ui::Ui::new(window.display());
+        
+        Self::init_ui(&mut ui, &mut window, &playback_manager);
 
+        let mut program = Program {
+            bottom_panel_height: bottom_panel_height as f64,
+            window: &mut window,
+            picture_panel: &mut picture_panel,
+            playback_manager: &playback_manager,
+            ui: ui,
+        };
+
+        program.start_event_loop(&mut events_loop);
+    }
+
+    fn init_ui<'b>(
+        ui: &mut ui::Ui<'b>,
+        window: &mut Window,
+        playback_manager: &'b RefCell<PlaybackManager>,
+    ) {
         let exe_parent = std::env::current_exe().unwrap().parent().unwrap().to_owned();
-
         let button_texture = Rc::new(
             load_texture_without_cache(
                 window.display(),
                 &exe_parent.join("cogs.png")
             )
         );
+        let light_texture = Rc::new(
+            load_texture_without_cache(
+                window.display(),
+                &exe_parent.join("light.png")
+            )
+        );
+        let moon_texture = Rc::new(
+            load_texture_without_cache(
+                window.display(),
+                &exe_parent.join("moon.png")
+            )
+        );
 
-        let button = ui.create_button(button_texture, Vector2::new(8f32, 4f32), ||());
+        let button = ui.create_button(button_texture, Vector2::new(32f32, 4f32), Box::new(||()));
         {
             if let Some(button) = ui.get_button_mut(button) {
-                button.set_callback(Box::new(|| {
+                button.set_callback(Box::new(move || {
                     playback_manager.borrow_mut().request_load(LoadRequest::LoadNext);
                 }));
             }
         }
-        
-        let mut program = Program {
-            bottom_panel_height: bottom_panel_height as f64,
-            window: &mut window,
-            picture_panel: &mut picture_panel,
-            playback_manager: &playback_manager,
-            ui: &mut ui,
-        };
-
-        program.start_event_loop(&mut events_loop);
+        let _ = ui.create_toggle(moon_texture, light_texture, Vector2::new(4f32, 4f32), true, Box::new(move |is_light| {
+            playback_manager.borrow_mut().request_load(LoadRequest::LoadNext);
+        }));
     }
+
 
     fn start_event_loop(&mut self, events_loop: &mut glutin::EventsLoop) {
         let mut running = true;

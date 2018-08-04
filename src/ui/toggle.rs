@@ -12,30 +12,36 @@ use cgmath::{Matrix4, Vector2};
 use ui::{ElementFunctions, DrawContext, Event};
 
 
-pub struct Button<'a> {
-    texture: Rc<SrgbTexture2d>,
-    callback: Box<Fn() -> () + 'a>,
+pub struct Toggle<'a> {
+    texture_on: Rc<SrgbTexture2d>,
+    texture_off: Rc<SrgbTexture2d>,
+    callback: Box<Fn(bool) -> () + 'a>,
     position: Vector2<f32>,
+    is_on: bool,
     hover: bool,
     click: bool,
 }
 
-impl<'a> Button<'a> {
+impl<'a> Toggle<'a> {
     pub fn new(
-        texture: Rc<SrgbTexture2d>,
-        callback: Box<Fn() -> () + 'a>,
+        texture_on: Rc<SrgbTexture2d>,
+        texture_off: Rc<SrgbTexture2d>,
+        callback: Box<Fn(bool) -> () + 'a>,
         position: Vector2<f32>,
+        is_on: bool,
     ) -> Self {
-        Button {
-            texture,
+        Toggle {
+            texture_on,
+            texture_off,
             callback,
             position,
+            is_on,
             hover: false,
             click: false,
         }
     }
 
-    pub fn set_callback(&mut self, callback: Box<Fn() -> () + 'a>) {
+    pub fn set_callback(&mut self, callback: Box<Fn(bool) -> () + 'a>) {
         self.callback = callback;
     }
 
@@ -43,20 +49,22 @@ impl<'a> Button<'a> {
         let cursor_x = cursor_position.x as f32;
         let cursor_y = cursor_position.y as f32;
 
-        let img_w = self.texture.width() as f32;
-        let img_h = self.texture.height() as f32;
+        let img_w = self.texture_on.width() as f32;
+        let img_h = self.texture_on.height() as f32;
 
         cursor_x as f32 > self.position.x && cursor_x < (self.position.x + img_w)
             && cursor_y as f32 > self.position.y && cursor_y < (self.position.y + img_h)
     }
 }
 
-impl<'a> ElementFunctions for Button<'a> {
+impl<'a> ElementFunctions for Toggle<'a> {
     fn draw(&self, target: &mut Frame, context: &DrawContext) {
         use glium::{Blend, BlendingFunction, LinearBlendingFactor};
 
-        let img_w = self.texture.width() as f32;
-        let img_h = self.texture.height() as f32;
+        let texture = if self.is_on { &self.texture_on } else { &self.texture_off };
+
+        let img_w = texture.width() as f32;
+        let img_h = texture.height() as f32;
 
         // Model tranform
         let transform = Matrix4::from_nonuniform_scale(img_w, img_h, 1.0);
@@ -64,7 +72,7 @@ impl<'a> ElementFunctions for Button<'a> {
         // Projection
         let transform = context.projection_transform * transform;
 
-        let sampler = self.texture
+        let sampler = texture
             .sampled()
             .wrap_function(glium::uniforms::SamplerWrapFunction::Clamp)
             .magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest);
@@ -100,7 +108,6 @@ impl<'a> ElementFunctions for Button<'a> {
             .unwrap();
     }
 
-
     fn handle_event(&mut self, event: &Event) {
         match event {
             Event::MouseButton {button, state, position } => {
@@ -109,7 +116,8 @@ impl<'a> ElementFunctions for Button<'a> {
                         if *state == glutin::ElementState::Pressed {
                             self.click = true;
                         } else if self.click == true {
-                            (self.callback)();
+                            self.is_on = !self.is_on;
+                            (self.callback)(self.is_on);
                             self.click = false;
                         }
                     } else {
