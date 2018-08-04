@@ -16,7 +16,8 @@ pub struct Button<'a> {
     texture: Rc<SrgbTexture2d>,
     callback: Box<Fn() -> () + 'a>,
     position: Vector2<f32>,
-    hover: bool
+    hover: bool,
+    click: bool,
 }
 
 impl<'a> Button<'a> {
@@ -29,7 +30,8 @@ impl<'a> Button<'a> {
             texture,
             callback,
             position,
-            hover: false
+            hover: false,
+            click: false,
         }
     }
 
@@ -58,7 +60,7 @@ impl<'a> ElementFunctions for Button<'a> {
 
         // Model tranform
         let transform = Matrix4::from_nonuniform_scale(img_w, img_h, 1.0);
-        let transform = Matrix4::from_translation(-1.0 * self.position.extend(0.0)) * transform;
+        let transform = Matrix4::from_translation(self.position.extend(0.0)) * transform;
         // Projection
         let transform = context.projection_transform * transform;
 
@@ -67,11 +69,14 @@ impl<'a> ElementFunctions for Button<'a> {
             .wrap_function(glium::uniforms::SamplerWrapFunction::Clamp)
             .magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest);
       
+        let texture_size = [img_w, img_h];
         // building the uniforms
         let uniforms = uniform! {
             matrix: Into::<[[f32; 4]; 4]>::into(transform),
             tex: sampler,
-            brighten: if self.hover { 0.25f32 } else { 0.0f32 }
+            texture_size: texture_size,
+            brighten: if self.hover { 0.15f32 } else { 0.0f32 },
+            shadow_offset: if self.click { 0.7f32 } else { 0.8f32 }
         };
         let image_draw_params = glium::DrawParameters {
             viewport: Some(*context.viewport),
@@ -99,9 +104,14 @@ impl<'a> ElementFunctions for Button<'a> {
     fn handle_event(&mut self, event: &Event) {
         match event {
             Event::MouseButton {button, state, position } => {
-                if *button == glutin::MouseButton::Left && *state == glutin::ElementState::Pressed {
+                if *button == glutin::MouseButton::Left {
                     if self.cursor_above(position) {
-                        (self.callback)();
+                        if *state == glutin::ElementState::Pressed {
+                            self.click = true;
+                        } else {
+                            (self.callback)();
+                            self.click = false;
+                        }
                     }
                 }
             }

@@ -11,8 +11,6 @@ pub struct Window {
 }
 
 impl Window {
-    pub const BOTTOM_PANEL_HEIGHT: u32 = 32;
-
     pub fn init(events_loop: &glutin::EventsLoop) -> Self {
         use glium::glutin::Icon;
 

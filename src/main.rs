@@ -20,6 +20,8 @@ use glium::glutin::{VirtualKeyCode, WindowEvent};
 use glium::{glutin, Surface};
 use glium::texture::{RawImage2d, SrgbTexture2d};
 
+use cgmath::Vector2;
+
 mod image_cache;
 mod handle_panic;
 mod ui;
@@ -88,6 +90,7 @@ impl OptionRefClone for Option<Rc<glium::texture::SrgbTexture2d>> {
 
 
 struct Program<'a, 'b: 'a> {
+    bottom_panel_height: f64,
     window: &'a mut Window,
     picture_panel: &'a mut PicturePanel,
     playback_manager: &'a RefCell<PlaybackManager>,
@@ -104,9 +107,11 @@ impl<'a, 'b: 'a> Program<'a, 'b> {
     }
 
     fn start() {
+        let bottom_panel_height = 32;
+
         let mut events_loop = glutin::EventsLoop::new();
         let mut window = Window::init(&events_loop);
-        let mut picture_panel = PicturePanel::new(window.display());
+        let mut picture_panel = PicturePanel::new(window.display(), bottom_panel_height);
         let playback_manager = RefCell::new(PlaybackManager::new());
 
         // Load image
@@ -123,7 +128,7 @@ impl<'a, 'b: 'a> Program<'a, 'b> {
         // Just quickly display the loaded image here before we load the remaining parts of the program
         Self::draw_picture(&mut window, &mut picture_panel);
         
-        let mut ui = ui::Ui::new(window.display(), Window::BOTTOM_PANEL_HEIGHT);
+        let mut ui = ui::Ui::new(window.display(), bottom_panel_height);
 
         let exe_parent = std::env::current_exe().unwrap().parent().unwrap().to_owned();
 
@@ -134,7 +139,7 @@ impl<'a, 'b: 'a> Program<'a, 'b> {
             )
         );
 
-        let button = ui.create_button(button_texture, ||());
+        let button = ui.create_button(button_texture, Vector2::new(8f32, 4f32), ||());
         {
             if let Some(button) = ui.get_button_mut(button) {
                 button.set_callback(Box::new(|| {
@@ -144,6 +149,7 @@ impl<'a, 'b: 'a> Program<'a, 'b> {
         }
         
         let mut program = Program {
+            bottom_panel_height: bottom_panel_height as f64,
             window: &mut window,
             picture_panel: &mut picture_panel,
             playback_manager: &playback_manager,
@@ -155,6 +161,7 @@ impl<'a, 'b: 'a> Program<'a, 'b> {
 
     fn start_event_loop(&mut self, events_loop: &mut glutin::EventsLoop) {
         let mut running = true;
+        let mut mouse_y = 0f64;
         // the main loop
         while running {
             events_loop.poll_events(|event| {
@@ -171,6 +178,9 @@ impl<'a, 'b: 'a> Program<'a, 'b> {
                                     }
                                 }
                             }
+                        },
+                        WindowEvent::CursorMoved { position, .. } => {
+                            mouse_y = position.y;
                         }
                         _ => (),
                     }
@@ -180,11 +190,26 @@ impl<'a, 'b: 'a> Program<'a, 'b> {
                 self.picture_panel.pre_events();
 
                 // Dispatch event
-                self.picture_panel.handle_event(&event, &mut self.window, &mut self.playback_manager.borrow_mut());
-                if let Event::WindowEvent { ref event, .. } = event {
-                    let window_size = self.window.display().gl_window().get_inner_size().unwrap();
-                    self.ui.window_event(&event, window_size);
+                let window_size = self.window.display().gl_window().get_inner_size().unwrap();
+                match event {
+                    Event::WindowEvent {event: WindowEvent::MouseInput {..}, ..} => {
+                        if mouse_y < (window_size.height - self.bottom_panel_height) {
+                            self.picture_panel.handle_event(&event, &mut self.window, &mut self.playback_manager.borrow_mut());
+                        } else {
+                            if let Event::WindowEvent { ref event, .. } = event {
+                                let window_size = self.window.display().gl_window().get_inner_size().unwrap();
+                                self.ui.window_event(&event, window_size);
+                            }
+                        }
+                    }
+                    _ => {
+                        if let Event::WindowEvent { ref event, .. } = event {
+                            self.ui.window_event(&event, window_size);
+                        }
+                        self.picture_panel.handle_event(&event, &mut self.window, &mut self.playback_manager.borrow_mut());
+                    }
                 }
+                
 
                 // Update screen after a resize event or refresh
                 if let Event::WindowEvent { event, .. } = event {

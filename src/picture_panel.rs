@@ -42,6 +42,7 @@ pub struct PicturePanel {
     zoom_scale: f32,
     cam_pos: Vector2<f32>,
     projection_transform: Matrix4<f32>,
+    bottom: u32,
 
     // On Windows there is a bug that the cursor moved event will get
     // triggered with 0, 0 corrdinates when the window regains focus by
@@ -58,7 +59,7 @@ pub struct PicturePanel {
 }
 
 impl PicturePanel {
-    pub fn new(display: &glium::Display) -> Self {
+    pub fn new(display: &glium::Display, bottom: u32) -> Self {
         // Clear the screen right at the start so that the user sees the background color
         // whilst the image is loading.
         {
@@ -118,6 +119,7 @@ impl PicturePanel {
             zoom_scale: 1.0,
             cam_pos: Vector2::new(0.0, 0.0),
             projection_transform: Matrix4::identity(),
+            bottom,
 
             file_hover_state: FileHoverState::Idle,
 
@@ -151,7 +153,7 @@ impl PicturePanel {
         match event {
             glutin::Event::WindowEvent { event, .. } => {
                 let window_size = window.display().gl_window().get_inner_size().unwrap();
-                let panel_size = Self::get_panel_size(window_size);
+                let panel_size = self.get_panel_size(window_size);
                 match event {
                     WindowEvent::KeyboardInput { input, .. } => {
                         if let Some(keycode) = input.virtual_keycode {
@@ -299,7 +301,7 @@ impl PicturePanel {
 
     pub fn draw(&mut self, target: &mut Frame, window: &Window) {
         let window_size = window.display().gl_window().get_inner_size().unwrap();
-        let panel_size = Self::get_panel_size(window_size);
+        let panel_size = self.get_panel_size(window_size);
 
         self.update_projection_transform(panel_size);
 
@@ -330,9 +332,9 @@ impl PicturePanel {
             let image_draw_params = glium::DrawParameters {
                 viewport: Some(glium::Rect {
                     left: 0,
-                    bottom: Window::BOTTOM_PANEL_HEIGHT,
+                    bottom: self.bottom,
                     width: window_size.width as u32,
-                    height: window_size.height as u32 - Window::BOTTOM_PANEL_HEIGHT
+                    height: window_size.height as u32 - self.bottom
                 }),
                 .. Default::default()
             };
@@ -395,10 +397,10 @@ impl PicturePanel {
         }
     }
 
-    fn get_panel_size(window_size: LogicalSize) -> LogicalSize {
+    fn get_panel_size(&self, window_size: LogicalSize) -> LogicalSize {
         LogicalSize {
             width: window_size.width,
-            height: (window_size.height - Window::BOTTOM_PANEL_HEIGHT as f64).max(0.0),
+            height: (window_size.height - self.bottom as f64).max(0.0),
         }
     }
 }

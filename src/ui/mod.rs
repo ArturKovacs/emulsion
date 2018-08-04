@@ -192,10 +192,11 @@ impl<'button, 'a: 'button> Ui<'a> {
     pub fn create_button(
         &mut self,
         texture: Rc<SrgbTexture2d>,
+        position: Vector2<f32>,
         callback: fn() -> ()
     ) -> ButtonId<'a> {
         let mut result = Box::new(Button::new(
-            texture, Box::new(callback), Vector2::new(0.0, 0.0),
+            texture, Box::new(callback), position,
         ));
 
         let ptr = &mut (*result) as *mut Button;
