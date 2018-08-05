@@ -10,7 +10,7 @@ extern crate sys_info;
 extern crate backtrace;
 
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::thread;
@@ -18,9 +18,7 @@ use std::time::Duration;
 
 use glium::glutin::{VirtualKeyCode, WindowEvent};
 use glium::{glutin, Surface};
-use glium::texture::{RawImage2d, SrgbTexture2d};
 
-use cgmath::Vector2;
 
 mod image_cache;
 mod handle_panic;
@@ -116,13 +114,6 @@ impl<'a> Program<'a> {
         program.start_event_loop(&mut events_loop);
     }
 
-
-    fn init_ui<'b>(
-        ui: &mut ui::Ui<'b>,
-        window: &mut Window,
-        playback_manager: &'b RefCell<PlaybackManager>,
-    ) {
-    }
 
     fn start_event_loop(&mut self, events_loop: &mut glutin::EventsLoop) {
         let mut running = true;

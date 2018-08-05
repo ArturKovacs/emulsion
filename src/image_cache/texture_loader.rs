@@ -9,8 +9,6 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use std::iter;
-
 use glium;
 
 use glium::texture::{RawImage2d, SrgbTexture2d};
@@ -179,24 +177,18 @@ impl TextureLoader {
         Ok(())
     }
 
-    pub fn send_load_requests(&mut self, dir_files: &Vec<fs::DirEntry>, current_name: &OsString) {
+    pub fn send_load_requests(&mut self, dir_files: &Vec<fs::DirEntry>, current_index: usize) {
         use std::collections::btree_map::Entry;
 
-        let mut iter = dir_files.iter();
-
-        // Step until curr file
-        while let Some(entry) = iter.next() {
-            if entry.file_name() == *current_name {
-                break;
-            }
-        }
+        let mut index = current_index;
 
         let mut requested_images = 0;
         // Send as many load requests so that the estimated total will just fill the cache
         let mut estimated_remaining_cap = self.remaining_capacity;
         while estimated_remaining_cap > self.curr_est_size as isize {
             // Send a load request for the closest file not in the cache or outdated
-            if let Some(file) = iter.next() {
+            index += 1;
+            if let Some(file) = dir_files.get(index) {
                 let file_path = file.path();
                 let file_name = if let Some(file_name) = file_path.file_name() {
                     file_name.to_owned()
@@ -354,114 +346,6 @@ impl TextureLoader {
         Ok(result_texture)
     }
 
-    pub fn load_iter_jump<'a, IterT>(
-        &mut self,
-        display: &glium::Display,
-        mut entries_twice: IterT,
-        jump_count: u32,
-        current_name: &OsString,
-    ) -> Result<(Rc<SrgbTexture2d>, OsString)>
-    where
-        IterT: iter::Iterator<Item = &'a fs::DirEntry>,
-    {
-        let mut jump_remaining = jump_count;
-        'finding_current: while let Some(curr_file) = entries_twice.next() {
-            if curr_file.file_type()?.is_file() {
-                if curr_file.file_name() == *current_name {
-                    // Find next file
-                    'finding_target: while let Some(next) = entries_twice.next() {
-                        if next.file_type().unwrap().is_file() {
-                            let next_filepath = next.path();
-                            if Self::is_file_supported(next_filepath.as_ref()) {
-                                if jump_remaining > 0 {
-                                    jump_remaining -= 1;
-                                }
-
-                                if jump_remaining == 0 {
-                                    let next_filepath_str = next_filepath.to_str().unwrap();
-                                    match self.load_specific(display, &next_filepath) {
-                                        Err(Error(ErrorKind::ImageLoadError(_err), ..)) => {
-                                            // The file has to be supported at this point
-                                            return Err(Error::from(
-                                                format!("Image file should have been supported but it is not. ('{}')", next_filepath_str),
-                                            ));
-                                        }
-                                        Err(err) => {
-                                            // Some other error occured, it is a bad sign,
-                                            // just return the error
-                                            return Err(err);
-                                        }
-                                        Ok(result) => {
-                                            return Ok((
-                                                result,
-                                                next_filepath.file_name().unwrap().to_owned(),
-                                            ));
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    return Err(Error::from("Couldn't jump to the requested file."));
-                }
-            }
-        }
-
-        Err(Error::from(
-            "Couldn't find the current file in the the directory",
-        ))
-    }
-
-    ///
-    /// entries_twice should be an iterator of the folder chained with itself.
-    ///
-    pub fn load_iter_next<'a, IterT>(
-        &mut self,
-        display: &glium::Display,
-        mut entries_twice: IterT,
-        current_name: &OsString,
-    ) -> Result<(Rc<SrgbTexture2d>, OsString)>
-    where
-        IterT: iter::Iterator<Item = &'a fs::DirEntry>,
-    {
-        'finding_current: while let Some(curr_file) = entries_twice.next() {
-            if curr_file.file_type()?.is_file() {
-                if curr_file.file_name() == *current_name {
-                    // Find next file
-                    'finding_next: while let Some(next) = entries_twice.next() {
-                        if next.file_type().unwrap().is_file() {
-                            let next_filename = next.path();
-                            match self.load_specific(display, &next_filename) {
-                                Err(Error(ErrorKind::ImageLoadError(_err), ..)) => {
-                                    // Image type not supported, just skip it
-                                    continue 'finding_next;
-                                }
-                                Err(err) => {
-                                    // Some other error occured, it is a bad sign,
-                                    // just return the error
-                                    return Err(err);
-                                }
-                                Ok(result) => {
-                                    return Ok((
-                                        result,
-                                        next_filename.file_name().unwrap().to_owned(),
-                                    ));
-                                }
-                            }
-                        }
-                    }
-                    // Current already found at this point
-                    break 'finding_current;
-                }
-            }
-        }
-
-        Err(Error::from(format!(
-            "Couldn't find the current file in the the directory. Current file: '{}'",
-            current_name.to_str().unwrap()
-        )))
-    }
 
     pub fn load_image(image_path: &Path) -> Result<image::RgbaImage> {
         Ok(image::open(image_path)?.to_rgba())

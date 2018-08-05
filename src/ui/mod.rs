@@ -1,7 +1,5 @@
 
-use std::mem;
 use std::rc::Rc;
-use std::cell::RefCell;
 use std::boxed::Box;
 
 use glium::{Display, Rect, Frame, Surface, VertexBuffer, IndexBuffer, Program};

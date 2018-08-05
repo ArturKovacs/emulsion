@@ -1,15 +1,15 @@
 
 
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::thread;
-use std::time::Duration;
+
+
 
 use glium;
-use glium::glutin::{VirtualKeyCode, WindowEvent};
-use glium::{glutin, Surface};
+use glium::glutin::WindowEvent;
+use glium::glutin;
 use glium::texture::{RawImage2d, SrgbTexture2d};
 
 use image;
@@ -17,7 +17,6 @@ use image;
 use cgmath::Vector2;
 
 use ui::{Ui, SliderId};
-use picture_panel::PicturePanel;
 use playback_manager::{PlaybackManager, LoadRequest};
 use window::*;
 

@@ -95,7 +95,7 @@ impl PlaybackManager {
         self.playback_state = PlaybackState::Paused;
     }
 
-    pub fn current_filename<'a>(&'a self) -> &'a OsString {
+    pub fn current_filename(&self) -> OsString {
         self.image_cache.current_filename()
     }
 
