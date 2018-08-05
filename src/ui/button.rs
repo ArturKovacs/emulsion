@@ -93,7 +93,7 @@ impl<'a> ElementFunctions for Button<'a> {
             .draw(
                 context.unit_quad_vertices,
                 context.unit_quad_indices,
-                context.program,
+                context.textured_program,
                 &uniforms,
                 &image_draw_params,
             )

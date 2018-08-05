@@ -16,8 +16,8 @@ use ui::button::Button;
 mod toggle;
 use ui::toggle::Toggle;
 
-mod label;
-use ui::label::Label;
+mod slider;
+use ui::slider::Slider;
 
 use shaders;
 
@@ -33,7 +33,9 @@ implement_vertex!(Vertex, position, tex_coords);
 pub struct DrawContext<'a> {
     unit_quad_vertices: &'a VertexBuffer<Vertex>,
     unit_quad_indices: &'a IndexBuffer<u16>,
-    program: &'a Program,
+    textured_program: &'a Program,
+    colored_shadowed_program: &'a Program,
+    colored_program: &'a Program,
     viewport: &'a Rect,
     projection_transform: &'a Matrix4<f32>,
 }
@@ -65,12 +67,20 @@ pub struct ToggleId<'a> {
     ptr: *mut Toggle<'a>
 }
 
+#[derive(Copy, Clone)]
+pub struct SliderId<'a> {
+    ptr: *mut Slider<'a>
+}
+
 pub struct Ui<'a> {
     buttons: Vec<Box<Button<'a>>>,
     toggles: Vec<Box<Toggle<'a>>>,
+    sliders: Vec<Box<Slider<'a>>>,
     unit_quad_vertices: VertexBuffer<Vertex>,
     unit_quad_indices: IndexBuffer<u16>,
-    program: Program,
+    textured_program: Program,
+    colored_shadowed_program: Program,
+    colored_program: Program,
     cursor_pos: glutin::dpi::LogicalPosition
 }
 
@@ -108,7 +118,7 @@ impl<'reference, 'element: 'reference> Ui<'element> {
                 .unwrap();
 
         // compiling shaders and linking them together
-        let program = program!(display,
+        let textured_program = program!(display,
             140 => {
                 vertex: shaders::VERTEX_140,
                 fragment: shaders::UI_FRAGMENT_140
@@ -120,12 +130,39 @@ impl<'reference, 'element: 'reference> Ui<'element> {
             },
         ).unwrap();
 
+        let colored_shadowed_program = program!(display,
+            140 => {
+                vertex: shaders::VERTEX_140,
+                fragment: shaders::COLOR_SHADOW_F_140
+            },
+
+            110 => {
+                vertex: shaders::VERTEX_110,
+                fragment: shaders::COLOR_SHADOW_F_110
+            },
+        ).unwrap();
+
+        let colored_program = program!(display,
+            140 => {
+                vertex: shaders::VERTEX_140,
+                fragment: shaders::COLOR_F_140
+            },
+
+            110 => {
+                vertex: shaders::VERTEX_110,
+                fragment: shaders::COLOR_F_110
+            },
+        ).unwrap();
+
         Ui {
             buttons: Vec::new(),
             toggles: Vec::new(),
+            sliders: Vec::new(),
             unit_quad_vertices: vertex_buffer,
             unit_quad_indices: index_buffer,
-            program,
+            textured_program,
+            colored_shadowed_program,
+            colored_program,
             cursor_pos: glutin::dpi::LogicalPosition::new(0.0, 0.0)
         }
     }
@@ -157,6 +194,9 @@ impl<'reference, 'element: 'reference> Ui<'element> {
         for toggle in self.toggles.iter_mut() {
             toggle.handle_event(&event);
         }
+        for slider in self.sliders.iter_mut() {
+            slider.handle_event(&event);
+        }
     }
 
 
@@ -181,7 +221,9 @@ impl<'reference, 'element: 'reference> Ui<'element> {
         let context = DrawContext {
             unit_quad_vertices: &self.unit_quad_vertices,
             unit_quad_indices: &self.unit_quad_indices,
-            program: &self.program,
+            textured_program: &self.textured_program,
+            colored_shadowed_program: &self.colored_shadowed_program,
+            colored_program: &self.colored_program,
             viewport: &viewport,
             projection_transform: &projection_transform,
         };
@@ -191,6 +233,9 @@ impl<'reference, 'element: 'reference> Ui<'element> {
         }
         for toggle in self.toggles.iter() {
             toggle.draw(target, &context);
+        }
+        for slider in self.sliders.iter() {
+            slider.draw(target, &context);
         }
     }
 
@@ -215,6 +260,19 @@ impl<'reference, 'element: 'reference> Ui<'element> {
             let ptr = toggle as *mut Toggle;
             if ptr == id.ptr {
                 return Some(toggle);
+            }
+        }
+        None
+    }
+
+
+    pub fn get_slider_mut(&'reference mut self, id: SliderId<'element>)
+    -> Option<&'reference mut Slider<'element>> {
+        for slider in self.sliders.iter_mut() {
+            let mut slider = &mut (**slider);
+            let ptr = slider as *mut Slider;
+            if ptr == id.ptr {
+                return Some(slider);
             }
         }
         None
@@ -258,6 +316,27 @@ impl<'reference, 'element: 'reference> Ui<'element> {
         self.toggles.push(result);
 
         ToggleId {
+            ptr
+        }
+    }
+
+    pub fn create_slider(
+        &mut self,
+        position: Vector2<f32>,
+        size: Vector2<f32>,
+        steps: u32,
+        value: u32,
+        callback: Box<Fn(u32, u32) -> () + 'element>
+    ) -> SliderId<'element> {
+        let mut result = Box::new(Slider::new(
+            position, size, steps, value, callback
+        ));
+
+        let ptr = &mut (*result) as *mut Slider;
+
+        self.sliders.push(result);
+
+        SliderId {
             ptr
         }
     }

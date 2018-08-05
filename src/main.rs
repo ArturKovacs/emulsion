@@ -143,6 +143,7 @@ impl<'a> Program<'a> {
         program.start_event_loop(&mut events_loop);
     }
 
+
     fn init_ui<'b>(
         ui: &mut ui::Ui<'b>,
         window: &mut Window,
@@ -176,9 +177,16 @@ impl<'a> Program<'a> {
                 }));
             }
         }
-        let _ = ui.create_toggle(moon_texture, light_texture, Vector2::new(4f32, 4f32), true, Box::new(move |is_light| {
-            playback_manager.borrow_mut().request_load(LoadRequest::LoadNext);
-        }));
+        let _ = ui.create_toggle(moon_texture, light_texture, Vector2::new(4f32, 4f32), true,
+            Box::new(move |_is_light| {
+                playback_manager.borrow_mut().request_load(LoadRequest::LoadNext);
+            })
+        );
+        let _ = ui.create_slider(Vector2::new(64f32, 3f32), Vector2::new(512f32, 24f32), 32, 5,
+            Box::new(|_, value| {
+                println!("Jumped to {}", value);
+            })
+        );
     }
 
 
@@ -214,25 +222,14 @@ impl<'a> Program<'a> {
 
                 // Dispatch event
                 let window_size = self.window.display().gl_window().get_inner_size().unwrap();
-                match event {
-                    Event::WindowEvent {event: WindowEvent::MouseInput {..}, ..} => {
-                        if mouse_y < (window_size.height - self.bottom_panel_height) {
-                            self.picture_panel.handle_event(&event, &mut self.window, &mut self.playback_manager.borrow_mut());
-                        } else {
-                            if let Event::WindowEvent { ref event, .. } = event {
-                                let window_size = self.window.display().gl_window().get_inner_size().unwrap();
-                                self.ui.window_event(&event, window_size);
-                            }
-                        }
-                    }
-                    _ => {
-                        if let Event::WindowEvent { ref event, .. } = event {
-                            self.ui.window_event(&event, window_size);
-                        }
-                        self.picture_panel.handle_event(&event, &mut self.window, &mut self.playback_manager.borrow_mut());
-                    }
+                if let Event::WindowEvent { ref event, .. } = event {
+                    self.ui.window_event(&event, window_size);
                 }
-                
+                self.picture_panel.handle_event(
+                    &event,
+                    &mut self.window,
+                    &mut self.playback_manager.borrow_mut()
+                );
 
                 // Update screen after a resize event or refresh
                 if let Event::WindowEvent { event, .. } = event {
