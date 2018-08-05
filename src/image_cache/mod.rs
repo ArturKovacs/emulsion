@@ -65,6 +65,14 @@ impl ImageCache {
         self.dir_path.join(self.current_filename()).to_owned()
     }
 
+    pub fn current_file_index(&self) -> usize {
+        self.current_index
+    }
+
+    pub fn current_dir_len(&self) -> usize {
+        self.dir_files.len()
+    }
+
 
     pub fn update_directory(&mut self) -> Result<()> {
         let curr_filename = self.current_filename();
@@ -85,12 +93,38 @@ impl ImageCache {
     }
 
 
+    pub fn load_at_index(
+        &mut self,
+        display: &glium::Display,
+        index: usize,
+    ) -> Result<(Rc<SrgbTexture2d>, OsString)> {
+        let path = self.dir_files.get(index).ok_or_else(|| {
+            format!(
+                "Index {} is out of bounds of the current directory '{}'",
+                index,
+                self.dir_path.to_str().unwrap()
+            )
+        })?.path();
+
+        let result = self.loader.load_specific(display, &path)?;
+
+        self.current_index = index;
+
+        Ok((
+            result,
+            path.file_name().unwrap_or(OsStr::new("")).to_owned()
+        ))
+    }
+
+
     pub fn load_specific(
         &mut self,
         display: &glium::Display,
         path: &Path,
     ) -> Result<Rc<SrgbTexture2d>> {
         let path = path.canonicalize()?;
+
+        let result = self.loader.load_specific(display, &path)?;
 
         let current_name = match path.file_name() {
             Some(filename) => filename.to_owned(),
@@ -105,9 +139,15 @@ impl ImageCache {
             path.parent().ok_or("Could not get parent directory")?.to_owned();
         if self.dir_path != parent {
             self.change_directory(parent, current_name)?;
+        } else {
+            for (index, entry) in self.dir_files.iter().enumerate() {
+                if entry.file_name() == current_name {
+                    self.current_index = index;
+                }
+            }
         }
 
-        return Ok(self.loader.load_specific(display, &path)?);
+        Ok(result)
     }
 
     pub fn load_next(&mut self, display: &glium::Display) -> Result<(Rc<SrgbTexture2d>, OsString)> {

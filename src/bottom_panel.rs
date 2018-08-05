@@ -5,8 +5,6 @@ use std::path::Path;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-
-
 use glium;
 use glium::glutin::WindowEvent;
 use glium::glutin;
@@ -94,8 +92,8 @@ impl<'a> BottomPanel<'a> {
             })
         );
         let slider = ui.create_slider(Vector2::new(64f32, 3f32), Vector2::new(512f32, 24f32), 32, 5,
-            Box::new(|_, value| {
-                println!("Jumped to {}", value);
+            Box::new(move |_, value| {
+                playback_manager.borrow_mut().request_load(LoadRequest::LoadAtIndex(value as usize));
             })
         );
 
@@ -122,7 +120,10 @@ impl<'a> BottomPanel<'a> {
     }
 
 
-    pub fn draw(&self, target: &mut glium::Frame) {
+    pub fn draw(&mut self, target: &mut glium::Frame, playback_manager: &PlaybackManager) {
+        let curr_file_index = playback_manager.current_file_index() as u32;
+        let curr_dir_len = playback_manager.current_dir_len() as u32;
+        self.ui.get_slider_mut(self.slider).unwrap().set_steps(curr_dir_len, curr_file_index);
         self.ui.draw(target);
     }
 }

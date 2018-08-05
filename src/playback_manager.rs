@@ -21,6 +21,7 @@ pub enum LoadRequest {
     LoadNext,
     LoadPrevious,
     LoadSpecific(PathBuf),
+    LoadAtIndex(usize),
     Jump(i32),
 }
 
@@ -103,6 +104,14 @@ impl PlaybackManager {
         self.image_cache.current_file_path()
     }
 
+    pub fn current_file_index(&self) -> usize {
+        self.image_cache.current_file_index()
+    }
+
+    pub fn current_dir_len(&self) -> usize {
+        self.image_cache.current_dir_len()
+    }
+
     pub fn update_directory(&mut self) -> image_cache::Result<()> {
         self.image_cache.update_directory()
     }
@@ -183,9 +192,12 @@ impl PlaybackManager {
                     Err(String::from("Could not extract filename").into())
                 }
             ),
+            LoadRequest::LoadAtIndex(index) => {
+                Some(self.image_cache.load_at_index(window.display(), index))
+            },
             LoadRequest::Jump(jump_count) => {
                 Some(self.image_cache.load_jump(window.display(), jump_count))
-            }
+            },
             LoadRequest::None => None,
         };
         if let Some(result) = load_result {

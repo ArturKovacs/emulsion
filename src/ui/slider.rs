@@ -63,6 +63,10 @@ impl<'a> Slider<'a> {
         self.value
     }
 
+    pub fn set_value(&mut self, value: u32) {
+        self.value = value;
+    }
+
     pub fn position(&self) -> Vector2<f32> {
         self.position
     }

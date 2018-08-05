@@ -197,7 +197,7 @@ impl<'a> Program<'a> {
         target.clear_color(0.9, 0.9, 0.9, 0.0);
 
         self.picture_panel.draw(&mut target, &self.window);
-        self.bottom_panel.draw(&mut target);
+        self.bottom_panel.draw(&mut target, &self.playback_manager.borrow());
 
         target.finish().unwrap();
     }
