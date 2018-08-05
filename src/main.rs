@@ -30,6 +30,9 @@ mod shaders;
 mod picture_panel;
 use picture_panel::PicturePanel;
 
+mod bottom_panel;
+use bottom_panel::BottomPanel;
+
 mod playback_manager;
 use playback_manager::{PlaybackManager, LoadRequest};
 
@@ -51,30 +54,6 @@ fn main() {
 // ========================================================
 
 
-fn load_texture_without_cache(
-    display: &glium::Display,
-    image_path: &Path,
-) -> SrgbTexture2d {
-    let image = image::open(image_path).unwrap().to_rgba();
-
-    texture_from_image(display, image)
-}
-
-fn texture_from_image(
-    display: &glium::Display,
-    image: image::RgbaImage,
-) -> SrgbTexture2d {
-    let image_dimensions = image.dimensions();
-    let image = RawImage2d::from_raw_rgba(image.into_raw(), image_dimensions);
-
-    SrgbTexture2d::with_mipmaps(
-        display,
-        image,
-        glium::texture::MipmapsOption::NoMipmap,
-    ).unwrap()
-}
-
-
 trait OptionRefClone {
     fn ref_clone(&self) -> Self;
 }
@@ -90,11 +69,10 @@ impl OptionRefClone for Option<Rc<glium::texture::SrgbTexture2d>> {
 
 
 struct Program<'a> {
-    bottom_panel_height: f64,
     window: &'a mut Window,
     picture_panel: &'a mut PicturePanel,
     playback_manager: &'a RefCell<PlaybackManager>,
-    ui: ui::Ui<'a>,
+    bottom_panel: BottomPanel<'a>,
 }
 
 impl<'a> Program<'a> {
@@ -107,11 +85,9 @@ impl<'a> Program<'a> {
     }
 
     fn start() {
-        let bottom_panel_height = 32;
-
         let mut events_loop = glutin::EventsLoop::new();
         let mut window = Window::init(&events_loop);
-        let mut picture_panel = PicturePanel::new(window.display(), bottom_panel_height);
+        let mut picture_panel = PicturePanel::new(window.display(), BottomPanel::HEIGHT);
         let playback_manager = RefCell::new(PlaybackManager::new());
 
         // Load image
@@ -127,17 +103,14 @@ impl<'a> Program<'a> {
 
         // Just quickly display the loaded image here before we load the remaining parts of the program
         Self::draw_picture(&mut window, &mut picture_panel);
-        
-        let mut ui = ui::Ui::new(window.display());
-        
-        Self::init_ui(&mut ui, &mut window, &playback_manager);
+   
+        let bottom_panel = BottomPanel::new(&mut window, &playback_manager);
 
         let mut program = Program {
-            bottom_panel_height: bottom_panel_height as f64,
             window: &mut window,
             picture_panel: &mut picture_panel,
             playback_manager: &playback_manager,
-            ui: ui,
+            bottom_panel,
         };
 
         program.start_event_loop(&mut events_loop);
@@ -149,46 +122,7 @@ impl<'a> Program<'a> {
         window: &mut Window,
         playback_manager: &'b RefCell<PlaybackManager>,
     ) {
-        let exe_parent = std::env::current_exe().unwrap().parent().unwrap().to_owned();
-        let button_texture = Rc::new(
-            load_texture_without_cache(
-                window.display(),
-                &exe_parent.join("cogs.png")
-            )
-        );
-        let light_texture = Rc::new(
-            load_texture_without_cache(
-                window.display(),
-                &exe_parent.join("light.png")
-            )
-        );
-        let moon_texture = Rc::new(
-            load_texture_without_cache(
-                window.display(),
-                &exe_parent.join("moon.png")
-            )
-        );
-
-        let button = ui.create_button(button_texture, Vector2::new(32f32, 4f32), Box::new(||()));
-        {
-            if let Some(button) = ui.get_button_mut(button) {
-                button.set_callback(Box::new(move || {
-                    playback_manager.borrow_mut().request_load(LoadRequest::LoadNext);
-                }));
-            }
-        }
-        let _ = ui.create_toggle(moon_texture, light_texture, Vector2::new(4f32, 4f32), true,
-            Box::new(move |_is_light| {
-                playback_manager.borrow_mut().request_load(LoadRequest::LoadNext);
-            })
-        );
-        let _ = ui.create_slider(Vector2::new(64f32, 3f32), Vector2::new(512f32, 24f32), 32, 5,
-            Box::new(|_, value| {
-                println!("Jumped to {}", value);
-            })
-        );
     }
-
 
     fn start_event_loop(&mut self, events_loop: &mut glutin::EventsLoop) {
         let mut running = true;
@@ -221,10 +155,7 @@ impl<'a> Program<'a> {
                 self.picture_panel.pre_events();
 
                 // Dispatch event
-                let window_size = self.window.display().gl_window().get_inner_size().unwrap();
-                if let Event::WindowEvent { ref event, .. } = event {
-                    self.ui.window_event(&event, window_size);
-                }
+                self.bottom_panel.handle_event(&event, &self.window);
                 self.picture_panel.handle_event(
                     &event,
                     &mut self.window,
@@ -275,7 +206,7 @@ impl<'a> Program<'a> {
         target.clear_color(0.9, 0.9, 0.9, 0.0);
 
         self.picture_panel.draw(&mut target, &self.window);
-        self.ui.draw(&mut target);
+        self.bottom_panel.draw(&mut target);
 
         target.finish().unwrap();
     }

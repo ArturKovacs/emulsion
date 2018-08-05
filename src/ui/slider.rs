@@ -52,6 +52,10 @@ impl<'a> Slider<'a> {
         self.callback = callback;
     }
 
+    pub fn set_size(&mut self, size: Vector2<f32>) {
+        self.size = size;
+    }
+
     pub fn set_steps(&mut self, steps: u32, value: u32) {
         self.steps = steps;
         self.value = value;
@@ -59,6 +63,10 @@ impl<'a> Slider<'a> {
 
     pub fn value(&self) -> u32 {
         self.value
+    }
+
+    pub fn position(&self) -> Vector2<f32> {
+        self.position
     }
 
     fn cursor_above(&self, cursor_position: &glutin::dpi::LogicalPosition) -> bool {
