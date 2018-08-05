@@ -11,7 +11,6 @@ use glium::index::PrimitiveType;
 use glium::{Frame, Surface};
 use glium::glutin;
 
-
 use cgmath::ElementWise;
 use cgmath::SquareMatrix;
 use cgmath::{Matrix4, Vector2, Vector4};
@@ -51,7 +50,7 @@ pub struct PicturePanel {
     ignore_one_mouse_move: bool,
 
     last_mouse_pos: Vector2<f32>,
-    left_mouse_down: bool,
+    panning: bool,
 
     file_hover_state: FileHoverState,
 
@@ -126,7 +125,7 @@ impl PicturePanel {
             ignore_one_mouse_move: false,
 
             last_mouse_pos: Vector2::new(0.0, 0.0),
-            left_mouse_down: false,
+            panning: false,
 
             should_sleep: true
         }
@@ -188,7 +187,14 @@ impl PicturePanel {
                 }
                 WindowEvent::MouseInput { state, button, .. } => {
                     if *button == glutin::MouseButton::Left {
-                        self.left_mouse_down = *state == glutin::ElementState::Pressed;
+                        if *state == glutin::ElementState::Released {
+                            self.panning = false;
+                        } else {
+                            let bottom_y = window_size.height as u32 - self.bottom;
+                            if (self.last_mouse_pos.y as u32) < bottom_y {
+                                self.panning = true;
+                            }
+                        }
                     }
                 }
                 WindowEvent::CursorMoved { position, .. } => {
@@ -197,7 +203,7 @@ impl PicturePanel {
                     } else {
                         let pos_vec = Vector2::new(position.x as f32, position.y as f32);
                         // Update transform
-                        if self.left_mouse_down {
+                        if self.panning {
                             let inv_projection_transform =
                                 self.projection_transform.invert().unwrap();
 
