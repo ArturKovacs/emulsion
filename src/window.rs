@@ -5,13 +5,14 @@ use glium;
 use glium::glutin;
 use glium::glutin::dpi::LogicalSize;
 
+use configuration::Configuration;
 
 pub struct Window {
     display: glium::Display,
 }
 
 impl Window {
-    pub fn init(events_loop: &glutin::EventsLoop) -> Self {
+    pub fn new(events_loop: &glutin::EventsLoop, config: &Configuration) -> Self {
         use glium::glutin::Icon;
 
         let exe_parent = std::env::current_exe().unwrap().parent().unwrap().to_owned();
@@ -22,10 +23,12 @@ impl Window {
 
         let window = glutin::WindowBuilder::new()
             .with_title("Loading")
-            .with_dimensions(LogicalSize::new(512.0, 512.0))
+            .with_dimensions(LogicalSize::new(
+                config.window_width as f64,
+                config.window_height as f64
+            ))
             .with_fullscreen(None)
             .with_window_icon(Some(icon))
-            //.with_decorations(true)
             .with_visibility(true);
 
         //let context = glutin::ContextBuilder::new().with_gl(GlRequest::Specific(Api::OpenGl, (3, 1)));

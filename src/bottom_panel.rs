@@ -16,6 +16,7 @@ use cgmath::Vector2;
 
 use ui::{Ui, SliderId};
 use playback_manager::{PlaybackManager, LoadRequest};
+use configuration::Configuration;
 use window::*;
 
 
@@ -55,8 +56,9 @@ impl<'a> BottomPanel<'a> {
     pub fn new(
         window: &mut Window,
         playback_manager: &'a RefCell<PlaybackManager>,
+        configuration: &'a RefCell<Configuration>,
     ) -> Self {
-        let mut ui = Ui::new(window.display());
+        let mut ui = Ui::new(window.display(), Self::HEIGHT as f32);
 
         let exe_parent = env::current_exe().unwrap().parent().unwrap().to_owned();
         let button_texture = Rc::new(
@@ -78,20 +80,29 @@ impl<'a> BottomPanel<'a> {
             )
         );
 
-        let button = ui.create_button(button_texture, Vector2::new(32f32, 4f32), Box::new(||()));
-        {
-            if let Some(button) = ui.get_button_mut(button) {
-                button.set_callback(Box::new(move || {
+        let config = configuration.borrow();
+
+        let _ = ui.create_button(
+            button_texture,
+            Vector2::new(32f32, 4f32),
+            Box::new(move || {
                     playback_manager.borrow_mut().request_load(LoadRequest::LoadNext);
-                }));
-            }
-        }
-        let _ = ui.create_toggle(moon_texture, light_texture, Vector2::new(4f32, 4f32), true,
-            Box::new(move |_is_light| {
-                playback_manager.borrow_mut().request_load(LoadRequest::LoadNext);
+                })
+        );
+        let _ = ui.create_toggle(
+            moon_texture,
+            light_texture,
+            Vector2::new(4f32, 4f32),
+            config.light_theme,
+            Box::new(move |is_light| {
+                configuration.borrow_mut().light_theme = is_light;
             })
         );
-        let slider = ui.create_slider(Vector2::new(64f32, 3f32), Vector2::new(512f32, 24f32), 32, 5,
+        let slider = ui.create_slider(
+            Vector2::new(64f32, 3f32),
+            Vector2::new(512f32, 24f32),
+            32,
+            5,
             Box::new(move |_, value| {
                 playback_manager.borrow_mut().request_load(LoadRequest::LoadAtIndex(value as usize));
             })
@@ -120,10 +131,20 @@ impl<'a> BottomPanel<'a> {
     }
 
 
-    pub fn draw(&mut self, target: &mut glium::Frame, playback_manager: &PlaybackManager) {
+    pub fn draw(
+        &mut self,
+        target: &mut glium::Frame,
+        playback_manager: &PlaybackManager,
+        config: &Configuration
+    ) {
         let curr_file_index = playback_manager.current_file_index() as u32;
         let curr_dir_len = playback_manager.current_dir_len() as u32;
         self.ui.get_slider_mut(self.slider).unwrap().set_steps(curr_dir_len, curr_file_index);
-        self.ui.draw(target);
+        let color = if config.light_theme {
+            [0.95, 0.95, 0.95, 1.0f32]
+        } else {
+            [0.1, 0.1, 0.1, 1.0f32]
+        };
+        self.ui.draw(target, &color);
     }
 }

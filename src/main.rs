@@ -8,6 +8,10 @@ extern crate glium;
 extern crate image;
 extern crate sys_info;
 extern crate backtrace;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate rmp_serde;
 
 use std::env;
 use std::path::PathBuf;
@@ -37,6 +41,8 @@ use playback_manager::{PlaybackManager, LoadRequest};
 mod window;
 use window::*;
 
+mod configuration;
+use configuration::Configuration;
 
 // ========================================================
 // Glorious main function
@@ -67,6 +73,9 @@ impl OptionRefClone for Option<Rc<glium::texture::SrgbTexture2d>> {
 
 
 struct Program<'a> {
+    configuration: &'a RefCell<Configuration>,
+    config_file_path: PathBuf,
+
     window: &'a mut Window,
     picture_panel: &'a mut PicturePanel,
     playback_manager: &'a RefCell<PlaybackManager>,
@@ -83,8 +92,19 @@ impl<'a> Program<'a> {
     }
 
     fn start() {
+        // Load config file
+        let config_file_name = "cfg.bin";
+        let exe_path = env::current_exe().unwrap();
+        let exe_parent = exe_path.parent().unwrap();
+        let config_file_path = exe_parent.join(config_file_name);
+        let config = if let Ok(config) = Configuration::load(config_file_path.as_path()) {
+            RefCell::new(config)
+        } else {
+            RefCell::new(Default::default())
+        };
+
         let mut events_loop = glutin::EventsLoop::new();
-        let mut window = Window::init(&events_loop);
+        let mut window = Window::new(&events_loop, &config.borrow());
         let mut picture_panel = PicturePanel::new(window.display(), BottomPanel::HEIGHT);
         let playback_manager = RefCell::new(PlaybackManager::new());
 
@@ -102,9 +122,11 @@ impl<'a> Program<'a> {
         // Just quickly display the loaded image here before we load the remaining parts of the program
         Self::draw_picture(&mut window, &mut picture_panel);
    
-        let bottom_panel = BottomPanel::new(&mut window, &playback_manager);
+        let bottom_panel = BottomPanel::new(&mut window, &playback_manager, &config);
 
         let mut program = Program {
+            configuration: &config,
+            config_file_path: config_file_path.clone(),
             window: &mut window,
             picture_panel: &mut picture_panel,
             playback_manager: &playback_manager,
@@ -112,12 +134,13 @@ impl<'a> Program<'a> {
         };
 
         program.start_event_loop(&mut events_loop);
+
+        let _ = program.configuration.borrow().save(config_file_path);
     }
 
 
     fn start_event_loop(&mut self, events_loop: &mut glutin::EventsLoop) {
         let mut running = true;
-        let mut mouse_y = 0f64;
         // the main loop
         while running {
             events_loop.poll_events(|event| {
@@ -135,9 +158,16 @@ impl<'a> Program<'a> {
                                 }
                             }
                         },
-                        WindowEvent::CursorMoved { position, .. } => {
-                            mouse_y = position.y;
-                        }
+                        WindowEvent::Resized(size) => {
+                            let mut config = self.configuration.borrow_mut();
+                            config.window_width = size.width as u32;
+                            config.window_height = size.height as u32;
+                            // Don't you dare saving to file here.
+                        },
+                        WindowEvent::Focused(false) => {
+                            let config = self.configuration.borrow();
+                            let _ = config.save(self.config_file_path.as_path());
+                        },
                         _ => (),
                     }
                 }
@@ -194,10 +224,18 @@ impl<'a> Program<'a> {
     fn draw(&mut self) {
         let mut target = self.window.display().draw();
 
-        target.clear_color(0.9, 0.9, 0.9, 0.0);
+        if self.configuration.borrow().light_theme {
+            target.clear_color(0.9, 0.9, 0.9, 0.0);
+        } else {
+            target.clear_color(0.02, 0.02, 0.02, 0.0);
+        }
 
         self.picture_panel.draw(&mut target, &self.window);
-        self.bottom_panel.draw(&mut target, &self.playback_manager.borrow());
+        self.bottom_panel.draw(
+            &mut target,
+            &self.playback_manager.borrow(),
+            &self.configuration.borrow(),
+        );
 
         target.finish().unwrap();
     }

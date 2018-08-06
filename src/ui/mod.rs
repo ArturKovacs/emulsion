@@ -2,7 +2,7 @@
 use std::rc::Rc;
 use std::boxed::Box;
 
-use glium::{Display, Rect, Frame, Surface, VertexBuffer, IndexBuffer, Program};
+use glium::{Display, Rect, Frame, Surface, VertexBuffer, IndexBuffer, Program, DrawParameters};
 use glium::texture::SrgbTexture2d;
 use glium::glutin;
 
@@ -79,11 +79,12 @@ pub struct Ui<'a> {
     textured_program: Program,
     colored_shadowed_program: Program,
     colored_program: Program,
-    cursor_pos: glutin::dpi::LogicalPosition
+    cursor_pos: glutin::dpi::LogicalPosition,
+    height: f32
 }
 
 impl<'reference, 'element: 'reference> Ui<'element> {
-    pub fn new(display: &Display) -> Self {
+    pub fn new(display: &Display, height: f32) -> Self {
         use glium::index::PrimitiveType;
 
         let vertex_buffer = {
@@ -161,7 +162,8 @@ impl<'reference, 'element: 'reference> Ui<'element> {
             textured_program,
             colored_shadowed_program,
             colored_program,
-            cursor_pos: glutin::dpi::LogicalPosition::new(0.0, 0.0)
+            cursor_pos: glutin::dpi::LogicalPosition::new(0.0, 0.0),
+            height
         }
     }
 
@@ -198,22 +200,22 @@ impl<'reference, 'element: 'reference> Ui<'element> {
     }
 
 
-    pub fn draw(&self, target: &mut Frame) {
+    pub fn draw(&self, target: &mut Frame, bg_color: &[f32; 4]) {
         use cgmath::ortho;
 
-        let (width, height) = target.get_dimensions();
+        let width = target.get_dimensions().0 as f32;
 
         let left = 0f32;
-        let right = width as f32 + left;
+        let right = width + left;
         let bottom = 0f32;
-        let top = height as f32 + bottom;
+        let top = self.height + bottom;
         let projection_transform = ortho(left, right, bottom, top, -1f32, 1f32);
 
         let viewport = Rect {
             left: left as u32,
-            width,
+            width: width as u32,
             bottom: bottom as u32,
-            height
+            height: self.height as u32
         };
 
         let context = DrawContext {
@@ -225,6 +227,8 @@ impl<'reference, 'element: 'reference> Ui<'element> {
             viewport: &viewport,
             projection_transform: &projection_transform,
         };
+
+        Self::draw_background(target, &context, bg_color);
 
         for button in self.buttons.iter() {
             button.draw(target, &context);
@@ -337,5 +341,31 @@ impl<'reference, 'element: 'reference> Ui<'element> {
         SliderId {
             ptr
         }
+    }
+
+    fn draw_background(target: &mut Frame, context: &DrawContext, color: &[f32; 4]) {
+
+        let image_draw_params = DrawParameters {
+            viewport: Some(*context.viewport),
+            .. Default::default()
+        };
+
+        let mut transform = Matrix4::from_nonuniform_scale(
+            context.viewport.width as f32,
+            context.viewport.height as f32,
+            1.0
+        );
+        transform = context.projection_transform * transform;
+        let uniforms = uniform! {
+            matrix: Into::<[[f32; 4]; 4]>::into(transform),
+            color: *color,
+        };
+        target.draw(
+            context.unit_quad_vertices,
+            context.unit_quad_indices,
+            context.colored_program,
+            &uniforms,
+            &image_draw_params,
+        ).unwrap();
     }
 }
