@@ -36,6 +36,11 @@ pub enum CachedTexture {
     LoadRequested,
 }
 
+pub enum LoadResult {
+    Ok{path: PathBuf, metadata: fs::Metadata, image: image::RgbaImage},
+    Failed,
+}
+
 pub struct TextureLoader {
     curr_dir: PathBuf,
     curr_est_size: usize,
@@ -47,12 +52,14 @@ pub struct TextureLoader {
     texture_cache: BTreeMap<OsString, CachedTexture>,
     join_handles: Option<Vec<thread::JoinHandle<()>>>,
 
-    image_rx: Receiver<(PathBuf, fs::Metadata, image::RgbaImage)>,
+    image_rx: Receiver<LoadResult>,
     path_tx: Sender<PathBuf>,
+
+	requested_images: i32,
 }
 
 impl TextureLoader {
-    const MAX_BULK_PREFETCH_REQUEST: i32 = 4;
+    const MAX_PENDING_PREFETCH_REQUESTS: i32 = 4;
 
     /// # Arguemnts
     /// * `capacity` - Number of bytes. The last image loaded will be the one at which the allocated memory reaches or exceeds capacity
@@ -89,13 +96,15 @@ impl TextureLoader {
 
             image_rx: loaded_img_rx,
             path_tx: load_request_tx,
+
+            requested_images: 0
         }
     }
 
     fn thread_loop(
         running: Arc<AtomicBool>,
         load_request_rx: Arc<Mutex<Receiver<PathBuf>>>,
-        loaded_img_tx: Sender<(PathBuf, fs::Metadata, image::RgbaImage)>,
+        loaded_img_tx: Sender<LoadResult>,
     ) {
         // walk the directory starting from the current item and cache in all the images
         // do this by stepping in both directions so that the cached images ahead of the file
@@ -103,27 +112,23 @@ impl TextureLoader {
         while running.load(Ordering::Acquire) {
             let img_path = {
                 let load_request = load_request_rx.lock().unwrap();
-                if let Some(path) = load_request.recv().ok() {
-                    path
-                } else {
-                    return;
-                }
+                load_request.recv().unwrap()
             };
             // It is very important that we release the mutex before starting to load the image
 
-            let metadata = match fs::metadata(img_path.as_path()) {
-                Ok(metadata) => metadata,
-                Err(_) => continue,
-            };
-            let image = match Self::load_image(img_path.as_path()) {
-                Ok(image) => image,
-                Err(_) => continue,
+            let result = {
+                if let Ok(metadata) = fs::metadata(img_path.as_path()) {
+                    if let Ok(image) = Self::load_image(img_path.as_path()) {
+                        LoadResult::Ok{path: img_path, metadata, image}
+                    } else {
+                        LoadResult::Failed
+                    }
+                } else {
+                    LoadResult::Failed
+                }
             };
 
-            if loaded_img_tx.send((img_path, metadata, image)).is_err() {
-                return;
-            }
-            //thread::sleep(time::Duration::from_millis(1));
+            loaded_img_tx.send(result).unwrap();
         }
     }
 
@@ -133,40 +138,42 @@ impl TextureLoader {
 
         loop {
             match self.image_rx.try_recv() {
-                Ok((path, metadata, image)) => {
-                    let size_estimate =
-                        Self::get_image_size_estimate((image.width(), image.height())) as isize;
-                    match self.texture_cache.entry(path.file_name().unwrap().to_owned())
-                    {
-                        Entry::Vacant(entry) => {
-                            let texture = Rc::new(Self::texture_from_image(display, image)?);
-                            entry.insert(CachedTexture::Texture((metadata, texture)));
-                            self.remaining_capacity -= size_estimate;
-                        }
-                        Entry::Occupied(mut entry) => match entry.get_mut() {
-                            CachedTexture::Texture(ref mut entry) => {
-                                if entry.0.modified().unwrap() < metadata.modified().unwrap() {
-                                    let old_size_estimate = {
-                                        let old_image = &entry.1;
-                                        Self::get_image_size_estimate((
-                                            old_image.width(),
-                                            old_image.height(),
-                                        )) as isize
-                                    };
-                                    let texture =
-                                        Rc::new(Self::texture_from_image(display, image)?);
-                                    entry.0 = metadata;
-                                    entry.1 = texture;
-                                    self.remaining_capacity += old_size_estimate;
+                Ok(load_result) => {
+                    self.requested_images -= 1;
+                    if let LoadResult::Ok { path, metadata, image } = load_result {
+                        let size_estimate =
+                            Self::get_image_size_estimate((image.width(), image.height())) as isize;
+                        match self.texture_cache.entry(path.file_name().unwrap().to_owned()) {
+                            Entry::Vacant(entry) => {
+                                let texture = Rc::new(Self::texture_from_image(display, image)?);
+                                entry.insert(CachedTexture::Texture((metadata, texture)));
+                                self.remaining_capacity -= size_estimate;
+                            }
+                            Entry::Occupied(mut entry) => match entry.get_mut() {
+                                CachedTexture::Texture(ref mut entry) => {
+                                    if entry.0.modified().unwrap() < metadata.modified().unwrap() {
+                                        let old_size_estimate = {
+                                            let old_image = &entry.1;
+                                            Self::get_image_size_estimate((
+                                                old_image.width(),
+                                                old_image.height(),
+                                            )) as isize
+                                        };
+                                        let texture =
+                                            Rc::new(Self::texture_from_image(display, image)?);
+                                        entry.0 = metadata;
+                                        entry.1 = texture;
+                                        self.remaining_capacity += old_size_estimate;
+                                        self.remaining_capacity -= size_estimate;
+                                    }
+                                }
+                                entry @ CachedTexture::LoadRequested => {
+                                    let texture = Rc::new(Self::texture_from_image(display, image)?);
+                                    *entry = CachedTexture::Texture((metadata, texture));
                                     self.remaining_capacity -= size_estimate;
                                 }
                             }
-                            entry @ CachedTexture::LoadRequested => {
-                                let texture = Rc::new(Self::texture_from_image(display, image)?);
-                                *entry = CachedTexture::Texture((metadata, texture));
-                                self.remaining_capacity -= size_estimate;
-                            }
-                        },
+                        }
                     }
                 }
                 Err(TryRecvError::Disconnected) => return Ok(()),
@@ -182,9 +189,9 @@ impl TextureLoader {
 
         let mut index = current_index;
 
-        let mut requested_images = 0;
         // Send as many load requests so that the estimated total will just fill the cache
         let mut estimated_remaining_cap = self.remaining_capacity;
+
         while estimated_remaining_cap > self.curr_est_size as isize {
             // Send a load request for the closest file not in the cache or outdated
             index += 1;
@@ -199,7 +206,9 @@ impl TextureLoader {
                     Entry::Vacant(entry) => {
                         if Self::is_file_supported(file_path.as_ref()) {
                             entry.insert(CachedTexture::LoadRequested);
-                            self.path_tx.send(file.path()).unwrap();
+                            self.path_tx.send(file_path).unwrap();
+							estimated_remaining_cap -= self.curr_est_size as isize;
+							self.requested_images += 1;
                         }
                     }
                     Entry::Occupied(entry) => {
@@ -208,13 +217,13 @@ impl TextureLoader {
                                 != file.metadata().unwrap().modified().unwrap()
                             {
                                 self.path_tx.send(file_path).unwrap();
+								estimated_remaining_cap -= self.curr_est_size as isize;
+								self.requested_images += 1;
                             }
                         }
                     }
                 }
-                estimated_remaining_cap -= self.curr_est_size as isize;
-                requested_images += 1;
-                if requested_images >= Self::MAX_BULK_PREFETCH_REQUEST {
+                if self.requested_images >= Self::MAX_PENDING_PREFETCH_REQUESTS {
                     break;
                 }
             } else {
