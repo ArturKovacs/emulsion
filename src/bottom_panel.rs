@@ -61,12 +61,6 @@ impl<'a> BottomPanel<'a> {
         let mut ui = Ui::new(window.display(), Self::HEIGHT as f32);
 
         let exe_parent = env::current_exe().unwrap().parent().unwrap().to_owned();
-        let button_texture = Rc::new(
-            load_texture_without_cache(
-                window.display(),
-                &exe_parent.join("cogs.png")
-            )
-        );
         let light_texture = Rc::new(
             load_texture_without_cache(
                 window.display(),
@@ -82,13 +76,6 @@ impl<'a> BottomPanel<'a> {
 
         let config = configuration.borrow();
 
-        let _ = ui.create_button(
-            button_texture,
-            Vector2::new(32f32, 4f32),
-            Box::new(move || {
-                    playback_manager.borrow_mut().request_load(LoadRequest::LoadNext);
-                })
-        );
         let _ = ui.create_toggle(
             moon_texture,
             light_texture,
