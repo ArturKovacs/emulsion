@@ -177,31 +177,31 @@ impl<'a> Program<'a> {
 
                 // Dispatch event
                 self.bottom_panel.handle_event(&event, &self.window);
+                // Playback manager is borrowed only after the bottom panel button callbacks
+                // are finished
+                let mut playback_manager = self.playback_manager.borrow_mut();
                 self.picture_panel.handle_event(
                     &event,
                     &mut self.window,
-                    &mut self.playback_manager.borrow_mut()
+                    &mut playback_manager
                 );
 
                 // Update screen after a resize event or refresh
                 if let Event::WindowEvent { event, .. } = event {
                     match event {
-                        WindowEvent::Resized(..) | WindowEvent::Refresh => self.draw(),
+                        WindowEvent::Resized(..) | WindowEvent::Refresh => self.draw(&playback_manager),
                         _ => (),
                     }
                 }
             });
 
-            let load_requested = {
-                let mut playback_manager = self.playback_manager.borrow_mut();
-                playback_manager.update_image(&mut self.window);
-                self.picture_panel.set_image(playback_manager.image_texture().ref_clone());
-
-                *playback_manager.load_request() != LoadRequest::None
-            };
-            self.draw();
-
             let mut playback_manager = self.playback_manager.borrow_mut();
+            let load_requested = *playback_manager.load_request() != LoadRequest::None;
+            playback_manager.update_image(&mut self.window);
+            self.picture_panel.set_image(playback_manager.image_texture().ref_clone());
+
+            self.draw(&playback_manager);
+
             // Update dirctory after draw
             if load_requested {
                 playback_manager.update_directory().unwrap();
@@ -221,7 +221,14 @@ impl<'a> Program<'a> {
         }
     }
 
-    fn draw(&mut self) {
+    fn draw(&mut self, playback_manager: &PlaybackManager) {
+        match self.window.display().gl_window().get_inner_size() {
+            Some(window_size) => if window_size.width <= 0.0 || window_size.height <= 0.0 {
+                return;
+            },
+            None => return
+        }
+
         let mut target = self.window.display().draw();
 
         if self.configuration.borrow().light_theme {
@@ -233,7 +240,7 @@ impl<'a> Program<'a> {
         self.picture_panel.draw(&mut target, &self.window);
         self.bottom_panel.draw(
             &mut target,
-            &self.playback_manager.borrow(),
+            playback_manager,
             &self.configuration.borrow(),
         );
 

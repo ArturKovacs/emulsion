@@ -303,7 +303,15 @@ impl PicturePanel {
 
 
     pub fn draw(&mut self, target: &mut Frame, window: &Window) {
-        let window_size = window.display().gl_window().get_inner_size().unwrap();
+        let window_size = match window.display().gl_window().get_inner_size() {
+            Some(size) => size,
+            None => return
+        };
+
+        if window_size.width <= 0.0 || window_size.height <= 0.0 {
+            return;
+        }
+
         let panel_size = self.get_panel_size(window_size);
 
         self.update_projection_transform(panel_size);
