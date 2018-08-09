@@ -221,11 +221,20 @@ impl ImageCache {
     fn collect_directory(path: &Path) -> Result<Vec<fs::DirEntry>> {
         let mut dir_files: Vec<_> = fs::read_dir(path)?
             .filter_map(|x| {
-                let entry = x.unwrap();
-                if entry.file_type().unwrap().is_file() {
-                    Some(entry)
-                } else {
-                    None
+                match x.ok() {
+                    Some(entry) => match entry.file_type().ok() {
+                        Some(file_type) => if file_type.is_file() {
+                            if TextureLoader::is_file_supported(entry.path().as_path()) {
+                                Some(entry)
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        },
+                        None => None,
+                    },
+                    None => None,
                 }
             })
             .collect();
