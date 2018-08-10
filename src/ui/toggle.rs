@@ -39,6 +39,14 @@ impl<'a> Toggle<'a> {
         }
     }
 
+    pub fn position(&self) -> Vector2<f32> {
+        self.position
+    }
+
+    pub fn set_position(&mut self, pos: Vector2<f32>) {
+        self.position = pos;
+    }
+
     pub fn set_callback(&mut self, callback: Box<Fn(bool) -> () + 'a>) {
         self.callback = callback;
     }

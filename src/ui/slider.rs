@@ -69,6 +69,10 @@ impl<'a> Slider<'a> {
         self.position
     }
 
+    pub fn set_position(&mut self, pos: Vector2<f32>) {
+        self.position = pos;
+    }
+
     fn cursor_above(&self, cursor_position: &glutin::dpi::LogicalPosition) -> bool {
         let cursor_x = cursor_position.x as f32;
         let cursor_y = cursor_position.y as f32;

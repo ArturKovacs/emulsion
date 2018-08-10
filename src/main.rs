@@ -111,7 +111,7 @@ impl<'a> Program<'a> {
 
         let mut events_loop = glutin::EventsLoop::new();
         let mut window = Window::new(&events_loop, &config.borrow());
-        let mut picture_panel = PicturePanel::new(window.display(), BottomPanel::HEIGHT);
+        let mut picture_panel = PicturePanel::new(window.display(), BottomPanel::HEIGHT as u32);
         let playback_manager = RefCell::new(PlaybackManager::new());
 
         // Load image
