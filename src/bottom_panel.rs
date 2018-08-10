@@ -111,7 +111,7 @@ impl<'a> BottomPanel<'a> {
         let color = if config.light_theme {
             [0.95, 0.95, 0.95, 1.0f32]
         } else {
-            [0.1, 0.1, 0.1, 1.0f32]
+            [0.05, 0.05, 0.05, 1.0f32]
         };
         self.ui.draw(target, &color);
     }

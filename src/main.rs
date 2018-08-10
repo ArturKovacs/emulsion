@@ -80,10 +80,19 @@ struct Program<'a> {
 }
 
 impl<'a> Program<'a> {
-    fn draw_picture(window: &mut Window, picture_controller: &mut PicturePanel) {
+    fn get_bg_color(light_theme: bool) -> [f32; 4] {
+        if light_theme {
+            [0.9, 0.9, 0.9, 0.0]
+        } else {
+            [0.02, 0.02, 0.02, 0.0]
+        }
+    }
+
+    fn draw_picture(window: &mut Window, picture_controller: &mut PicturePanel, light_theme: bool) {
         let mut target = window.display().draw();
 
-        target.clear_color(0.9, 0.9, 0.9, 0.0);
+        let bg_color = Self::get_bg_color(light_theme);
+        target.clear_color(bg_color[0], bg_color[1], bg_color[2], bg_color[3]);
         picture_controller.draw(&mut target, window);
         target.finish().unwrap();
     }
@@ -117,7 +126,7 @@ impl<'a> Program<'a> {
         }
 
         // Just quickly display the loaded image here before we load the remaining parts of the program
-        Self::draw_picture(&mut window, &mut picture_panel);
+        Self::draw_picture(&mut window, &mut picture_panel, config.borrow().light_theme);
 
         let bottom_panel = BottomPanel::new(&mut window, &playback_manager, &config);
 
@@ -227,11 +236,8 @@ impl<'a> Program<'a> {
 
         let mut target = self.window.display().draw();
 
-        if self.configuration.borrow().light_theme {
-            target.clear_color(0.9, 0.9, 0.9, 0.0);
-        } else {
-            target.clear_color(0.02, 0.02, 0.02, 0.0);
-        }
+        let bg_color = Self::get_bg_color(self.configuration.borrow().light_theme);
+        target.clear_color(bg_color[0], bg_color[1], bg_color[2], bg_color[3]);
 
         self.picture_panel.draw(&mut target, &self.window);
         self.bottom_panel
