@@ -1,10 +1,9 @@
-
-use std::rc::Rc;
 use std::boxed::Box;
+use std::rc::Rc;
 
-use glium::{Display, Rect, Frame, Surface, VertexBuffer, IndexBuffer, Program, DrawParameters};
-use glium::texture::SrgbTexture2d;
 use glium::glutin;
+use glium::texture::SrgbTexture2d;
+use glium::{Display, DrawParameters, Frame, IndexBuffer, Program, Rect, Surface, VertexBuffer};
 
 use cgmath::{Matrix4, Vector2};
 
@@ -27,7 +26,6 @@ struct Vertex {
 
 implement_vertex!(Vertex, position, tex_coords);
 
-
 pub struct DrawContext<'a> {
     unit_quad_vertices: &'a VertexBuffer<Vertex>,
     unit_quad_indices: &'a IndexBuffer<u16>,
@@ -42,11 +40,11 @@ pub enum Event {
     MouseButton {
         button: glutin::MouseButton,
         state: glutin::ElementState,
-        position: glutin::dpi::LogicalPosition
+        position: glutin::dpi::LogicalPosition,
     },
     MouseMove {
-        position: glutin::dpi::LogicalPosition
-    }
+        position: glutin::dpi::LogicalPosition,
+    },
 }
 
 pub trait ElementFunctions {
@@ -54,20 +52,19 @@ pub trait ElementFunctions {
     fn handle_event(&mut self, event: &Event);
 }
 
-
 #[derive(Copy, Clone)]
 pub struct ButtonId<'a> {
-    ptr: *mut Button<'a>
+    ptr: *mut Button<'a>,
 }
 
 #[derive(Copy, Clone)]
 pub struct ToggleId<'a> {
-    ptr: *mut Toggle<'a>
+    ptr: *mut Toggle<'a>,
 }
 
 #[derive(Copy, Clone)]
 pub struct SliderId<'a> {
-    ptr: *mut Slider<'a>
+    ptr: *mut Slider<'a>,
 }
 
 pub struct Ui<'a> {
@@ -80,7 +77,7 @@ pub struct Ui<'a> {
     colored_shadowed_program: Program,
     colored_program: Program,
     cursor_pos: glutin::dpi::LogicalPosition,
-    height: f32
+    height: f32,
 }
 
 impl<'reference, 'element: 'reference> Ui<'element> {
@@ -113,8 +110,7 @@ impl<'reference, 'element: 'reference> Ui<'element> {
 
         // building the index buffer
         let index_buffer =
-            IndexBuffer::new(display, PrimitiveType::TriangleStrip, &[1 as u16, 2, 0, 3])
-                .unwrap();
+            IndexBuffer::new(display, PrimitiveType::TriangleStrip, &[1 as u16, 2, 0, 3]).unwrap();
 
         // compiling shaders and linking them together
         let textured_program = program!(display,
@@ -163,27 +159,28 @@ impl<'reference, 'element: 'reference> Ui<'element> {
             colored_shadowed_program,
             colored_program,
             cursor_pos: glutin::dpi::LogicalPosition::new(0.0, 0.0),
-            height
+            height,
         }
     }
 
-
-    pub fn window_event(&mut self, event: &glutin::WindowEvent, window_size: glutin::dpi::LogicalSize) {
+    pub fn window_event(
+        &mut self,
+        event: &glutin::WindowEvent,
+        window_size: glutin::dpi::LogicalSize,
+    ) {
         let event = match event {
-            glutin::WindowEvent::CursorMoved {position, ..} => {
+            glutin::WindowEvent::CursorMoved { position, .. } => {
                 self.cursor_pos.x = position.x;
                 self.cursor_pos.y = window_size.height as f64 - position.y;
 
                 Event::MouseMove {
-                    position: self.cursor_pos
+                    position: self.cursor_pos,
                 }
-            },
-            glutin::WindowEvent::MouseInput {state, button, ..} => {
-                Event::MouseButton {
-                    button: *button,
-                    state: *state,
-                    position: self.cursor_pos
-                }
+            }
+            glutin::WindowEvent::MouseInput { state, button, .. } => Event::MouseButton {
+                button: *button,
+                state: *state,
+                position: self.cursor_pos,
             },
             _ => return,
         };
@@ -198,7 +195,6 @@ impl<'reference, 'element: 'reference> Ui<'element> {
             slider.handle_event(&event);
         }
     }
-
 
     pub fn draw(&self, target: &mut Frame, bg_color: &[f32; 4]) {
         use cgmath::ortho;
@@ -215,7 +211,7 @@ impl<'reference, 'element: 'reference> Ui<'element> {
             left: left as u32,
             width: width as u32,
             bottom: bottom as u32,
-            height: self.height as u32
+            height: self.height as u32,
         };
 
         let context = DrawContext {
@@ -241,9 +237,10 @@ impl<'reference, 'element: 'reference> Ui<'element> {
         }
     }
 
-
-    pub fn get_button_mut(&'reference mut self, id: ButtonId<'element>)
-    -> Option<&'reference mut Button<'element>> {
+    pub fn get_button_mut(
+        &'reference mut self,
+        id: ButtonId<'element>,
+    ) -> Option<&'reference mut Button<'element>> {
         for button in self.buttons.iter_mut() {
             let button = &mut (**button);
             let ptr = button as *mut Button;
@@ -254,9 +251,10 @@ impl<'reference, 'element: 'reference> Ui<'element> {
         None
     }
 
-
-    pub fn get_toggle_mut(&'reference mut self, id: ToggleId<'element>)
-    -> Option<&'reference mut Toggle<'element>> {
+    pub fn get_toggle_mut(
+        &'reference mut self,
+        id: ToggleId<'element>,
+    ) -> Option<&'reference mut Toggle<'element>> {
         for toggle in self.toggles.iter_mut() {
             let mut toggle = &mut (**toggle);
             let ptr = toggle as *mut Toggle;
@@ -267,9 +265,10 @@ impl<'reference, 'element: 'reference> Ui<'element> {
         None
     }
 
-
-    pub fn get_slider_mut(&'reference mut self, id: SliderId<'element>)
-    -> Option<&'reference mut Slider<'element>> {
+    pub fn get_slider_mut(
+        &'reference mut self,
+        id: SliderId<'element>,
+    ) -> Option<&'reference mut Slider<'element>> {
         for slider in self.sliders.iter_mut() {
             let mut slider = &mut (**slider);
             let ptr = slider as *mut Slider;
@@ -280,26 +279,20 @@ impl<'reference, 'element: 'reference> Ui<'element> {
         None
     }
 
-
     pub fn create_button(
         &mut self,
         texture: Rc<SrgbTexture2d>,
         position: Vector2<f32>,
-        callback: Box<Fn() -> () + 'element>
+        callback: Box<Fn() -> () + 'element>,
     ) -> ButtonId<'element> {
-        let mut result = Box::new(Button::new(
-            texture, callback, position,
-        ));
+        let mut result = Box::new(Button::new(texture, callback, position));
 
         let ptr = &mut (*result) as *mut Button;
 
         self.buttons.push(result);
 
-        ButtonId {
-            ptr
-        }
+        ButtonId { ptr }
     }
-
 
     pub fn create_toggle(
         &mut self,
@@ -307,19 +300,21 @@ impl<'reference, 'element: 'reference> Ui<'element> {
         texture_off: Rc<SrgbTexture2d>,
         position: Vector2<f32>,
         is_on: bool,
-        callback: Box<Fn(bool) -> () + 'element>
+        callback: Box<Fn(bool) -> () + 'element>,
     ) -> ToggleId<'element> {
         let mut result = Box::new(Toggle::new(
-            texture_on, texture_off, callback, position, is_on
+            texture_on,
+            texture_off,
+            callback,
+            position,
+            is_on,
         ));
 
         let ptr = &mut (*result) as *mut Toggle;
 
         self.toggles.push(result);
 
-        ToggleId {
-            ptr
-        }
+        ToggleId { ptr }
     }
 
     pub fn create_slider(
@@ -328,44 +323,41 @@ impl<'reference, 'element: 'reference> Ui<'element> {
         size: Vector2<f32>,
         steps: u32,
         value: u32,
-        callback: Box<Fn(u32, u32) -> () + 'element>
+        callback: Box<Fn(u32, u32) -> () + 'element>,
     ) -> SliderId<'element> {
-        let mut result = Box::new(Slider::new(
-            position, size, steps, value, callback
-        ));
+        let mut result = Box::new(Slider::new(position, size, steps, value, callback));
 
         let ptr = &mut (*result) as *mut Slider;
 
         self.sliders.push(result);
 
-        SliderId {
-            ptr
-        }
+        SliderId { ptr }
     }
 
     fn draw_background(target: &mut Frame, context: &DrawContext, color: &[f32; 4]) {
-
         let image_draw_params = DrawParameters {
             viewport: Some(*context.viewport),
-            .. Default::default()
+            ..Default::default()
         };
 
         let mut transform = Matrix4::from_nonuniform_scale(
             context.viewport.width as f32,
             context.viewport.height as f32,
-            1.0
+            1.0,
         );
         transform = context.projection_transform * transform;
         let uniforms = uniform! {
             matrix: Into::<[[f32; 4]; 4]>::into(transform),
             color: *color,
         };
-        target.draw(
-            context.unit_quad_vertices,
-            context.unit_quad_indices,
-            context.colored_program,
-            &uniforms,
-            &image_draw_params,
-        ).unwrap();
+        target
+            .draw(
+                context.unit_quad_vertices,
+                context.unit_quad_indices,
+                context.colored_program,
+                &uniforms,
+                &image_draw_params,
+            )
+            .unwrap();
     }
 }

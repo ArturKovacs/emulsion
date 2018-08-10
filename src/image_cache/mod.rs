@@ -1,4 +1,4 @@
-use std::ffi::{OsString, OsStr};
+use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -26,8 +26,8 @@ pub mod errors {
     }
 }
 
-use self::errors::*;
 pub use self::errors::Result;
+use self::errors::*;
 
 pub struct ImageCache {
     dir_path: PathBuf,
@@ -39,7 +39,7 @@ pub struct ImageCache {
 }
 
 /// This is a store for the supported images loaded from a folder
-/// 
+///
 /// The basic idea is to have a few images already in the memory while an image is shown on the screen
 impl ImageCache {
     /// # Arguments
@@ -73,7 +73,6 @@ impl ImageCache {
         self.dir_files.len()
     }
 
-
     pub fn update_directory(&mut self) -> Result<()> {
         let curr_filename = self.current_filename();
         self.dir_files = Self::collect_directory(self.dir_path.as_path())?;
@@ -92,19 +91,21 @@ impl ImageCache {
         ).into())
     }
 
-
     pub fn load_at_index(
         &mut self,
         display: &glium::Display,
         index: usize,
     ) -> Result<(Rc<SrgbTexture2d>, OsString)> {
-        let path = self.dir_files.get(index).ok_or_else(|| {
-            format!(
-                "Index {} is out of bounds of the current directory '{}'",
-                index,
-                self.dir_path.to_str().unwrap()
-            )
-        })?.path();
+        let path = self.dir_files
+            .get(index)
+            .ok_or_else(|| {
+                format!(
+                    "Index {} is out of bounds of the current directory '{}'",
+                    index,
+                    self.dir_path.to_str().unwrap()
+                )
+            })?
+            .path();
 
         let result = self.loader.load_specific(display, &path)?;
 
@@ -112,10 +113,9 @@ impl ImageCache {
 
         Ok((
             result,
-            path.file_name().unwrap_or(OsStr::new("")).to_owned()
+            path.file_name().unwrap_or(OsStr::new("")).to_owned(),
         ))
     }
-
 
     pub fn load_specific(
         &mut self,
@@ -135,8 +135,9 @@ impl ImageCache {
         };
 
         // Directory may have changed
-        let parent =
-            path.parent().ok_or("Could not get parent directory")?.to_owned();
+        let parent = path.parent()
+            .ok_or("Could not get parent directory")?
+            .to_owned();
         if self.dir_path != parent {
             self.change_directory(parent, current_name)?;
         } else {
@@ -188,7 +189,10 @@ impl ImageCache {
         let result = self.loader.load_specific(display, &target_path)?;
         self.current_index = target_index as usize;
 
-        Ok((result, target_path.file_name().unwrap_or(OsStr::new("")).to_owned()))
+        Ok((
+            result,
+            target_path.file_name().unwrap_or(OsStr::new("")).to_owned(),
+        ))
     }
 
     pub fn process_prefetched(&mut self, display: &glium::Display) -> Result<()> {
@@ -196,7 +200,8 @@ impl ImageCache {
     }
 
     pub fn send_load_requests(&mut self) {
-        self.loader.send_load_requests(&self.dir_files, self.current_index);
+        self.loader
+            .send_load_requests(&self.dir_files, self.current_index);
     }
 
     fn change_directory(&mut self, dir_path: PathBuf, filename: OsString) -> Result<()> {
@@ -220,27 +225,24 @@ impl ImageCache {
 
     fn collect_directory(path: &Path) -> Result<Vec<fs::DirEntry>> {
         let mut dir_files: Vec<_> = fs::read_dir(path)?
-            .filter_map(|x| {
-                match x.ok() {
-                    Some(entry) => match entry.file_type().ok() {
-                        Some(file_type) => if file_type.is_file() {
-                            if TextureLoader::is_file_supported(entry.path().as_path()) {
-                                Some(entry)
-                            } else {
-                                None
-                            }
+            .filter_map(|x| match x.ok() {
+                Some(entry) => match entry.file_type().ok() {
+                    Some(file_type) => if file_type.is_file() {
+                        if TextureLoader::is_file_supported(entry.path().as_path()) {
+                            Some(entry)
                         } else {
                             None
-                        },
-                        None => None,
+                        }
+                    } else {
+                        None
                     },
                     None => None,
-                }
+                },
+                None => None,
             })
             .collect();
 
-        dir_files
-            .sort_unstable_by(|a, b| a.file_name().cmp(&b.file_name()));
+        dir_files.sort_unstable_by(|a, b| a.file_name().cmp(&b.file_name()));
 
         Ok(dir_files)
     }

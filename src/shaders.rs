@@ -1,4 +1,3 @@
-
 pub static VERTEX_110: &str = include_str!("shaders/vertex_110.glsl");
 pub static VERTEX_140: &str = include_str!("shaders/vertex_140.glsl");
 

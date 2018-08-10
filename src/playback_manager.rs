@@ -1,7 +1,6 @@
-
-use std::mem;
 use std::ffi::OsString;
 use std::io::Write;
+use std::mem;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Instant;
@@ -47,7 +46,6 @@ pub struct PlaybackManager {
     image_texture: Option<Rc<glium::texture::SrgbTexture2d>>,
 }
 
-
 impl PlaybackManager {
     pub fn new() -> Self {
         let cache_capaxity = match sys_info::mem_info() {
@@ -76,7 +74,7 @@ impl PlaybackManager {
             load_request: LoadRequest::None,
             should_sleep: true,
 
-            image_texture: None
+            image_texture: None,
         };
 
         resulting_window
@@ -132,7 +130,6 @@ impl PlaybackManager {
         &self.image_texture
     }
 
-
     pub fn update_image(&mut self, window: &mut Window) {
         self.should_sleep = true;
 
@@ -147,12 +144,13 @@ impl PlaybackManager {
         let frame_delta_time_nanos = (NANOS_PER_SEC as f64 / framerate) as u64;
 
         if self.playback_state == PlaybackState::Paused {
-            self.image_cache.process_prefetched(window.display()).unwrap();
+            self.image_cache
+                .process_prefetched(window.display())
+                .unwrap();
             self.image_cache.send_load_requests();
         } else if load_request == LoadRequest::None {
             let elapsed = self.playback_start_time.elapsed();
-            let elapsed_nanos =
-                elapsed.as_secs() * NANOS_PER_SEC + elapsed.subsec_nanos() as u64;
+            let elapsed_nanos = elapsed.as_secs() * NANOS_PER_SEC + elapsed.subsec_nanos() as u64;
             let frame_step =
                 (elapsed_nanos / frame_delta_time_nanos) - self.frame_count_since_playback_start;
             if frame_step > 0 {
@@ -163,13 +161,13 @@ impl PlaybackManager {
                 };
                 self.frame_count_since_playback_start += frame_step;
             } else {
-                self.image_cache.process_prefetched(window.display()).unwrap();
+                self.image_cache
+                    .process_prefetched(window.display())
+                    .unwrap();
 
                 let nanos_since_last = elapsed_nanos % frame_delta_time_nanos;
                 const BUISY_WAIT_TRESHOLD: f32 = 0.8;
-                if nanos_since_last
-                    > (frame_delta_time_nanos as f32 * BUISY_WAIT_TRESHOLD) as u64
-                {
+                if nanos_since_last > (frame_delta_time_nanos as f32 * BUISY_WAIT_TRESHOLD) as u64 {
                     // Just buisy wait if we are getting very close to the next frame swap
                     self.should_sleep = false;
                 } else {
@@ -183,21 +181,21 @@ impl PlaybackManager {
         let load_result = match load_request {
             LoadRequest::LoadNext => Some(self.image_cache.load_next(window.display())),
             LoadRequest::LoadPrevious => Some(self.image_cache.load_prev(window.display())),
-            LoadRequest::LoadSpecific(ref file_path) => Some(
-                if let Some(file_name) = file_path.file_name() {
+            LoadRequest::LoadSpecific(ref file_path) => {
+                Some(if let Some(file_name) = file_path.file_name() {
                     self.image_cache
                         .load_specific(window.display(), file_path.as_ref())
                         .map(|x| (x, OsString::from(file_name)))
                 } else {
                     Err(String::from("Could not extract filename").into())
-                }
-            ),
+                })
+            }
             LoadRequest::LoadAtIndex(index) => {
                 Some(self.image_cache.load_at_index(window.display(), index))
-            },
+            }
             LoadRequest::Jump(jump_count) => {
                 Some(self.image_cache.load_jump(window.display(), jump_count))
-            },
+            }
             LoadRequest::None => None,
         };
         if let Some(result) = load_result {

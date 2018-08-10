@@ -1,14 +1,12 @@
-
 use std::boxed::Box;
 
 use glium;
-use glium::{Surface, Frame};
 use glium::glutin;
+use glium::{Frame, Surface};
 
 use cgmath::{Matrix4, Vector2, Vector3};
 
-use ui::{ElementFunctions, DrawContext, Event};
-
+use ui::{DrawContext, ElementFunctions, Event};
 
 pub struct Slider<'a> {
     callback: Box<Fn(u32, u32) -> () + 'a>,
@@ -42,8 +40,8 @@ impl<'a> Slider<'a> {
     }
 
     /// Sets the function that will be called on slider value change
-    /// 
-    /// # Arguments 
+    ///
+    /// # Arguments
     /// * `callback` - The function that will be called. The first parameter of this function
     /// is the number of steps. The second parameter is the current value (step).
     pub fn set_callback(&mut self, callback: Box<Fn(u32, u32) -> () + 'a>) {
@@ -78,8 +76,10 @@ impl<'a> Slider<'a> {
         let width = self.size.x;
         let height = self.size.y;
 
-        cursor_x as f32 > self.position.x && cursor_x < (self.position.x + width)
-            && cursor_y as f32 > self.position.y && cursor_y < (self.position.y + height)
+        cursor_x as f32 > self.position.x
+            && cursor_x < (self.position.x + width)
+            && cursor_y as f32 > self.position.y
+            && cursor_y < (self.position.y + height)
     }
 
     fn value_from_cursor(&self, cursor_x: f32) -> u32 {
@@ -102,11 +102,11 @@ impl<'a> ElementFunctions for Slider<'a> {
             blend: Blend {
                 color: BlendingFunction::Addition {
                     source: LinearBlendingFactor::SourceAlpha,
-                    destination: LinearBlendingFactor::OneMinusSourceAlpha
+                    destination: LinearBlendingFactor::OneMinusSourceAlpha,
                 },
-                .. Default::default()
+                ..Default::default()
             },
-            .. Default::default()
+            ..Default::default()
         };
 
         // -----------------------
@@ -116,7 +116,7 @@ impl<'a> ElementFunctions for Slider<'a> {
         let slider_pos = Vector3::new(
             self.position.x + value_ratio * self.size.x,
             self.position.y,
-            0.0
+            0.0,
         );
         let color = [0.2, 0.2, 0.2, 1.0f32];
 
@@ -127,13 +127,15 @@ impl<'a> ElementFunctions for Slider<'a> {
             matrix: Into::<[[f32; 4]; 4]>::into(transform),
             color: color,
         };
-        target.draw(
-            context.unit_quad_vertices,
-            context.unit_quad_indices,
-            context.colored_program,
-            &uniforms,
-            &image_draw_params,
-        ).unwrap();
+        target
+            .draw(
+                context.unit_quad_vertices,
+                context.unit_quad_indices,
+                context.colored_program,
+                &uniforms,
+                &image_draw_params,
+            )
+            .unwrap();
 
         // -----------------------
         // Draw slider background (shadow)
@@ -151,19 +153,24 @@ impl<'a> ElementFunctions for Slider<'a> {
             size: size,
             shadow_offset: 0.8f32,
         };
-        target.draw(
-            context.unit_quad_vertices,
-            context.unit_quad_indices,
-            context.colored_shadowed_program,
-            &uniforms,
-            &image_draw_params,
-        ).unwrap();
+        target
+            .draw(
+                context.unit_quad_vertices,
+                context.unit_quad_indices,
+                context.colored_shadowed_program,
+                &uniforms,
+                &image_draw_params,
+            )
+            .unwrap();
     }
-
 
     fn handle_event(&mut self, event: &Event) {
         match event {
-            Event::MouseButton {button, state, position } => {
+            Event::MouseButton {
+                button,
+                state,
+                position,
+            } => {
                 if *button == glutin::MouseButton::Left {
                     if self.cursor_above(position) {
                         if *state == glutin::ElementState::Pressed {
@@ -178,7 +185,7 @@ impl<'a> ElementFunctions for Slider<'a> {
                     }
                 }
             }
-            Event::MouseMove {position} => {
+            Event::MouseMove { position } => {
                 self.hover = self.cursor_above(position);
                 if self.click == true {
                     self.value = self.value_from_cursor(position.x as f32);

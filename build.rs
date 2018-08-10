@@ -9,5 +9,4 @@ fn main() {
 }
 
 #[cfg(unix)]
-fn main() {
-}
+fn main() {}

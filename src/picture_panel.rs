@@ -1,15 +1,14 @@
-
+use std::mem;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::mem;
 
 use glium;
-use glium::glutin::{VirtualKeyCode, WindowEvent};
 use glium::glutin::dpi::LogicalSize;
+use glium::glutin::{VirtualKeyCode, WindowEvent};
 use glium::index::PrimitiveType;
 
-use glium::{Frame, Surface};
 use glium::glutin;
+use glium::{Frame, Surface};
 
 use cgmath::ElementWise;
 use cgmath::SquareMatrix;
@@ -17,8 +16,8 @@ use cgmath::{Matrix4, Vector2, Vector4};
 
 use shaders;
 
-use window::*;
 use playback_manager::*;
+use window::*;
 
 #[derive(Copy, Clone)]
 struct Vertex {
@@ -30,7 +29,7 @@ implement_vertex!(Vertex, position, tex_coords);
 
 enum FileHoverState {
     Idle,
-    HoveredFile{prev_file: PathBuf}
+    HoveredFile { prev_file: PathBuf },
 }
 
 pub struct PicturePanel {
@@ -127,7 +126,7 @@ impl PicturePanel {
             last_mouse_pos: Vector2::new(0.0, 0.0),
             panning: false,
 
-            should_sleep: true
+            should_sleep: true,
         }
     }
 
@@ -147,7 +146,7 @@ impl PicturePanel {
         &mut self,
         event: &glutin::Event,
         window: &mut Window,
-        playback_manager: &mut PlaybackManager
+        playback_manager: &mut PlaybackManager,
     ) {
         if let glutin::Event::WindowEvent { event, .. } = event {
             let window_size = window.display().gl_window().get_inner_size().unwrap();
@@ -168,7 +167,10 @@ impl PicturePanel {
                                     if playback_manager.playback_state() == PlaybackState::Forward {
                                         playback_manager.pause_playback();
                                         let filename = playback_manager
-                                            .current_filename().to_str().unwrap().to_owned();
+                                            .current_filename()
+                                            .to_str()
+                                            .unwrap()
+                                            .to_owned();
                                         window.set_title_filename(filename.as_ref());
                                     } else {
                                         playback_manager.start_playback_forward();
@@ -212,21 +214,11 @@ impl PicturePanel {
                             let mut curr_world_pos = Self::get_mouse_proj(pos_vec, window_size);
 
                             let tmp = inv_projection_transform
-                                * Vector4::new(
-                                    last_world_pos.x,
-                                    last_world_pos.y,
-                                    0f32,
-                                    1f32,
-                                );
+                                * Vector4::new(last_world_pos.x, last_world_pos.y, 0f32, 1f32);
                             last_world_pos.x = tmp.x;
                             last_world_pos.y = tmp.y;
                             let tmp = inv_projection_transform
-                                * Vector4::new(
-                                    curr_world_pos.x,
-                                    curr_world_pos.y,
-                                    0f32,
-                                    1f32,
-                                );
+                                * Vector4::new(curr_world_pos.x, curr_world_pos.y, 0f32, 1f32);
                             curr_world_pos.x = tmp.x;
                             curr_world_pos.y = tmp.y;
 
@@ -257,10 +249,7 @@ impl PicturePanel {
                         1.0 / (delta.abs() + 1.0)
                     };
 
-                    let mut mouse_world = Self::get_mouse_proj(
-                        self.last_mouse_pos,
-                        panel_size,
-                    );
+                    let mut mouse_world = Self::get_mouse_proj(self.last_mouse_pos, panel_size);
 
                     let transformed = self.projection_transform.invert().unwrap()
                         * Vector4::new(mouse_world.x, mouse_world.y, 0.0, 1.0);
@@ -278,34 +267,33 @@ impl PicturePanel {
                     }
                 }
                 WindowEvent::HoveredFile(file_name) => {
-                    self.file_hover_state = FileHoverState::HoveredFile{prev_file: playback_manager.current_file_path()};
+                    self.file_hover_state = FileHoverState::HoveredFile {
+                        prev_file: playback_manager.current_file_path(),
+                    };
                     playback_manager.request_load(LoadRequest::LoadSpecific(file_name.clone()));
                 }
                 WindowEvent::HoveredFileCancelled => {
                     let mut tmp_hover_state = FileHoverState::Idle;
                     mem::swap(&mut self.file_hover_state, &mut tmp_hover_state);
-                    if let FileHoverState::HoveredFile{prev_file} = tmp_hover_state {
+                    if let FileHoverState::HoveredFile { prev_file } = tmp_hover_state {
                         playback_manager.request_load(LoadRequest::LoadSpecific(prev_file));
                     }
                 }
-                WindowEvent::DroppedFile(file_name) => {
-                    match self.file_hover_state {
-                        FileHoverState::Idle => {
-                            playback_manager.request_load(LoadRequest::LoadSpecific(file_name.clone()));
-                        }
-                        _ => (),
+                WindowEvent::DroppedFile(file_name) => match self.file_hover_state {
+                    FileHoverState::Idle => {
+                        playback_manager.request_load(LoadRequest::LoadSpecific(file_name.clone()));
                     }
-                }
+                    _ => (),
+                },
                 _ => (),
             }
         }
     }
 
-
     pub fn draw(&mut self, target: &mut Frame, window: &Window) {
         let window_size = match window.display().gl_window().get_inner_size() {
             Some(size) => size,
-            None => return
+            None => return,
         };
 
         if window_size.width <= 0.0 || window_size.height <= 0.0 {
@@ -345,9 +333,9 @@ impl PicturePanel {
                     left: 0,
                     bottom: self.bottom,
                     width: window_size.width as u32,
-                    height: window_size.height as u32 - self.bottom
+                    height: window_size.height as u32 - self.bottom,
                 }),
-                .. Default::default()
+                ..Default::default()
             };
             target
                 .draw(
@@ -360,7 +348,6 @@ impl PicturePanel {
                 .unwrap();
         }
     }
-
 
     pub fn update_projection_transform(&mut self, panel_size: LogicalSize) {
         if let Some(ref texture) = self.image_texture {
@@ -383,12 +370,13 @@ impl PicturePanel {
         }
     }
 
-
     fn get_mouse_proj(mouse_screen: Vector2<f32>, panel_size: LogicalSize) -> Vector2<f32> {
         // Calculate mouse pos in "world space"
         //let window_size = self.display.gl_window().get_inner_size().unwrap();
-        let panel_center =
-            Vector2::new(panel_size.width as f32 * 0.5, panel_size.height as f32 * 0.5);
+        let panel_center = Vector2::new(
+            panel_size.width as f32 * 0.5,
+            panel_size.height as f32 * 0.5,
+        );
         let mut mouse_world = mouse_screen - panel_center;
         mouse_world.y *= -1.0;
         mouse_world.div_assign_element_wise(Vector2::new(

@@ -1,10 +1,8 @@
-
-
 use std::fs::File;
 use std::path::Path;
 //use std::result::Result;
-use serde::{Serialize, Deserialize};
-use rmp_serde::{Serializer, Deserializer};
+use rmp_serde::{Deserializer, Serializer};
+use serde::{Deserialize, Serialize};
 
 #[derive(PartialEq, Serialize, Deserialize)]
 pub struct Configuration {

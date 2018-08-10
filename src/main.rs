@@ -5,29 +5,28 @@ extern crate cgmath;
 extern crate error_chain;
 #[macro_use]
 extern crate glium;
-extern crate image;
-extern crate sys_info;
 extern crate backtrace;
+extern crate image;
 extern crate serde;
+extern crate sys_info;
 #[macro_use]
 extern crate serde_derive;
 extern crate rmp_serde;
 
+use std::cell::RefCell;
 use std::env;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::cell::RefCell;
 use std::thread;
 use std::time::Duration;
 
 use glium::glutin::{VirtualKeyCode, WindowEvent};
 use glium::{glutin, Surface};
 
-
-mod image_cache;
 mod handle_panic;
-mod ui;
+mod image_cache;
 mod shaders;
+mod ui;
 
 mod picture_panel;
 use picture_panel::PicturePanel;
@@ -36,7 +35,7 @@ mod bottom_panel;
 use bottom_panel::BottomPanel;
 
 mod playback_manager;
-use playback_manager::{PlaybackManager, LoadRequest};
+use playback_manager::{LoadRequest, PlaybackManager};
 
 mod window;
 use window::*;
@@ -48,15 +47,14 @@ use configuration::Configuration;
 // Glorious main function
 // ========================================================
 fn main() {
-    use std::panic;
     use std::boxed::Box;
+    use std::panic;
 
     panic::set_hook(Box::new(handle_panic::handle_panic));
 
     Program::start();
 }
 // ========================================================
-
 
 trait OptionRefClone {
     fn ref_clone(&self) -> Self;
@@ -70,7 +68,6 @@ impl OptionRefClone for Option<Rc<glium::texture::SrgbTexture2d>> {
         }
     }
 }
-
 
 struct Program<'a> {
     configuration: &'a RefCell<Configuration>,
@@ -121,7 +118,7 @@ impl<'a> Program<'a> {
 
         // Just quickly display the loaded image here before we load the remaining parts of the program
         Self::draw_picture(&mut window, &mut picture_panel);
-   
+
         let bottom_panel = BottomPanel::new(&mut window, &playback_manager, &config);
 
         let mut program = Program {
@@ -137,7 +134,6 @@ impl<'a> Program<'a> {
 
         let _ = program.configuration.borrow().save(config_file_path);
     }
-
 
     fn start_event_loop(&mut self, events_loop: &mut glutin::EventsLoop) {
         let mut running = true;
@@ -157,17 +153,17 @@ impl<'a> Program<'a> {
                                     }
                                 }
                             }
-                        },
+                        }
                         WindowEvent::Resized(size) => {
                             let mut config = self.configuration.borrow_mut();
                             config.window_width = size.width as u32;
                             config.window_height = size.height as u32;
                             // Don't you dare saving to file here.
-                        },
+                        }
                         WindowEvent::Focused(false) => {
                             let config = self.configuration.borrow();
                             let _ = config.save(self.config_file_path.as_path());
-                        },
+                        }
                         _ => (),
                     }
                 }
@@ -180,16 +176,15 @@ impl<'a> Program<'a> {
                 // Playback manager is borrowed only after the bottom panel button callbacks
                 // are finished
                 let mut playback_manager = self.playback_manager.borrow_mut();
-                self.picture_panel.handle_event(
-                    &event,
-                    &mut self.window,
-                    &mut playback_manager
-                );
+                self.picture_panel
+                    .handle_event(&event, &mut self.window, &mut playback_manager);
 
                 // Update screen after a resize event or refresh
                 if let Event::WindowEvent { event, .. } = event {
                     match event {
-                        WindowEvent::Resized(..) | WindowEvent::Refresh => self.draw(&playback_manager),
+                        WindowEvent::Resized(..) | WindowEvent::Refresh => {
+                            self.draw(&playback_manager)
+                        }
                         _ => (),
                     }
                 }
@@ -198,7 +193,8 @@ impl<'a> Program<'a> {
             let mut playback_manager = self.playback_manager.borrow_mut();
             let load_requested = *playback_manager.load_request() != LoadRequest::None;
             playback_manager.update_image(&mut self.window);
-            self.picture_panel.set_image(playback_manager.image_texture().ref_clone());
+            self.picture_panel
+                .set_image(playback_manager.image_texture().ref_clone());
 
             self.draw(&playback_manager);
 
@@ -209,8 +205,8 @@ impl<'a> Program<'a> {
 
             let should_sleep = {
                 playback_manager.should_sleep()
-                && self.picture_panel.should_sleep()
-                && !load_requested
+                    && self.picture_panel.should_sleep()
+                    && !load_requested
             };
 
             // Let other processes run for a bit.
@@ -226,7 +222,7 @@ impl<'a> Program<'a> {
             Some(window_size) => if window_size.width <= 0.0 || window_size.height <= 0.0 {
                 return;
             },
-            None => return
+            None => return,
         }
 
         let mut target = self.window.display().draw();
@@ -238,13 +234,9 @@ impl<'a> Program<'a> {
         }
 
         self.picture_panel.draw(&mut target, &self.window);
-        self.bottom_panel.draw(
-            &mut target,
-            playback_manager,
-            &self.configuration.borrow(),
-        );
+        self.bottom_panel
+            .draw(&mut target, playback_manager, &self.configuration.borrow());
 
         target.finish().unwrap();
     }
 }
-
