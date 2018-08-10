@@ -97,7 +97,7 @@ impl TextureLoader {
             image_rx: loaded_img_rx,
             path_tx: load_request_tx,
 
-            requested_images: 0
+            requested_images: 0,
         }
     }
 
@@ -315,7 +315,7 @@ impl TextureLoader {
                     }
                     if !passed_current && remaining_capacity < image_size_estimate {
                         if let CachedTexture::Texture(ref entry) = texture {
-                            remaining_capacity -=
+                            remaining_capacity +=
                                 Self::get_image_size_estimate((entry.1.width(), entry.1.height()))
                                     as isize;
                             false
