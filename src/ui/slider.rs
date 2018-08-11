@@ -1,4 +1,5 @@
 use std::boxed::Box;
+use std::rc::Rc;
 
 use glium;
 use glium::glutin;
@@ -8,30 +9,33 @@ use cgmath::{Matrix4, Vector2, Vector3};
 
 use ui::{DrawContext, ElementFunctions, Event};
 
-pub struct Slider<'a> {
-    callback: Box<Fn(u32, u32) -> () + 'a>,
+pub struct Slider<'callback_ref> {
+    callback: Rc<Fn(u32, u32)->() + 'callback_ref>,
     position: Vector2<f32>,
     size: Vector2<f32>,
+    shadow_color: Vector3<f32>,
     steps: u32,
     value: u32,
     hover: bool,
     click: bool,
 }
 
-impl<'a> Slider<'a> {
+impl<'callback_ref> Slider<'callback_ref> {
     const DISPLAY_OFFSET: f32 = 0.5;
 
-    pub fn new(
+    pub fn new<F>(
         position: Vector2<f32>,
         size: Vector2<f32>,
         steps: u32,
         value: u32,
-        callback: Box<Fn(u32, u32) -> () + 'a>,
-    ) -> Self {
+        callback: F,
+    ) -> Self
+    where F: Fn(u32, u32) -> () + 'callback_ref {
         Slider {
-            callback,
+            callback: Rc::new(callback),
             position,
             size,
+            shadow_color: Vector3::new(0.0, 0.0, 0f32),
             steps,
             value,
             hover: false,
@@ -44,8 +48,9 @@ impl<'a> Slider<'a> {
     /// # Arguments
     /// * `callback` - The function that will be called. The first parameter of this function
     /// is the number of steps. The second parameter is the current value (step).
-    pub fn set_callback(&mut self, callback: Box<Fn(u32, u32) -> () + 'a>) {
-        self.callback = callback;
+    pub fn set_callback<F>(&mut self, callback: F)
+    where F: Fn(u32, u32) -> () + 'callback_ref {
+        self.callback = Rc::new(callback);
     }
 
     pub fn set_size(&mut self, size: Vector2<f32>) {
@@ -55,6 +60,10 @@ impl<'a> Slider<'a> {
     pub fn set_steps(&mut self, steps: u32, value: u32) {
         self.steps = steps;
         self.value = value;
+    }
+
+    pub fn set_shadow_color(&mut self, color: Vector3<f32>) {
+        self.shadow_color = color;
     }
 
     pub fn value(&self) -> u32 {
@@ -92,9 +101,16 @@ impl<'a> Slider<'a> {
 
         value_almost.round().min(self.steps as f32 - 1f32).max(0f32) as u32
     }
+
+    fn create_no_arg_callback(&self) -> Box<Fn() + 'callback_ref> {
+        let callback = self.callback.clone();
+        let steps = self.steps;
+        let value = self.value;
+        Box::new(move || {callback(steps, value);})
+    }
 }
 
-impl<'a> ElementFunctions for Slider<'a> {
+impl<'callback_ref> ElementFunctions<'callback_ref> for Slider<'callback_ref> {
     fn draw(&self, target: &mut Frame, context: &DrawContext) {
         use glium::{Blend, BlendingFunction, LinearBlendingFactor};
 
@@ -155,6 +171,7 @@ impl<'a> ElementFunctions for Slider<'a> {
             matrix: Into::<[[f32; 4]; 4]>::into(transform),
             color: color,
             size: size,
+            shadow_color: Into::<[f32; 3]>::into(self.shadow_color),
             shadow_offset: 0.8f32,
         };
         target
@@ -168,7 +185,8 @@ impl<'a> ElementFunctions for Slider<'a> {
             .unwrap();
     }
 
-    fn handle_event(&mut self, event: &Event) {
+    fn handle_event(&mut self, event: &Event) -> Option<Box<Fn()->() + 'callback_ref>> {
+        let mut result: Option<Box<Fn()->()>> = None;
         match event {
             Event::MouseButton {
                 button,
@@ -180,7 +198,7 @@ impl<'a> ElementFunctions for Slider<'a> {
                         if *state == glutin::ElementState::Pressed {
                             self.click = true;
                             self.value = self.value_from_cursor(position.x as f32);
-                            (self.callback)(self.steps, self.value);
+                            result = Some(self.create_no_arg_callback());
                         } else {
                             self.click = false;
                         }
@@ -193,9 +211,11 @@ impl<'a> ElementFunctions for Slider<'a> {
                 self.hover = self.cursor_above(position);
                 if self.click == true {
                     self.value = self.value_from_cursor(position.x as f32);
-                    (self.callback)(self.steps, self.value);
+                    result = Some(self.create_no_arg_callback());
                 }
             }
         }
+
+        result
     }
 }

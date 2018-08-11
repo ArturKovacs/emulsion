@@ -10,28 +10,29 @@ use cgmath::{Matrix4, Vector2};
 
 use ui::{DrawContext, ElementFunctions, Event};
 
-pub struct Toggle<'a> {
+pub struct Toggle<'callback_ref> {
     texture_on: Rc<SrgbTexture2d>,
     texture_off: Rc<SrgbTexture2d>,
-    callback: Box<Fn(bool) -> () + 'a>,
+    callback: Rc<Fn(bool)->() + 'callback_ref>,
     position: Vector2<f32>,
     is_on: bool,
     hover: bool,
     click: bool,
 }
 
-impl<'a> Toggle<'a> {
-    pub fn new(
+impl<'callback_ref> Toggle<'callback_ref> {
+    pub fn new<F>(
         texture_on: Rc<SrgbTexture2d>,
         texture_off: Rc<SrgbTexture2d>,
-        callback: Box<Fn(bool) -> () + 'a>,
+        callback: F,
         position: Vector2<f32>,
         is_on: bool,
-    ) -> Self {
+    ) -> Self
+    where F: Fn(bool)->() + 'callback_ref {
         Toggle {
             texture_on,
             texture_off,
-            callback,
+            callback: Rc::new(callback),
             position,
             is_on,
             hover: false,
@@ -47,8 +48,9 @@ impl<'a> Toggle<'a> {
         self.position = pos;
     }
 
-    pub fn set_callback(&mut self, callback: Box<Fn(bool) -> () + 'a>) {
-        self.callback = callback;
+    pub fn set_callback<F>(&mut self, callback: F)
+        where F: Fn(bool)->() + 'callback_ref {
+        self.callback = Rc::new(callback);
     }
 
     fn cursor_above(&self, cursor_position: &glutin::dpi::LogicalPosition) -> bool {
@@ -65,7 +67,7 @@ impl<'a> Toggle<'a> {
     }
 }
 
-impl<'a> ElementFunctions for Toggle<'a> {
+impl<'callback_ref> ElementFunctions<'callback_ref> for Toggle<'callback_ref> {
     fn draw(&self, target: &mut Frame, context: &DrawContext) {
         use glium::{Blend, BlendingFunction, LinearBlendingFactor};
 
@@ -120,7 +122,8 @@ impl<'a> ElementFunctions for Toggle<'a> {
             .unwrap();
     }
 
-    fn handle_event(&mut self, event: &Event) {
+    fn handle_event(&mut self, event: &Event) -> Option<Box<Fn()->() + 'callback_ref>> {
+        let mut result: Option<Box<Fn()->()>> = None;
         match event {
             Event::MouseButton {
                 button,
@@ -133,8 +136,11 @@ impl<'a> ElementFunctions for Toggle<'a> {
                             self.click = true;
                         } else if self.click == true {
                             self.is_on = !self.is_on;
-                            (self.callback)(self.is_on);
                             self.click = false;
+
+                            let callback = self.callback.clone();
+                            let is_on = self.is_on;
+                            result = Some(Box::new(move || {callback(is_on);}));
                         }
                     } else {
                         self.click = false;
@@ -145,5 +151,6 @@ impl<'a> ElementFunctions for Toggle<'a> {
                 self.hover = self.cursor_above(position);
             }
         }
+        result
     }
 }

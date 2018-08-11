@@ -10,11 +10,13 @@ use glium::texture::{RawImage2d, SrgbTexture2d};
 
 use image;
 
-use cgmath::Vector2;
+use cgmath::{Vector2, Vector3};
 
 use configuration::Configuration;
 use playback_manager::{LoadRequest, PlaybackManager};
-use ui::{SliderId, ToggleId, Ui};
+use ui::Ui;
+use ui::slider::Slider;
+use ui::toggle::Toggle;
 use window::*;
 
 fn load_texture_without_cache(display: &glium::Display, image_path: &Path) -> SrgbTexture2d {
@@ -30,21 +32,21 @@ fn texture_from_image(display: &glium::Display, image: image::RgbaImage) -> Srgb
     SrgbTexture2d::with_mipmaps(display, image, glium::texture::MipmapsOption::NoMipmap).unwrap()
 }
 
-pub struct BottomPanel<'a> {
-    ui: Ui<'a>,
-    slider: SliderId<'a>,
-    theme_toggle: ToggleId<'a>,
-    help_toggle: ToggleId<'a>,
+pub struct BottomPanel<'callback_ref> {
+    ui: Ui<'callback_ref>,
+    slider: Rc<RefCell<Slider<'callback_ref>>>,
+    theme_toggle: Rc<RefCell<Toggle<'callback_ref>>>,
+    help_toggle: Rc<RefCell<Toggle<'callback_ref>>>,
 }
 
-impl<'a> BottomPanel<'a> {
+impl<'callback_ref> BottomPanel<'callback_ref> {
     pub const HEIGHT: i32 = 32;
     pub const CONTROLS_MAX_WIDTH: i32 = 1024;
 
     pub fn new(
         window: &mut Window,
-        playback_manager: &'a RefCell<PlaybackManager>,
-        configuration: &'a RefCell<Configuration>,
+        playback_manager: &'callback_ref RefCell<PlaybackManager>,
+        configuration: &'callback_ref RefCell<Configuration>,
     ) -> Self {
         let mut ui = Ui::new(window.display(), Self::HEIGHT as f32);
 
@@ -68,35 +70,45 @@ impl<'a> BottomPanel<'a> {
 
         let config = configuration.borrow();
 
-        let theme_toggle = ui.create_toggle(
-            moon_texture,
-            light_texture,
-            Vector2::new(32f32, 4f32),
-            config.light_theme,
-            Box::new(move |is_light| {
-                configuration.borrow_mut().light_theme = is_light;
-            }),
-        );
         let slider = ui.create_slider(
             Vector2::new(64f32, 3f32),
             Vector2::new(512f32, 24f32),
             32,
             5,
-            Box::new(move |_, value| {
+            move |_, value| {
                 playback_manager
                     .borrow_mut()
                     .request_load(LoadRequest::LoadAtIndex(value as usize));
-            }),
+            },
         );
         let help_toggle = ui.create_toggle(
             question.clone(),
             question,
             Vector2::new(32f32, 4f32),
             false,
-            Box::new(move |is_on| {
+            move |is_on| {
                 //configuration.borrow_mut().light_theme = is_light;
-            }),
+            },
         );
+
+        let theme_toggle = {
+            let slider = slider.clone();
+            ui.create_toggle(
+                moon_texture,
+                light_texture,
+                Vector2::new(32f32, 4f32),
+                config.light_theme,
+                move |is_light| {
+                    configuration.borrow_mut().light_theme = is_light;
+                    let color = if is_light {
+                        Vector3::new(0.0, 0.0, 0f32)
+                    } else {
+                        Vector3::new(1.0, 1.0, 1f32)
+                    };
+                    slider.borrow_mut().set_shadow_color(color);
+                },
+            )
+        };
 
         BottomPanel { ui, slider, theme_toggle, help_toggle }
     }
@@ -116,13 +128,16 @@ impl<'a> BottomPanel<'a> {
 
                 let mut x = window_size.width as i32 / 2 - controls_width / 2;
 
-                if let Some(toggle) = self.ui.get_toggle_mut(self.theme_toggle) {
+                {
+                    let mut toggle = self.theme_toggle.borrow_mut();
                     let pos = toggle.position();
                     toggle.set_position(Vector2::new((x + PADDING) as f32, pos.y));
                     x += 32 + SPACING;
                 }
 
-                if let Some(slider) = self.ui.get_slider_mut(self.slider) {
+
+                {
+                    let mut slider = self.slider.borrow_mut();
                     let pos = slider.position();
                     slider.set_position(Vector2::new((x + PADDING) as f32, pos.y));
                     let pos = slider.position();
@@ -132,7 +147,8 @@ impl<'a> BottomPanel<'a> {
                     x += width + 8;
                 }
 
-                if let Some(toggle) = self.ui.get_toggle_mut(self.help_toggle) {
+                {
+                    let mut toggle = self.help_toggle.borrow_mut();
                     let pos = toggle.position();
                     toggle.set_position(Vector2::new((x + 4 + SPACING) as f32, pos.y));
                 }
@@ -148,10 +164,7 @@ impl<'a> BottomPanel<'a> {
     ) {
         let curr_file_index = playback_manager.current_file_index() as u32;
         let curr_dir_len = playback_manager.current_dir_len() as u32;
-        self.ui
-            .get_slider_mut(self.slider)
-            .unwrap()
-            .set_steps(curr_dir_len, curr_file_index);
+        self.slider.borrow_mut().set_steps(curr_dir_len, curr_file_index);
         let color = if config.light_theme {
             [0.95, 0.95, 0.95, 1.0f32]
         } else {

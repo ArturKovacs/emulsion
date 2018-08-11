@@ -1,5 +1,6 @@
 use std::boxed::Box;
 use std::rc::Rc;
+use std::cell::RefCell;
 
 use glium::glutin;
 use glium::texture::SrgbTexture2d;
@@ -7,13 +8,10 @@ use glium::{Display, DrawParameters, Frame, IndexBuffer, Program, Rect, Surface,
 
 use cgmath::{Matrix4, Vector2};
 
-mod button;
-use ui::button::Button;
-
-mod toggle;
+pub mod toggle;
 use ui::toggle::Toggle;
 
-mod slider;
+pub mod slider;
 use ui::slider::Slider;
 
 use shaders;
@@ -47,30 +45,14 @@ pub enum Event {
     },
 }
 
-pub trait ElementFunctions {
+pub trait ElementFunctions<'callback_ref> {
     fn draw(&self, target: &mut Frame, context: &DrawContext);
-    fn handle_event(&mut self, event: &Event);
+    fn handle_event(&mut self, event: &Event) -> Option<Box<Fn()->() + 'callback_ref>>;
 }
 
-#[derive(Copy, Clone)]
-pub struct ButtonId<'a> {
-    ptr: *mut Button<'a>,
-}
-
-#[derive(Copy, Clone)]
-pub struct ToggleId<'a> {
-    ptr: *mut Toggle<'a>,
-}
-
-#[derive(Copy, Clone)]
-pub struct SliderId<'a> {
-    ptr: *mut Slider<'a>,
-}
-
-pub struct Ui<'a> {
-    buttons: Vec<Box<Button<'a>>>,
-    toggles: Vec<Box<Toggle<'a>>>,
-    sliders: Vec<Box<Slider<'a>>>,
+pub struct Ui<'callback_ref> {
+    toggles: Vec<Rc<RefCell<Toggle<'callback_ref>>>>,
+    sliders: Vec<Rc<RefCell<Slider<'callback_ref>>>>,
     unit_quad_vertices: VertexBuffer<Vertex>,
     unit_quad_indices: IndexBuffer<u16>,
     textured_program: Program,
@@ -80,7 +62,7 @@ pub struct Ui<'a> {
     height: f32,
 }
 
-impl<'reference, 'element: 'reference> Ui<'element> {
+impl<'callback_ref> Ui<'callback_ref> {
     pub fn new(display: &Display, height: f32) -> Self {
         use glium::index::PrimitiveType;
 
@@ -150,7 +132,6 @@ impl<'reference, 'element: 'reference> Ui<'element> {
         ).unwrap();
 
         Ui {
-            buttons: Vec::new(),
             toggles: Vec::new(),
             sliders: Vec::new(),
             unit_quad_vertices: vertex_buffer,
@@ -185,14 +166,23 @@ impl<'reference, 'element: 'reference> Ui<'element> {
             _ => return,
         };
 
-        for button in self.buttons.iter_mut() {
-            button.handle_event(&event);
-        }
         for toggle in self.toggles.iter_mut() {
-            toggle.handle_event(&event);
+            let callback = {
+                let mut toggle = toggle.borrow_mut();
+                toggle.handle_event(&event)
+            };
+            if let Some(callback) = callback {
+                (callback)();
+            }
         }
         for slider in self.sliders.iter_mut() {
-            slider.handle_event(&event);
+            let callback = {
+                let mut slider = slider.borrow_mut();
+                slider.handle_event(&event)
+            };
+            if let Some(callback) = callback {
+                (callback)();
+            }
         }
     }
 
@@ -226,112 +216,47 @@ impl<'reference, 'element: 'reference> Ui<'element> {
 
         Self::draw_background(target, &context, bg_color);
 
-        for button in self.buttons.iter() {
-            button.draw(target, &context);
-        }
         for toggle in self.toggles.iter() {
-            toggle.draw(target, &context);
+            toggle.borrow().draw(target, &context);
         }
         for slider in self.sliders.iter() {
-            slider.draw(target, &context);
+            slider.borrow().draw(target, &context);
         }
     }
 
-    pub fn get_button_mut(
-        &'reference mut self,
-        id: ButtonId<'element>,
-    ) -> Option<&'reference mut Button<'element>> {
-        for button in self.buttons.iter_mut() {
-            let button = &mut (**button);
-            let ptr = button as *mut Button;
-            if ptr == id.ptr {
-                return Some(button);
-            }
-        }
-        None
-    }
-
-    pub fn get_toggle_mut(
-        &'reference mut self,
-        id: ToggleId<'element>,
-    ) -> Option<&'reference mut Toggle<'element>> {
-        for toggle in self.toggles.iter_mut() {
-            let mut toggle = &mut (**toggle);
-            let ptr = toggle as *mut Toggle;
-            if ptr == id.ptr {
-                return Some(toggle);
-            }
-        }
-        None
-    }
-
-    pub fn get_slider_mut(
-        &'reference mut self,
-        id: SliderId<'element>,
-    ) -> Option<&'reference mut Slider<'element>> {
-        for slider in self.sliders.iter_mut() {
-            let mut slider = &mut (**slider);
-            let ptr = slider as *mut Slider;
-            if ptr == id.ptr {
-                return Some(slider);
-            }
-        }
-        None
-    }
-
-    pub fn create_button(
-        &mut self,
-        texture: Rc<SrgbTexture2d>,
-        position: Vector2<f32>,
-        callback: Box<Fn() -> () + 'element>,
-    ) -> ButtonId<'element> {
-        let mut result = Box::new(Button::new(texture, callback, position));
-
-        let ptr = &mut (*result) as *mut Button;
-
-        self.buttons.push(result);
-
-        ButtonId { ptr }
-    }
-
-    pub fn create_toggle(
+    pub fn create_toggle<F>(
         &mut self,
         texture_on: Rc<SrgbTexture2d>,
         texture_off: Rc<SrgbTexture2d>,
         position: Vector2<f32>,
         is_on: bool,
-        callback: Box<Fn(bool) -> () + 'element>,
-    ) -> ToggleId<'element> {
-        let mut result = Box::new(Toggle::new(
+        callback: F,
+    ) -> Rc<RefCell<Toggle<'callback_ref>>>
+    where F: Fn(bool)->() + 'callback_ref {
+        let mut result = Rc::new(RefCell::new(Toggle::new(
             texture_on,
             texture_off,
             callback,
             position,
             is_on,
-        ));
+        )));
 
-        let ptr = &mut (*result) as *mut Toggle;
-
-        self.toggles.push(result);
-
-        ToggleId { ptr }
+        self.toggles.push(result.clone());
+        result
     }
 
-    pub fn create_slider(
+    pub fn create_slider<F>(
         &mut self,
         position: Vector2<f32>,
         size: Vector2<f32>,
         steps: u32,
         value: u32,
-        callback: Box<Fn(u32, u32) -> () + 'element>,
-    ) -> SliderId<'element> {
-        let mut result = Box::new(Slider::new(position, size, steps, value, callback));
-
-        let ptr = &mut (*result) as *mut Slider;
-
-        self.sliders.push(result);
-
-        SliderId { ptr }
+        callback: F,
+    ) -> Rc<RefCell<Slider<'callback_ref>>>
+    where F: Fn(u32, u32)->() + 'callback_ref {
+        let mut result = Rc::new(RefCell::new(Slider::new(position, size, steps, value, callback)));
+        self.sliders.push(result.clone());
+        result
     }
 
     fn draw_background(target: &mut Frame, context: &DrawContext, color: &[f32; 4]) {
