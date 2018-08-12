@@ -32,6 +32,28 @@ fn texture_from_image(display: &glium::Display, image: image::RgbaImage) -> Srgb
     SrgbTexture2d::with_mipmaps(display, image, glium::texture::MipmapsOption::NoMipmap).unwrap()
 }
 
+
+fn set_theme<'callback_ref>(
+    light_theme: bool,
+    slider: &Rc<RefCell<Slider<'callback_ref>>>,
+    theme_toggle: &Rc<RefCell<Toggle<'callback_ref>>>,
+    help_toggle: &Rc<RefCell<Toggle<'callback_ref>>>,
+) {
+    let shadow_color =  if light_theme {
+        Vector3::new(0.0, 0.0, 0.0f32)
+    } else {
+        Vector3::new(0.6, 0.6, 0.6f32)
+    };
+
+    let mut slider = slider.borrow_mut();
+    let mut theme_toggle = theme_toggle.borrow_mut();
+    let mut help_toggle = help_toggle.borrow_mut();
+    slider.set_shadow_color(shadow_color);
+    theme_toggle.set_shadow_color(shadow_color);
+    help_toggle.set_shadow_color(shadow_color);
+}
+
+
 pub struct BottomPanel<'callback_ref> {
     ui: Ui<'callback_ref>,
     slider: Rc<RefCell<Slider<'callback_ref>>>,
@@ -91,24 +113,35 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
             },
         );
 
-        let theme_toggle = {
-            let slider = slider.clone();
-            ui.create_toggle(
-                moon_texture,
-                light_texture,
-                Vector2::new(32f32, 4f32),
-                config.light_theme,
-                move |is_light| {
-                    configuration.borrow_mut().light_theme = is_light;
-                    let color = if is_light {
-                        Vector3::new(0.0, 0.0, 0f32)
-                    } else {
-                        Vector3::new(1.0, 1.0, 1f32)
-                    };
-                    slider.borrow_mut().set_shadow_color(color);
-                },
-            )
-        };
+        let theme_toggle =  ui.create_toggle(
+            moon_texture,
+            light_texture,
+            Vector2::new(32f32, 4f32),
+            config.light_theme,
+            |_| {},
+        );
+
+        {
+            let theme_toggle_clone = theme_toggle.clone();
+            let slider_clone = slider.clone();
+            let help_toggle_clone = help_toggle.clone();
+            theme_toggle.borrow_mut().set_callback(move |is_light| {
+                configuration.borrow_mut().light_theme = is_light;
+                set_theme(
+                    is_light,
+                    &slider_clone,
+                    &theme_toggle_clone,
+                    &help_toggle_clone
+                );
+            });
+        }
+
+        set_theme(
+            config.light_theme,
+            &slider,
+            &theme_toggle,
+            &help_toggle
+        );
 
         BottomPanel { ui, slider, theme_toggle, help_toggle }
     }

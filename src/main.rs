@@ -209,7 +209,9 @@ impl<'a> Program<'a> {
 
             // Update dirctory after draw
             if load_requested {
-                playback_manager.update_directory().unwrap();
+                if let Err(err) = playback_manager.update_directory() {
+                    eprintln!("{}", err);
+                }
             }
 
             let should_sleep = {

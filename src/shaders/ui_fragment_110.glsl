@@ -2,6 +2,7 @@
 uniform sampler2D tex;
 uniform vec2 texture_size;
 uniform float brighten;
+uniform vec3 shadow_color;
 uniform float shadow_offset;
 varying vec2 v_tex_coords;
 
@@ -18,5 +19,5 @@ void main() {
         max(vec2(0.0), vec2(1.0) - (tex_cood_from_edge * texture_size + shadow_pixel_offset) / shadow_size);
 
     float shadow = shadow_along_axes.x + shadow_along_axes.y;
-    gl_FragColor = mix(color, vec4(vec3(0.0), 1.0), shadow);
+    gl_FragColor = vec4(mix(color.rgb, shadow_color, min(1.0, 4*shadow)), mix(color.a, 1.0, shadow));
 }
