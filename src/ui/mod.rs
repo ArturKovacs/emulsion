@@ -226,16 +226,14 @@ impl<'callback_ref> Ui<'callback_ref> {
 
     pub fn create_toggle<F>(
         &mut self,
-        texture_on: Rc<SrgbTexture2d>,
-        texture_off: Rc<SrgbTexture2d>,
+        texture: Rc<SrgbTexture2d>,
         position: Vector2<f32>,
         is_on: bool,
         callback: F,
     ) -> Rc<RefCell<Toggle<'callback_ref>>>
     where F: Fn(bool)->() + 'callback_ref {
         let mut result = Rc::new(RefCell::new(Toggle::new(
-            texture_on,
-            texture_off,
+            texture,
             callback,
             position,
             is_on,

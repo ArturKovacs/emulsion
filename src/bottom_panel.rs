@@ -38,6 +38,10 @@ fn set_theme<'callback_ref>(
     slider: &Rc<RefCell<Slider<'callback_ref>>>,
     theme_toggle: &Rc<RefCell<Toggle<'callback_ref>>>,
     help_toggle: &Rc<RefCell<Toggle<'callback_ref>>>,
+    moon_texture: &Rc<SrgbTexture2d>,
+    light_texture: &Rc<SrgbTexture2d>,
+    question_texture: &Rc<SrgbTexture2d>,
+    question_texture_light: &Rc<SrgbTexture2d>,
 ) {
     let shadow_color =  if light_theme {
         Vector3::new(0.0, 0.0, 0.0f32)
@@ -51,6 +55,14 @@ fn set_theme<'callback_ref>(
     slider.set_shadow_color(shadow_color);
     theme_toggle.set_shadow_color(shadow_color);
     help_toggle.set_shadow_color(shadow_color);
+
+    if light_theme {
+        theme_toggle.set_texture(moon_texture.clone());
+        help_toggle.set_texture(question_texture.clone());
+    } else {
+        theme_toggle.set_texture(light_texture.clone());
+        help_toggle.set_texture(question_texture_light.clone());
+    }
 }
 
 
@@ -105,7 +117,6 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
         );
         let help_toggle = ui.create_toggle(
             question.clone(),
-            question,
             Vector2::new(32f32, 4f32),
             false,
             move |is_on| {
@@ -114,11 +125,21 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
         );
 
         let theme_toggle =  ui.create_toggle(
-            moon_texture,
-            light_texture,
+            moon_texture.clone(),
             Vector2::new(32f32, 4f32),
             config.light_theme,
             |_| {},
+        );
+
+        set_theme(
+            config.light_theme,
+            &slider,
+            &theme_toggle,
+            &help_toggle,
+            &moon_texture,
+            &light_texture,
+            &question,
+            &question_light
         );
 
         {
@@ -131,17 +152,14 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
                     is_light,
                     &slider_clone,
                     &theme_toggle_clone,
-                    &help_toggle_clone
+                    &help_toggle_clone,
+                    &moon_texture,
+                    &light_texture,
+                    &question,
+                    &question_light
                 );
             });
         }
-
-        set_theme(
-            config.light_theme,
-            &slider,
-            &theme_toggle,
-            &help_toggle
-        );
 
         BottomPanel { ui, slider, theme_toggle, help_toggle }
     }

@@ -11,8 +11,7 @@ use cgmath::{Matrix4, Vector2, Vector3};
 use ui::{DrawContext, ElementFunctions, Event};
 
 pub struct Toggle<'callback_ref> {
-    texture_on: Rc<SrgbTexture2d>,
-    texture_off: Rc<SrgbTexture2d>,
+    texture: Rc<SrgbTexture2d>,
     callback: Rc<Fn(bool)->() + 'callback_ref>,
     position: Vector2<f32>,
     shadow_color: Vector3<f32>,
@@ -23,16 +22,14 @@ pub struct Toggle<'callback_ref> {
 
 impl<'callback_ref> Toggle<'callback_ref> {
     pub fn new<F>(
-        texture_on: Rc<SrgbTexture2d>,
-        texture_off: Rc<SrgbTexture2d>,
+        texture: Rc<SrgbTexture2d>,
         callback: F,
         position: Vector2<f32>,
         is_on: bool,
     ) -> Self
     where F: Fn(bool)->() + 'callback_ref {
         Toggle {
-            texture_on,
-            texture_off,
+            texture,
             callback: Rc::new(callback),
             position,
             shadow_color: Vector3::new(0.0, 0.0, 0.0f32),
@@ -40,6 +37,10 @@ impl<'callback_ref> Toggle<'callback_ref> {
             hover: false,
             click: false,
         }
+    }
+
+    pub fn set_texture(&mut self, texture: Rc<SrgbTexture2d>) {
+        self.texture = texture;
     }
 
     pub fn position(&self) -> Vector2<f32> {
@@ -63,8 +64,8 @@ impl<'callback_ref> Toggle<'callback_ref> {
         let cursor_x = cursor_position.x as f32;
         let cursor_y = cursor_position.y as f32;
 
-        let img_w = self.texture_on.width() as f32;
-        let img_h = self.texture_on.height() as f32;
+        let img_w = self.texture.width() as f32;
+        let img_h = self.texture.height() as f32;
 
         cursor_x as f32 > self.position.x
             && cursor_x < (self.position.x + img_w)
@@ -77,14 +78,8 @@ impl<'callback_ref> ElementFunctions<'callback_ref> for Toggle<'callback_ref> {
     fn draw(&self, target: &mut Frame, context: &DrawContext) {
         use glium::{Blend, BlendingFunction, LinearBlendingFactor};
 
-        let texture = if self.is_on {
-            &self.texture_on
-        } else {
-            &self.texture_off
-        };
-
-        let img_w = texture.width() as f32;
-        let img_h = texture.height() as f32;
+        let img_w = self.texture.width() as f32;
+        let img_h = self.texture.height() as f32;
 
         // Model tranform
         let transform = Matrix4::from_nonuniform_scale(img_w, img_h, 1.0);
@@ -92,7 +87,7 @@ impl<'callback_ref> ElementFunctions<'callback_ref> for Toggle<'callback_ref> {
         // Projection
         let transform = context.projection_transform * transform;
 
-        let sampler = texture
+        let sampler = self.texture
             .sampled()
             .wrap_function(glium::uniforms::SamplerWrapFunction::Clamp)
             .magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest);

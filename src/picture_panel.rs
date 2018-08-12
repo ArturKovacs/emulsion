@@ -16,6 +16,7 @@ use cgmath::{Matrix4, Vector2, Vector4};
 
 use shaders;
 
+use configuration::Configuration;
 use playback_manager::*;
 use window::*;
 
@@ -290,7 +291,7 @@ impl PicturePanel {
         }
     }
 
-    pub fn draw(&mut self, target: &mut Frame, window: &Window) {
+    pub fn draw(&mut self, target: &mut Frame, window: &Window, config: &Configuration) {
         let window_size = match window.display().gl_window().get_inner_size() {
             Some(size) => size,
             None => return,
@@ -326,6 +327,7 @@ impl PicturePanel {
             // building the uniforms
             let uniforms = uniform! {
                 matrix: Into::<[[f32; 4]; 4]>::into(transform),
+                bright_shade: if config.light_theme { 0.95f32 } else { 0.3f32 },
                 tex: sampler
             };
             let image_draw_params = glium::DrawParameters {
