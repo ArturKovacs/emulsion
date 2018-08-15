@@ -12,7 +12,7 @@ use ui::{DrawContext, ElementFunctions, Event};
 
 pub struct Toggle<'callback_ref> {
     texture: Rc<SrgbTexture2d>,
-    callback: Rc<Fn(bool)->() + 'callback_ref>,
+    callback: Rc<Fn(bool) -> () + 'callback_ref>,
     position: Vector2<f32>,
     shadow_color: Vector3<f32>,
     is_on: bool,
@@ -27,7 +27,9 @@ impl<'callback_ref> Toggle<'callback_ref> {
         position: Vector2<f32>,
         is_on: bool,
     ) -> Self
-    where F: Fn(bool)->() + 'callback_ref {
+    where
+        F: Fn(bool) -> () + 'callback_ref,
+    {
         Toggle {
             texture,
             callback: Rc::new(callback),
@@ -52,7 +54,9 @@ impl<'callback_ref> Toggle<'callback_ref> {
     }
 
     pub fn set_callback<F>(&mut self, callback: F)
-        where F: Fn(bool)->() + 'callback_ref {
+    where
+        F: Fn(bool) -> () + 'callback_ref,
+    {
         self.callback = Rc::new(callback);
     }
 
@@ -87,7 +91,8 @@ impl<'callback_ref> ElementFunctions<'callback_ref> for Toggle<'callback_ref> {
         // Projection
         let transform = context.projection_transform * transform;
 
-        let sampler = self.texture
+        let sampler = self
+            .texture
             .sampled()
             .wrap_function(glium::uniforms::SamplerWrapFunction::Clamp)
             .magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest);
@@ -124,8 +129,8 @@ impl<'callback_ref> ElementFunctions<'callback_ref> for Toggle<'callback_ref> {
             .unwrap();
     }
 
-    fn handle_event(&mut self, event: &Event) -> Option<Box<Fn()->() + 'callback_ref>> {
-        let mut result: Option<Box<Fn()->()>> = None;
+    fn handle_event(&mut self, event: &Event) -> Option<Box<Fn() -> () + 'callback_ref>> {
+        let mut result: Option<Box<Fn() -> ()>> = None;
         match event {
             Event::MouseButton {
                 button,
@@ -142,7 +147,9 @@ impl<'callback_ref> ElementFunctions<'callback_ref> for Toggle<'callback_ref> {
 
                             let callback = self.callback.clone();
                             let is_on = self.is_on;
-                            result = Some(Box::new(move || {callback(is_on);}));
+                            result = Some(Box::new(move || {
+                                callback(is_on);
+                            }));
                         }
                     } else {
                         self.click = false;

@@ -14,9 +14,9 @@ use cgmath::{Vector2, Vector3};
 
 use configuration::Configuration;
 use playback_manager::{LoadRequest, PlaybackManager};
-use ui::Ui;
 use ui::slider::Slider;
 use ui::toggle::Toggle;
+use ui::Ui;
 use window::*;
 
 fn load_texture_without_cache(display: &glium::Display, image_path: &Path) -> SrgbTexture2d {
@@ -32,7 +32,6 @@ fn texture_from_image(display: &glium::Display, image: image::RgbaImage) -> Srgb
     SrgbTexture2d::with_mipmaps(display, image, glium::texture::MipmapsOption::NoMipmap).unwrap()
 }
 
-
 fn set_theme<'callback_ref>(
     light_theme: bool,
     slider: &Rc<RefCell<Slider<'callback_ref>>>,
@@ -43,7 +42,7 @@ fn set_theme<'callback_ref>(
     question_texture: &Rc<SrgbTexture2d>,
     question_texture_light: &Rc<SrgbTexture2d>,
 ) {
-    let shadow_color =  if light_theme {
+    let shadow_color = if light_theme {
         Vector3::new(0.0, 0.0, 0.0f32)
     } else {
         Vector3::new(0.6, 0.6, 0.6f32)
@@ -64,7 +63,6 @@ fn set_theme<'callback_ref>(
         help_toggle.set_texture(question_texture_light.clone());
     }
 }
-
 
 pub struct BottomPanel<'callback_ref> {
     ui: Ui<'callback_ref>,
@@ -124,7 +122,7 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
             },
         );
 
-        let theme_toggle =  ui.create_toggle(
+        let theme_toggle = ui.create_toggle(
             moon_texture.clone(),
             Vector2::new(32f32, 4f32),
             config.light_theme,
@@ -139,7 +137,7 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
             &moon_texture,
             &light_texture,
             &question,
-            &question_light
+            &question_light,
         );
 
         {
@@ -156,12 +154,17 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
                     &moon_texture,
                     &light_texture,
                     &question,
-                    &question_light
+                    &question_light,
                 );
             });
         }
 
-        BottomPanel { ui, slider, theme_toggle, help_toggle }
+        BottomPanel {
+            ui,
+            slider,
+            theme_toggle,
+            help_toggle,
+        }
     }
 
     pub fn handle_event(&mut self, event: &glutin::Event, window: &Window) {
@@ -175,7 +178,9 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
                 const SPACING: i32 = 32;
                 const PADDING: i32 = 4;
                 const BUTTON_SIZE: i32 = 24;
-                let controls_width = (window_size.width as i32 - MARGIN*2).max(1).min(Self::CONTROLS_MAX_WIDTH);
+                let controls_width = (window_size.width as i32 - MARGIN * 2)
+                    .max(1)
+                    .min(Self::CONTROLS_MAX_WIDTH);
 
                 let mut x = window_size.width as i32 / 2 - controls_width / 2;
 
@@ -186,14 +191,14 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
                     x += 32 + SPACING;
                 }
 
-
                 {
                     let mut slider = self.slider.borrow_mut();
                     let pos = slider.position();
                     slider.set_position(Vector2::new((x + PADDING) as f32, pos.y));
                     let pos = slider.position();
-                    let button_space = BUTTON_SIZE + PADDING*2;
-                    let width = (controls_width - button_space*2 - SPACING*2 - PADDING*2).max(1);
+                    let button_space = BUTTON_SIZE + PADDING * 2;
+                    let width =
+                        (controls_width - button_space * 2 - SPACING * 2 - PADDING * 2).max(1);
                     slider.set_size(Vector2::new(width as f32, 24f32));
                     x += width + 8;
                 }
@@ -215,7 +220,9 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
     ) {
         let curr_file_index = playback_manager.current_file_index() as u32;
         let curr_dir_len = playback_manager.current_dir_len() as u32;
-        self.slider.borrow_mut().set_steps(curr_dir_len, curr_file_index);
+        self.slider
+            .borrow_mut()
+            .set_steps(curr_dir_len, curr_file_index);
         let color = if config.light_theme {
             [0.95, 0.95, 0.95, 1.0f32]
         } else {

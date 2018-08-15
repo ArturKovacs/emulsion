@@ -10,7 +10,7 @@ use cgmath::{Matrix4, Vector2, Vector3};
 use ui::{DrawContext, ElementFunctions, Event};
 
 pub struct Slider<'callback_ref> {
-    callback: Rc<Fn(u32, u32)->() + 'callback_ref>,
+    callback: Rc<Fn(u32, u32) -> () + 'callback_ref>,
     position: Vector2<f32>,
     size: Vector2<f32>,
     shadow_color: Vector3<f32>,
@@ -30,7 +30,9 @@ impl<'callback_ref> Slider<'callback_ref> {
         value: u32,
         callback: F,
     ) -> Self
-    where F: Fn(u32, u32) -> () + 'callback_ref {
+    where
+        F: Fn(u32, u32) -> () + 'callback_ref,
+    {
         Slider {
             callback: Rc::new(callback),
             position,
@@ -49,7 +51,9 @@ impl<'callback_ref> Slider<'callback_ref> {
     /// * `callback` - The function that will be called. The first parameter of this function
     /// is the number of steps. The second parameter is the current value (step).
     pub fn set_callback<F>(&mut self, callback: F)
-    where F: Fn(u32, u32) -> () + 'callback_ref {
+    where
+        F: Fn(u32, u32) -> () + 'callback_ref,
+    {
         self.callback = Rc::new(callback);
     }
 
@@ -106,7 +110,9 @@ impl<'callback_ref> Slider<'callback_ref> {
         let callback = self.callback.clone();
         let steps = self.steps;
         let value = self.value;
-        Box::new(move || {callback(steps, value);})
+        Box::new(move || {
+            callback(steps, value);
+        })
     }
 }
 
@@ -185,8 +191,8 @@ impl<'callback_ref> ElementFunctions<'callback_ref> for Slider<'callback_ref> {
             .unwrap();
     }
 
-    fn handle_event(&mut self, event: &Event) -> Option<Box<Fn()->() + 'callback_ref>> {
-        let mut result: Option<Box<Fn()->()>> = None;
+    fn handle_event(&mut self, event: &Event) -> Option<Box<Fn() -> () + 'callback_ref>> {
+        let mut result: Option<Box<Fn() -> ()>> = None;
         match event {
             Event::MouseButton {
                 button,

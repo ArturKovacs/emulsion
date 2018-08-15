@@ -112,7 +112,8 @@ impl ImageCache {
         display: &glium::Display,
         index: usize,
     ) -> Result<(Rc<SrgbTexture2d>, OsString)> {
-        let path = self.dir_files
+        let path = self
+            .dir_files
             .get(index)
             .ok_or_else(|| {
                 format!(
@@ -150,7 +151,8 @@ impl ImageCache {
             )),
         };
 
-        let parent = path.parent()
+        let parent = path
+            .parent()
             .ok_or("Could not get parent directory")?
             .to_owned();
 
@@ -314,7 +316,8 @@ impl ImageCache {
                     {
                         let size_estimate =
                             get_image_size_estimate((image.width(), image.height())) as isize;
-                        match self.texture_cache
+                        match self
+                            .texture_cache
                             .entry(path.file_name().unwrap().to_owned())
                         {
                             Entry::Vacant(entry) => {
