@@ -157,12 +157,11 @@ impl PicturePanel {
                     if let Some(keycode) = input.virtual_keycode {
                         if input.state == glutin::ElementState::Pressed {
                             match keycode {
-                                VirtualKeyCode::Right | VirtualKeyCode::Left => {
-                                    if keycode == VirtualKeyCode::Right {
-                                        playback_manager.request_load(LoadRequest::LoadNext);
-                                    } else {
-                                        playback_manager.request_load(LoadRequest::LoadPrevious);
-                                    }
+                                VirtualKeyCode::Right | VirtualKeyCode::D => {
+                                    playback_manager.request_load(LoadRequest::LoadNext);
+                                }
+                                VirtualKeyCode::Left | VirtualKeyCode::A => {
+                                    playback_manager.request_load(LoadRequest::LoadPrevious);
                                 }
                                 VirtualKeyCode::Space => {
                                     if playback_manager.playback_state() == PlaybackState::Forward {
@@ -181,6 +180,13 @@ impl PicturePanel {
                                 VirtualKeyCode::R => {
                                     self.zoom_scale = 1.0;
                                     self.cam_pos = Vector2::new(0.0, 0.0);
+                                }
+                                VirtualKeyCode::Q => {
+                                    if let Some(ref texture) = self.image_texture {
+                                        self.zoom_scale =
+                                            texture.width().max(texture.height()) as f32
+                                            / (panel_size.width as f32).min(panel_size.height as f32);
+                                    }
                                 }
                                 _ => (),
                             }
