@@ -1,4 +1,3 @@
-use std::boxed::Box;
 use std::rc::Rc;
 
 use glium;
@@ -12,7 +11,7 @@ use ui::{DrawContext, ElementFunctions, Event};
 
 pub struct Toggle<'callback_ref> {
     texture: Rc<SrgbTexture2d>,
-    callback: Rc<Fn(bool) -> () + 'callback_ref>,
+    callback: Rc<Fn() + 'callback_ref>,
     position: Vector2<f32>,
     shadow_color: Vector3<f32>,
     is_on: bool,
@@ -28,7 +27,7 @@ impl<'callback_ref> Toggle<'callback_ref> {
         is_on: bool,
     ) -> Self
     where
-        F: Fn(bool) -> () + 'callback_ref,
+        F: Fn() + 'callback_ref,
     {
         Toggle {
             texture,
@@ -49,13 +48,17 @@ impl<'callback_ref> Toggle<'callback_ref> {
         self.position
     }
 
+    pub fn is_on(&self) -> bool {
+        self.is_on
+    }
+
     pub fn set_position(&mut self, pos: Vector2<f32>) {
         self.position = pos;
     }
 
     pub fn set_callback<F>(&mut self, callback: F)
     where
-        F: Fn(bool) -> () + 'callback_ref,
+        F: Fn() + 'callback_ref,
     {
         self.callback = Rc::new(callback);
     }
@@ -129,8 +132,8 @@ impl<'callback_ref> ElementFunctions<'callback_ref> for Toggle<'callback_ref> {
             .unwrap();
     }
 
-    fn handle_event(&mut self, event: &Event) -> Option<Box<Fn() -> () + 'callback_ref>> {
-        let mut result: Option<Box<Fn() -> ()>> = None;
+    fn handle_event(&mut self, event: &Event) -> Option<Rc<Fn() + 'callback_ref>> {
+        let mut result: Option<Rc<Fn()>> = None;
         match event {
             Event::MouseButton {
                 button,
@@ -145,11 +148,7 @@ impl<'callback_ref> ElementFunctions<'callback_ref> for Toggle<'callback_ref> {
                             self.is_on = !self.is_on;
                             self.click = false;
 
-                            let callback = self.callback.clone();
-                            let is_on = self.is_on;
-                            result = Some(Box::new(move || {
-                                callback(is_on);
-                            }));
+                            result = Some(self.callback.clone());
                         }
                     } else {
                         self.click = false;

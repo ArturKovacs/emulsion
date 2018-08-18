@@ -1,4 +1,3 @@
-use std::boxed::Box;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -47,7 +46,7 @@ pub enum Event {
 
 pub trait ElementFunctions<'callback_ref> {
     fn draw(&self, target: &mut Frame, context: &DrawContext);
-    fn handle_event(&mut self, event: &Event) -> Option<Box<Fn() -> () + 'callback_ref>>;
+    fn handle_event(&mut self, event: &Event) -> Option<Rc<Fn() + 'callback_ref>>;
 }
 
 pub struct Ui<'callback_ref> {
@@ -232,7 +231,7 @@ impl<'callback_ref> Ui<'callback_ref> {
         callback: F,
     ) -> Rc<RefCell<Toggle<'callback_ref>>>
     where
-        F: Fn(bool) -> () + 'callback_ref,
+        F: Fn() + 'callback_ref,
     {
         let result = Rc::new(RefCell::new(Toggle::new(
             texture, callback, position, is_on,
@@ -251,7 +250,7 @@ impl<'callback_ref> Ui<'callback_ref> {
         callback: F,
     ) -> Rc<RefCell<Slider<'callback_ref>>>
     where
-        F: Fn(u32, u32) -> () + 'callback_ref,
+        F: Fn() + 'callback_ref,
     {
         let result = Rc::new(RefCell::new(Slider::new(
             position, size, steps, value, callback,

@@ -34,9 +34,9 @@ fn texture_from_image(display: &glium::Display, image: image::RgbaImage) -> Srgb
 
 fn set_theme<'callback_ref>(
     light_theme: bool,
-    slider: &Rc<RefCell<Slider<'callback_ref>>>,
-    theme_toggle: &Rc<RefCell<Toggle<'callback_ref>>>,
-    help_toggle: &Rc<RefCell<Toggle<'callback_ref>>>,
+    slider: &mut Slider<'callback_ref>,
+    theme_toggle: &mut Toggle<'callback_ref>,
+    help_toggle: &mut Toggle<'callback_ref>,
     moon_texture: &Rc<SrgbTexture2d>,
     light_texture: &Rc<SrgbTexture2d>,
     question_texture: &Rc<SrgbTexture2d>,
@@ -48,9 +48,6 @@ fn set_theme<'callback_ref>(
         Vector3::new(0.6, 0.6, 0.6f32)
     };
 
-    let mut slider = slider.borrow_mut();
-    let mut theme_toggle = theme_toggle.borrow_mut();
-    let mut help_toggle = help_toggle.borrow_mut();
     slider.set_shadow_color(shadow_color);
     theme_toggle.set_shadow_color(shadow_color);
     help_toggle.set_shadow_color(shadow_color);
@@ -107,33 +104,37 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
             Vector2::new(512f32, 24f32),
             32,
             5,
-            move |_, value| {
+            || {},
+        );
+        {
+            let slider_clone = slider.clone();
+            slider.borrow_mut().set_callback(move || {
+                let slider = slider_clone.borrow();
                 playback_manager
                     .borrow_mut()
-                    .request_load(LoadRequest::LoadAtIndex(value as usize));
-            },
-        );
+                    .request_load(LoadRequest::LoadAtIndex(slider.value() as usize));
+            });
+        }
+
         let help_toggle = ui.create_toggle(
             question.clone(),
             Vector2::new(32f32, 4f32),
             false,
-            move |_| {
-                //configuration.borrow_mut().light_theme = is_light;
-            },
+            || {},
         );
 
         let theme_toggle = ui.create_toggle(
             moon_texture.clone(),
             Vector2::new(32f32, 4f32),
             config.light_theme,
-            |_| {},
+            || {},
         );
 
         set_theme(
             config.light_theme,
-            &slider,
-            &theme_toggle,
-            &help_toggle,
+            &mut slider.borrow_mut(),
+            &mut theme_toggle.borrow_mut(),
+            &mut help_toggle.borrow_mut(),
             &moon_texture,
             &light_texture,
             &question,
@@ -144,13 +145,15 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
             let theme_toggle_clone = theme_toggle.clone();
             let slider_clone = slider.clone();
             let help_toggle_clone = help_toggle.clone();
-            theme_toggle.borrow_mut().set_callback(move |is_light| {
+            theme_toggle.borrow_mut().set_callback(move || {
+                let mut theme_toggle = theme_toggle_clone.borrow_mut();
+                let is_light = theme_toggle.is_on();
                 configuration.borrow_mut().light_theme = is_light;
                 set_theme(
                     is_light,
-                    &slider_clone,
-                    &theme_toggle_clone,
-                    &help_toggle_clone,
+                    &mut slider_clone.borrow_mut(),
+                    &mut theme_toggle,
+                    &mut help_toggle_clone.borrow_mut(),
                     &moon_texture,
                     &light_texture,
                     &question,
