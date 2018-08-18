@@ -13,7 +13,7 @@ pub struct Configuration {
 
 impl Configuration {
     pub fn load<P: AsRef<Path>>(file_path: P) -> Result<Configuration, ()> {
-        let mut file = File::open(file_path).map_err(|_| ())?;
+        let file = File::open(file_path).map_err(|_| ())?;
         let mut de = Deserializer::new(file);
 
         Ok(Deserialize::deserialize(&mut de).map_err(|_| ())?)

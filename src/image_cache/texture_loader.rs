@@ -1,8 +1,5 @@
 use std;
-use std::collections::BTreeMap;
-use std::ffi::OsString;
 use std::fs;
-use std::mem;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};

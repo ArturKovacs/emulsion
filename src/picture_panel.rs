@@ -10,9 +10,9 @@ use glium::index::PrimitiveType;
 use glium::glutin;
 use glium::{Frame, Surface};
 
-use cgmath::ElementWise;
+use cgmath;
 use cgmath::SquareMatrix;
-use cgmath::{InnerSpace, Matrix, Matrix4, Vector2, Vector4};
+use cgmath::{InnerSpace, Matrix, Matrix4, Vector2, Vector3, Vector4};
 
 use shaders;
 
@@ -38,15 +38,17 @@ pub struct PicturePanel {
     index_buffer: glium::IndexBuffer<u16>,
     program: glium::Program,
     image_texture: Option<Rc<glium::texture::SrgbTexture2d>>,
-    zoom_scale: f32,
-    cam_pos: Vector2<f32>,
+    img_display_width: u32,
+    image_fit: bool,
+    img_pos: Vector2<f32>,
     projection_transform: Matrix4<f32>,
     bottom: u32,
+    panel_size: LogicalSize,
 
     // On Windows there is a bug that the cursor moved event will get
     // triggered with 0, 0 corrdinates when the window regains focus by
     // the user clicking into it.
-    // To work around this we ignore the first mose move event after the window gains focus.
+    // To work around this we ignore the first mouse move event after the window gains focus.
     ignore_one_mouse_move: bool,
 
     last_mouse_pos: Vector2<f32>,
@@ -73,20 +75,20 @@ impl PicturePanel {
                 display,
                 &[
                     Vertex {
-                        position: [-0.5, -0.5],
-                        tex_coords: [0.0, 1.0],
-                    },
-                    Vertex {
-                        position: [-0.5, 0.5],
+                        position: [0.0, 0.0],
                         tex_coords: [0.0, 0.0],
                     },
                     Vertex {
-                        position: [0.5, 0.5],
-                        tex_coords: [1.0, 0.0],
+                        position: [0.0, 1.0],
+                        tex_coords: [0.0, 1.0],
                     },
                     Vertex {
-                        position: [0.5, -0.5],
+                        position: [1.0, 1.0],
                         tex_coords: [1.0, 1.0],
+                    },
+                    Vertex {
+                        position: [1.0, 0.0],
+                        tex_coords: [1.0, 0.0],
                     },
                 ],
             ).unwrap()
@@ -115,10 +117,12 @@ impl PicturePanel {
             index_buffer,
             program,
             image_texture: None,
-            zoom_scale: 1.0,
-            cam_pos: Vector2::new(0.0, 0.0),
+            img_display_width: 1,
+            image_fit: true,
+            img_pos: Vector2::new(0.0, 0.0),
             projection_transform: Matrix4::identity(),
             bottom,
+            panel_size: LogicalSize {width: 1.0, height: 1.0},
 
             file_hover_state: FileHoverState::Idle,
 
@@ -150,8 +154,8 @@ impl PicturePanel {
         playback_manager: &mut PlaybackManager,
     ) {
         if let glutin::Event::WindowEvent { event, .. } = event {
-            let window_size = window.display().gl_window().get_inner_size().unwrap();
-            let panel_size = self.get_panel_size(window_size);
+            //let window_size = window.display().gl_window().get_inner_size().unwrap();
+            //let panel_size = self.get_panel_size(window_size);
             match event {
                 WindowEvent::KeyboardInput { input, .. } => {
                     if let Some(keycode) = input.virtual_keycode {
@@ -178,14 +182,21 @@ impl PicturePanel {
                                     };
                                 }
                                 VirtualKeyCode::R => {
-                                    self.zoom_scale = 1.0;
-                                    self.cam_pos = Vector2::new(0.0, 0.0);
+                                    self.fit_image_to_panel();
                                 }
                                 VirtualKeyCode::Q => {
-                                    if let Some(ref texture) = self.image_texture {
-                                        self.zoom_scale =
-                                            texture.width().max(texture.height()) as f32
-                                            / (panel_size.width as f32).min(panel_size.height as f32);
+                                    let texture_width = if let Some(ref texture) = self.image_texture {
+                                        Some(texture.width())
+                                    } else {
+                                        None
+                                    };
+                                    if let Some(texture_width) = texture_width {
+                                        let panel_center = Vector2::new(
+                                            self.panel_size.width as f32 * 0.5,
+                                            self.panel_size.height as f32 * 0.5,
+                                        );
+                                        self.zoom_image(panel_center, texture_width);
+                                        self.image_fit = false;
                                     }
                                 }
                                 _ => (),
@@ -194,13 +205,24 @@ impl PicturePanel {
                         }
                     }
                 }
+                WindowEvent::Resized(new_window_size) => {
+                    let new_panel_size = self.get_panel_size(*new_window_size);
+                    if self.image_fit {
+                        self.fit_image_to_panel();
+                    } else {
+                        let prev_panel_size = Vector2::new(self.panel_size.width as f32, self.panel_size.height as f32);
+                        let new_panel_size = Vector2::new(new_panel_size.width as f32, new_panel_size.height as f32);
+                        let center_offset = (new_panel_size - prev_panel_size) * 0.5f32;
+                        self.img_pos += center_offset;
+                    }
+                    self.panel_size = new_panel_size;
+                }
                 WindowEvent::MouseInput { state, button, .. } => {
                     if *button == glutin::MouseButton::Left {
                         if *state == glutin::ElementState::Released {
                             self.panning = false;
                         } else {
-                            let bottom_y = window_size.height as u32 - self.bottom;
-                            if (self.last_mouse_pos.y as u32) < bottom_y {
+                            if (self.last_mouse_pos.y as f64) < self.panel_size.height {
                                 self.panning = true;
                             }
                         }
@@ -213,25 +235,9 @@ impl PicturePanel {
                         let pos_vec = Vector2::new(position.x as f32, position.y as f32);
                         // Update transform
                         if self.panning {
-                            let inv_projection_transform =
-                                self.projection_transform.invert().unwrap();
-
-                            let mut last_world_pos =
-                                Self::get_mouse_proj(self.last_mouse_pos, window_size);
-                            let mut curr_world_pos = Self::get_mouse_proj(pos_vec, window_size);
-
-                            let tmp = inv_projection_transform
-                                * Vector4::new(last_world_pos.x, last_world_pos.y, 0f32, 1f32);
-                            last_world_pos.x = tmp.x;
-                            last_world_pos.y = tmp.y;
-                            let tmp = inv_projection_transform
-                                * Vector4::new(curr_world_pos.x, curr_world_pos.y, 0f32, 1f32);
-                            curr_world_pos.x = tmp.x;
-                            curr_world_pos.y = tmp.y;
-
-                            self.cam_pos += last_world_pos - curr_world_pos;
-
+                            self.img_pos += pos_vec - self.last_mouse_pos;
                             self.should_sleep = false;
+                            self.image_fit = false;
                         }
 
                         self.last_mouse_pos = pos_vec;
@@ -256,17 +262,11 @@ impl PicturePanel {
                         1.0 / (delta.abs() + 1.0)
                     };
 
-                    let mut mouse_world = Self::get_mouse_proj(self.last_mouse_pos, panel_size);
+                    let new_image_display_width = (self.img_display_width as f32 * delta).max(1.0) as u32;
+                    let last_mouse_pos = self.last_mouse_pos;
 
-                    let transformed = self.projection_transform.invert().unwrap()
-                        * Vector4::new(mouse_world.x, mouse_world.y, 0.0, 1.0);
-                    mouse_world.x = transformed.x;
-                    mouse_world.y = transformed.y;
-
-                    self.cam_pos += mouse_world * (1.0 - 1.0 / delta);
-                    self.zoom_scale *= delta;
-
-                    //println!("zoom_scale set to {}", self.zoom_scale);
+                    self.zoom_image(last_mouse_pos, new_image_display_width);
+                    self.image_fit = false;
                 }
                 WindowEvent::Focused(gained_focus) => {
                     if *gained_focus {
@@ -309,16 +309,25 @@ impl PicturePanel {
 
         let panel_size = self.get_panel_size(window_size);
 
-        self.update_projection_transform(panel_size);
+        self.update_projection_transform();
+
+        if self.image_fit {
+            self.fit_image_to_panel();
+        }
 
         if let Some(ref texture) = self.image_texture {
             let img_w = texture.width() as f32;
             let img_h = texture.height() as f32;
 
+            let img_height_over_width = img_h / img_w;
+            let image_display_width = self.img_display_width as f32;
+
             // Model tranform
-            let transform = Matrix4::from_nonuniform_scale(img_w, img_h, 1.0);
-            // View transform
-            let transform = Matrix4::from_translation(-1.0 * self.cam_pos.extend(0.0)) * transform;
+            let image_display_height = image_display_width * img_height_over_width;
+            let corner_x = (self.img_pos.x - image_display_width * 0.5).floor();
+            let corner_y = (self.img_pos.y - image_display_height * 0.5).floor();
+            let transform = Matrix4::from_nonuniform_scale(image_display_width, image_display_height, 1.0);
+            let transform = Matrix4::from_translation(Vector3::new(corner_x, corner_y, 0.0)) * transform;
             // Projection tranform
             let transform = self.projection_transform * transform;
 
@@ -357,41 +366,8 @@ impl PicturePanel {
         }
     }
 
-    pub fn update_projection_transform(&mut self, panel_size: LogicalSize) {
-        if let Some(ref texture) = self.image_texture {
-            let img_w = texture.width() as f32;
-            let img_h = texture.height() as f32;
-            let img_aspect = img_w / img_h;
-            // Projection tranform
-            let window_aspect = panel_size.width as f32 / panel_size.height as f32;
-            let (camera_width, camera_height) = if img_aspect < window_aspect {
-                // Window is wider than image relatively
-                (img_h * window_aspect, img_h)
-            } else {
-                // Window is taller than image relatively
-                (img_w, img_w * (1.0 / window_aspect))
-            };
-            let cam_scale_x = self.zoom_scale / camera_width;
-            let cam_scale_y = self.zoom_scale / camera_height;
-            self.projection_transform =
-                Matrix4::from_nonuniform_scale(cam_scale_x * 2.0, cam_scale_y * 2.0, 1.0);
-        }
-    }
-
-    fn get_mouse_proj(mouse_screen: Vector2<f32>, panel_size: LogicalSize) -> Vector2<f32> {
-        // Calculate mouse pos in "world space"
-        //let window_size = self.display.gl_window().get_inner_size().unwrap();
-        let panel_center = Vector2::new(
-            panel_size.width as f32 * 0.5,
-            panel_size.height as f32 * 0.5,
-        );
-        let mut mouse_world = mouse_screen - panel_center;
-        mouse_world.y *= -1.0;
-        mouse_world.div_assign_element_wise(Vector2::new(
-            panel_size.width as f32 * 0.5,
-            panel_size.height as f32 * 0.5,
-        ));
-        mouse_world
+    fn update_projection_transform(&mut self) {
+        self.projection_transform = cgmath::ortho(0.0, self.panel_size.width as f32, self.panel_size.height as f32, 0.0, -1.0, 1.0);
     }
 
     fn get_texel_size(&self, panel_size: LogicalSize) -> f32 {
@@ -418,6 +394,35 @@ impl PicturePanel {
         LogicalSize {
             width: window_size.width,
             height: (window_size.height - self.bottom as f64).max(0.0),
+        }
+    }
+
+    fn zoom_image(&mut self, anchor: Vector2<f32>, image_display_width: u32) {
+        self.img_pos = (image_display_width as f32 / self.img_display_width as f32) * (self.img_pos-anchor) + anchor;
+        self.img_display_width = image_display_width;
+    }
+
+    fn fit_image_to_panel(&mut self) {
+        let img_display_width = if let Some(ref texture) = self.image_texture {
+            let panel_aspect = self.panel_size.width as f32 / self.panel_size.height as f32;
+            let img_aspect = texture.width() as f32 / texture.height() as f32;
+
+            let img_display_width = if img_aspect > panel_aspect {
+                // The image is relatively wider than the panel
+                self.panel_size.width as u32
+            } else {
+                (self.panel_size.width as f32 * (img_aspect / panel_aspect)) as u32
+            };
+
+            Some(img_display_width)
+        } else {
+            None
+        };
+        
+        if let Some(img_display_width) = img_display_width {
+            self.img_pos = Vector2::new(self.panel_size.width as f32 * 0.5, self.panel_size.height as f32 * 0.5);
+            self.img_display_width = img_display_width;
+            self.image_fit = true;
         }
     }
 }

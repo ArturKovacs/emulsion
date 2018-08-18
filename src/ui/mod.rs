@@ -234,7 +234,7 @@ impl<'callback_ref> Ui<'callback_ref> {
     where
         F: Fn(bool) -> () + 'callback_ref,
     {
-        let mut result = Rc::new(RefCell::new(Toggle::new(
+        let result = Rc::new(RefCell::new(Toggle::new(
             texture, callback, position, is_on,
         )));
 
@@ -253,7 +253,7 @@ impl<'callback_ref> Ui<'callback_ref> {
     where
         F: Fn(u32, u32) -> () + 'callback_ref,
     {
-        let mut result = Rc::new(RefCell::new(Slider::new(
+        let result = Rc::new(RefCell::new(Slider::new(
             position, size, steps, value, callback,
         )));
         self.sliders.push(result.clone());

@@ -117,7 +117,7 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
             question.clone(),
             Vector2::new(32f32, 4f32),
             false,
-            move |is_on| {
+            move |_| {
                 //configuration.borrow_mut().light_theme = is_light;
             },
         );
@@ -195,7 +195,6 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
                     let mut slider = self.slider.borrow_mut();
                     let pos = slider.position();
                     slider.set_position(Vector2::new((x + PADDING) as f32, pos.y));
-                    let pos = slider.position();
                     let button_space = BUTTON_SIZE + PADDING * 2;
                     let width =
                         (controls_width - button_space * 2 - SPACING * 2 - PADDING * 2).max(1);
