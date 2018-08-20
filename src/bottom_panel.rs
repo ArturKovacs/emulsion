@@ -80,21 +80,22 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
         let mut ui = Ui::new(window.display(), Self::HEIGHT as f32);
 
         let exe_parent = env::current_exe().unwrap().parent().unwrap().to_owned();
+        let resource_dir = exe_parent.join("resource");
         let light_texture = Rc::new(load_texture_without_cache(
             window.display(),
-            &exe_parent.join("light.png"),
+            &resource_dir.join("light.png"),
         ));
         let moon_texture = Rc::new(load_texture_without_cache(
             window.display(),
-            &exe_parent.join("moon.png"),
+            &resource_dir.join("moon.png"),
         ));
         let question = Rc::new(load_texture_without_cache(
             window.display(),
-            &exe_parent.join("question_button.png"),
+            &resource_dir.join("question_button.png"),
         ));
         let question_light = Rc::new(load_texture_without_cache(
             window.display(),
-            &exe_parent.join("question_button_light.png"),
+            &resource_dir.join("question_button_light.png"),
         ));
 
         let config = configuration.borrow();

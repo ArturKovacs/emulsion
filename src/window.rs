@@ -20,7 +20,7 @@ impl Window {
             .unwrap()
             .to_owned();
 
-        let icon_path = exe_parent.join("emulsion48.png");
+        let icon_path = exe_parent.join("resource/emulsion48.png");
         let icon = Icon::from_path(icon_path.clone()).unwrap_or_else(|_| {
             panic!(format!(
                 "Could not load icon '{}'",
