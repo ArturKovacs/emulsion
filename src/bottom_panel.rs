@@ -45,7 +45,7 @@ fn set_theme<'callback_ref>(
     let shadow_color = if light_theme {
         Vector3::new(0.0, 0.0, 0.0f32)
     } else {
-        Vector3::new(0.6, 0.6, 0.6f32)
+        Vector3::new(0.4, 0.4, 0.4f32)
     };
 
     slider.set_shadow_color(shadow_color);

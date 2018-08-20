@@ -181,7 +181,7 @@ impl PicturePanel {
                                         window.set_title_filename("PLAYING");
                                     };
                                 }
-                                VirtualKeyCode::E => {
+                                VirtualKeyCode::F => {
                                     self.fit_image_to_panel();
                                 }
                                 VirtualKeyCode::Q => {
