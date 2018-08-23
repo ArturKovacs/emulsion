@@ -9,13 +9,13 @@ use glium;
 
 use glium::texture::SrgbTexture2d;
 
-mod texture_loader;
-use self::texture_loader::*;
+mod image_loader;
+use self::image_loader::*;
 
 pub mod errors {
     use glium::texture;
     use image;
-    use image_cache::texture_loader;
+    use image_cache::image_loader;
     use std::io;
 
     error_chain!{
@@ -23,7 +23,7 @@ pub mod errors {
             Io(io::Error) #[doc = "Error during IO"];
             TextureCreationError(texture::TextureCreationError);
             ImageLoadError(image::ImageError);
-            TextureLoaderError(texture_loader::errors::Error);
+            TextureLoaderError(image_loader::errors::Error);
         }
     }
 }
@@ -43,7 +43,7 @@ pub struct ImageCache {
     requested_images: i32,
     texture_cache: BTreeMap<OsString, CachedTexture>,
 
-    loader: TextureLoader,
+    loader: ImageLoader,
 }
 
 /// This is a store for the supported images loaded from a folder
@@ -66,7 +66,7 @@ impl ImageCache {
             requested_images: 0,
             texture_cache: BTreeMap::new(),
 
-            loader: TextureLoader::new(threads),
+            loader: ImageLoader::new(threads),
         }
     }
 
@@ -300,7 +300,6 @@ impl ImageCache {
     }
 
     pub fn process_prefetched(&mut self, display: &glium::Display) -> Result<()> {
-        use self::texture_loader::LoadResult;
         use std::collections::btree_map::Entry;
         use std::sync::mpsc::TryRecvError;
 

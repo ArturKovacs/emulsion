@@ -86,25 +86,18 @@ pub enum LoadResult {
     Failed,
 }
 
-// TODO RENAME THIS WHOLE MODULE TO IMAGE LOADER
-pub struct TextureLoader {
-    //curr_dir: PathBuf,
-    //curr_est_size: usize,
+
+pub struct ImageLoader {
     running: Arc<AtomicBool>,
-    //remaining_capacity: isize,
-    //total_capacity: isize,
-
-    //texture_cache: BTreeMap<OsString, CachedTexture>,
     join_handles: Option<Vec<thread::JoinHandle<()>>>,
-
     image_rx: Receiver<LoadResult>,
     path_tx: Sender<PathBuf>,
 }
 
-impl TextureLoader {
+impl ImageLoader {
     /// # Arguemnts
     /// * `capacity` - Number of bytes. The last image loaded will be the one at which the allocated memory reaches or exceeds capacity
-    pub fn new(threads: u32) -> TextureLoader {
+    pub fn new(threads: u32) -> ImageLoader {
         let running = Arc::new(AtomicBool::from(true));
         //let loader_cache = HashMap::new();
 
@@ -124,7 +117,7 @@ impl TextureLoader {
             }));
         }
 
-        TextureLoader {
+        ImageLoader {
             //curr_dir: PathBuf::new(),
             //curr_est_size: capacity as usize,
             running,
@@ -184,7 +177,7 @@ impl TextureLoader {
     }
 }
 
-impl Drop for TextureLoader {
+impl Drop for ImageLoader {
     fn drop(&mut self) {
         self.running.store(false, Ordering::Release);
 
