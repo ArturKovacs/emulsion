@@ -334,7 +334,7 @@ impl PicturePanel {
             let sampler = texture
                 .sampled()
                 .wrap_function(glium::uniforms::SamplerWrapFunction::Clamp);
-            let sampler = if self.get_texel_size(panel_size) >= 6f32 {
+            let sampler = if self.get_texel_size(panel_size) >= 4f32 {
                 sampler.magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest)
             } else {
                 sampler.magnify_filter(glium::uniforms::MagnifySamplerFilter::Linear)
@@ -373,18 +373,7 @@ impl PicturePanel {
     fn get_texel_size(&self, panel_size: LogicalSize) -> f32 {
         if let Some(ref image_texture) = self.image_texture {
             let img_w = image_texture.width() as f32;
-            // The following line is mathematically equivalent to transforming the vector on the
-            // right side by the matrix and then taking the X (first) component of the resulting
-            // vector.
-            let rendered_width_to_panel_width =
-                self.projection_transform
-                    .row(0)
-                    .dot(Vector4::new(img_w * 0.5, 0.0, 0.0, 1.0));
-            let rendered_width = rendered_width_to_panel_width * panel_size.width as f32;
-            rendered_width / img_w
-        //(panel_size.width.min(panel_size.height) as f32
-        //    / image_texture.width().max(image_texture.height()) as f32)
-        //    * self.zoom_scale
+            self.img_display_width as f32 / img_w
         } else {
             0f32
         }
