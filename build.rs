@@ -13,8 +13,7 @@ fn platform_specific() {
 }
 
 #[cfg(unix)]
-fn platform_specific() {
-}
+fn platform_specific() {}
 
 fn main() {
     platform_specific();
@@ -31,5 +30,4 @@ fn main() {
             fs::copy(entry.path(), target_resource_path.join(entry.file_name())).unwrap();
         }
     }
-
 }

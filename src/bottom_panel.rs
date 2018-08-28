@@ -117,12 +117,8 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
             });
         }
 
-        let help_toggle = ui.create_toggle(
-            question.clone(),
-            Vector2::new(32f32, 4f32),
-            false,
-            || {},
-        );
+        let help_toggle =
+            ui.create_toggle(question.clone(), Vector2::new(32f32, 4f32), false, || {});
 
         let theme_toggle = ui.create_toggle(
             moon_texture.clone(),

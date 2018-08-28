@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Instant;
 
+use rand::{thread_rng, Rng};
+
 use sys_info;
 
 use glium;
@@ -28,13 +30,16 @@ pub enum LoadRequest {
 pub enum PlaybackState {
     Paused,
     Forward,
+    Present,
+    RandomPresent,
     //Backward,
 }
 
 pub struct PlaybackManager {
     playback_state: PlaybackState,
-
     image_cache: ImageCache,
+
+    present_remaining: Vec<usize>,
 
     playback_start_time: Instant,
     frame_count_since_playback_start: u64,
@@ -66,9 +71,11 @@ impl PlaybackManager {
         };
 
         let resulting_window = PlaybackManager {
+            playback_state: PlaybackState::Paused,
             image_cache: ImageCache::new(cache_capaxity, thread_count),
 
-            playback_state: PlaybackState::Paused,
+            present_remaining: Vec::new(),
+
             playback_start_time: Instant::now(),
             frame_count_since_playback_start: 0,
             load_request: LoadRequest::None,
@@ -92,6 +99,19 @@ impl PlaybackManager {
 
     pub fn pause_playback(&mut self) {
         self.playback_state = PlaybackState::Paused;
+    }
+
+    pub fn start_random_presentation(&mut self) {
+        self.playback_start_time = Instant::now();
+        self.frame_count_since_playback_start = 0;
+        self.playback_state = PlaybackState::RandomPresent;
+        self.fill_present_remainig_with_random();
+    }
+
+    pub fn start_presentation(&mut self) {
+        self.playback_start_time = Instant::now();
+        self.frame_count_since_playback_start = 0;
+        self.playback_state = PlaybackState::Present;
     }
 
     pub fn current_filename(&self) -> OsString {
@@ -134,12 +154,15 @@ impl PlaybackManager {
         self.should_sleep = true;
 
         // The reason why I reset the load request in such a convoluted way is that
-        // it has to guarantee that self.load_request will be reset even if I return from this
+        // it has to guaranteprefetch_neighborsequest will be reset even if I return from this
         // function early
         let mut load_request = LoadRequest::None;
         mem::swap(&mut self.load_request, &mut load_request);
 
-        let framerate = 25.0;
+        let framerate = match self.playback_state {
+            PlaybackState::Present | PlaybackState::RandomPresent => 0.1667, // six seconds per img
+            _ => 25.0,
+        };
         const NANOS_PER_SEC: u64 = 1000_000_000;
         let frame_delta_time_nanos = (NANOS_PER_SEC as f64 / framerate) as u64;
 
@@ -147,16 +170,34 @@ impl PlaybackManager {
             self.image_cache
                 .process_prefetched(window.display())
                 .unwrap();
-            self.image_cache.send_load_requests();
+            self.image_cache.prefetch_neighbors();
         } else if load_request == LoadRequest::None {
             let elapsed = self.playback_start_time.elapsed();
             let elapsed_nanos = elapsed.as_secs() * NANOS_PER_SEC + elapsed.subsec_nanos() as u64;
+
             let frame_step =
                 (elapsed_nanos / frame_delta_time_nanos) - self.frame_count_since_playback_start;
             if frame_step > 0 {
                 load_request = match self.playback_state {
-                    PlaybackState::Forward => LoadRequest::Jump(frame_step as i32),
+                    PlaybackState::Forward | PlaybackState::Present => {
+                        LoadRequest::Jump(frame_step as i32)
+                    }
                     //PlaybackState::Backward => LoadRequest::Jump(-(frame_step as i32)),
+                    PlaybackState::RandomPresent => {
+                        let mut target = None;
+                        for _ in 0..frame_step {
+                            target = self.present_remaining.pop();
+                            if target == None {
+                                // Restart
+                                self.fill_present_remainig_with_random();
+                                target = self.present_remaining.pop();
+                            }
+                        }
+                        match target {
+                            Some(index) => LoadRequest::LoadAtIndex(index),
+                            None => LoadRequest::None,
+                        }
+                    }
                     PlaybackState::Paused => unreachable!(),
                 };
                 self.frame_count_since_playback_start += frame_step;
@@ -171,7 +212,14 @@ impl PlaybackManager {
                     // Just buisy wait if we are getting very close to the next frame swap
                     self.should_sleep = false;
                 } else {
-                    self.image_cache.send_load_requests();
+                    match self.playback_state {
+                        PlaybackState::RandomPresent => {
+                            if let Some(&last) = self.present_remaining.iter().last() {
+                                self.image_cache.prefetch_at_index(last);
+                            }
+                        }
+                        _ => self.image_cache.prefetch_neighbors(),
+                    }
                 }
             }
         }
@@ -231,5 +279,13 @@ impl PlaybackManager {
 
             self.should_sleep = false;
         }
+    }
+
+    fn fill_present_remainig_with_random(&mut self) {
+        self.present_remaining.clear();
+        for i in 0..self.image_cache.current_dir_len() {
+            self.present_remaining.push(i);
+        }
+        thread_rng().shuffle(self.present_remaining.as_mut_slice());
     }
 }

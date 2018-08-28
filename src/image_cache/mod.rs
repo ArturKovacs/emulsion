@@ -358,31 +358,48 @@ impl ImageCache {
         Ok(())
     }
 
-    pub fn send_load_requests(&mut self) {
-        use std::collections::btree_map::Entry;
-
+    pub fn prefetch_neighbors(&mut self) {
         let mut index = self.current_index;
 
         // Send as many load requests so that the estimated total will just fill the cache
         let mut estimated_remaining_cap = self.remaining_capacity;
 
         while estimated_remaining_cap > self.curr_est_size as isize {
+            if self.requested_images >= Self::MAX_PENDING_PREFETCH_REQUESTS {
+                break;
+            }
             // Send a load request for the closest file not in the cache or outdated
             index += 1;
+            if self.prefetch_at_index(index) {
+                estimated_remaining_cap -= self.curr_est_size as isize;
+            } else {
+                break;
+            }
+        }
+    }
+
+    pub fn prefetch_at_index(&mut self, index: usize) -> bool {
+        use std::collections::btree_map::Entry;
+
+        if self.requested_images >= Self::MAX_PENDING_PREFETCH_REQUESTS {
+            return false;
+        }
+
+        if self.remaining_capacity > self.curr_est_size as isize {
             if let Some(file) = self.dir_files.get(index) {
                 let file_path = file.path();
                 let file_name = if let Some(file_name) = file_path.file_name() {
                     file_name.to_owned()
                 } else {
-                    continue;
+                    return false;
                 };
                 match self.texture_cache.entry(file_name) {
                     Entry::Vacant(entry) => {
                         if is_file_supported(file_path.as_ref()) {
                             entry.insert(CachedTexture::LoadRequested);
                             self.loader.send_load_request(file_path);
-                            estimated_remaining_cap -= self.curr_est_size as isize;
                             self.requested_images += 1;
+                            return true;
                         }
                     }
                     Entry::Occupied(entry) => {
@@ -391,19 +408,15 @@ impl ImageCache {
                                 != file.metadata().unwrap().modified().unwrap()
                             {
                                 self.loader.send_load_request(file_path);
-                                estimated_remaining_cap -= self.curr_est_size as isize;
                                 self.requested_images += 1;
                             }
                         }
+                        return true;
                     }
                 }
-                if self.requested_images >= Self::MAX_PENDING_PREFETCH_REQUESTS {
-                    break;
-                }
-            } else {
-                break;
             }
         }
+        false
     }
 
     fn change_directory(&mut self, dir_path: PathBuf, filename: OsString) -> Result<()> {

@@ -86,7 +86,6 @@ pub enum LoadResult {
     Failed,
 }
 
-
 pub struct ImageLoader {
     running: Arc<AtomicBool>,
     join_handles: Option<Vec<thread::JoinHandle<()>>>,

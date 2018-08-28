@@ -12,7 +12,7 @@ use glium::{Frame, Surface};
 
 use cgmath;
 use cgmath::SquareMatrix;
-use cgmath::{InnerSpace, Matrix, Matrix4, Vector2, Vector3, Vector4};
+use cgmath::{Matrix4, Vector2, Vector3};
 
 use shaders;
 
@@ -122,7 +122,10 @@ impl PicturePanel {
             img_pos: Vector2::new(0.0, 0.0),
             projection_transform: Matrix4::identity(),
             bottom,
-            panel_size: LogicalSize {width: 1.0, height: 1.0},
+            panel_size: LogicalSize {
+                width: 1.0,
+                height: 1.0,
+            },
 
             file_hover_state: FileHoverState::Idle,
 
@@ -167,29 +170,49 @@ impl PicturePanel {
                                 VirtualKeyCode::Left | VirtualKeyCode::A => {
                                     playback_manager.request_load(LoadRequest::LoadPrevious);
                                 }
-                                VirtualKeyCode::Space => {
-                                    if playback_manager.playback_state() == PlaybackState::Forward {
-                                        playback_manager.pause_playback();
-                                        let filename = playback_manager
-                                            .current_filename()
-                                            .to_str()
-                                            .unwrap()
-                                            .to_owned();
-                                        window.set_title_filename(filename.as_ref());
-                                    } else {
+                                VirtualKeyCode::Space => match playback_manager.playback_state() {
+                                    PlaybackState::Forward => {
+                                        Self::pause_playback(window, playback_manager)
+                                    }
+                                    PlaybackState::Paused => {
                                         playback_manager.start_playback_forward();
-                                        window.set_title_filename("PLAYING");
-                                    };
-                                }
+                                        window.set_title_filename("Playing");
+                                    }
+                                    _ => (),
+                                },
+                                VirtualKeyCode::P => if input.modifiers.ctrl {
+                                    match playback_manager.playback_state() {
+                                        PlaybackState::RandomPresent => {
+                                            Self::pause_playback(window, playback_manager)
+                                        }
+                                        PlaybackState::Paused => {
+                                            playback_manager.start_random_presentation();
+                                            window.set_title_filename("Presenting In Random Order");
+                                        }
+                                        _ => (),
+                                    }
+                                } else {
+                                    match playback_manager.playback_state() {
+                                        PlaybackState::Present => {
+                                            Self::pause_playback(window, playback_manager)
+                                        }
+                                        PlaybackState::Paused => {
+                                            playback_manager.start_presentation();
+                                            window.set_title_filename("Presenting");
+                                        }
+                                        _ => (),
+                                    }
+                                },
                                 VirtualKeyCode::F => {
                                     self.fit_image_to_panel();
                                 }
                                 VirtualKeyCode::Q => {
-                                    let texture_width = if let Some(ref texture) = self.image_texture {
-                                        Some(texture.width())
-                                    } else {
-                                        None
-                                    };
+                                    let texture_width =
+                                        if let Some(ref texture) = self.image_texture {
+                                            Some(texture.width())
+                                        } else {
+                                            None
+                                        };
                                     if let Some(texture_width) = texture_width {
                                         let panel_center = Vector2::new(
                                             self.panel_size.width as f32 * 0.5,
@@ -210,8 +233,12 @@ impl PicturePanel {
                     if self.image_fit {
                         self.fit_image_to_panel();
                     } else {
-                        let prev_panel_size = Vector2::new(self.panel_size.width as f32, self.panel_size.height as f32);
-                        let new_panel_size = Vector2::new(new_panel_size.width as f32, new_panel_size.height as f32);
+                        let prev_panel_size = Vector2::new(
+                            self.panel_size.width as f32,
+                            self.panel_size.height as f32,
+                        );
+                        let new_panel_size =
+                            Vector2::new(new_panel_size.width as f32, new_panel_size.height as f32);
                         let center_offset = (new_panel_size - prev_panel_size) * 0.5f32;
                         self.img_pos += center_offset;
                     }
@@ -262,7 +289,8 @@ impl PicturePanel {
                         1.0 / (delta.abs() + 1.0)
                     };
 
-                    let new_image_display_width = (self.img_display_width as f32 * delta).max(1.0) as u32;
+                    let new_image_display_width =
+                        (self.img_display_width as f32 * delta).max(1.0) as u32;
                     let last_mouse_pos = self.last_mouse_pos;
 
                     self.zoom_image(last_mouse_pos, new_image_display_width);
@@ -326,15 +354,17 @@ impl PicturePanel {
             let image_display_height = image_display_width * img_height_over_width;
             let corner_x = (self.img_pos.x - image_display_width * 0.5).floor();
             let corner_y = (self.img_pos.y - image_display_height * 0.5).floor();
-            let transform = Matrix4::from_nonuniform_scale(image_display_width, image_display_height, 1.0);
-            let transform = Matrix4::from_translation(Vector3::new(corner_x, corner_y, 0.0)) * transform;
+            let transform =
+                Matrix4::from_nonuniform_scale(image_display_width, image_display_height, 1.0);
+            let transform =
+                Matrix4::from_translation(Vector3::new(corner_x, corner_y, 0.0)) * transform;
             // Projection tranform
             let transform = self.projection_transform * transform;
 
             let sampler = texture
                 .sampled()
                 .wrap_function(glium::uniforms::SamplerWrapFunction::Clamp);
-            let sampler = if self.get_texel_size(panel_size) >= 4f32 {
+            let sampler = if self.get_texel_size() >= 4f32 {
                 sampler.magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest)
             } else {
                 sampler.magnify_filter(glium::uniforms::MagnifySamplerFilter::Linear)
@@ -367,10 +397,17 @@ impl PicturePanel {
     }
 
     fn update_projection_transform(&mut self) {
-        self.projection_transform = cgmath::ortho(0.0, self.panel_size.width as f32, self.panel_size.height as f32, 0.0, -1.0, 1.0);
+        self.projection_transform = cgmath::ortho(
+            0.0,
+            self.panel_size.width as f32,
+            self.panel_size.height as f32,
+            0.0,
+            -1.0,
+            1.0,
+        );
     }
 
-    fn get_texel_size(&self, panel_size: LogicalSize) -> f32 {
+    fn get_texel_size(&self) -> f32 {
         if let Some(ref image_texture) = self.image_texture {
             let img_w = image_texture.width() as f32;
             self.img_display_width as f32 / img_w
@@ -387,7 +424,8 @@ impl PicturePanel {
     }
 
     fn zoom_image(&mut self, anchor: Vector2<f32>, image_display_width: u32) {
-        self.img_pos = (image_display_width as f32 / self.img_display_width as f32) * (self.img_pos-anchor) + anchor;
+        self.img_pos = (image_display_width as f32 / self.img_display_width as f32)
+            * (self.img_pos - anchor) + anchor;
         self.img_display_width = image_display_width;
     }
 
@@ -407,11 +445,24 @@ impl PicturePanel {
         } else {
             None
         };
-        
+
         if let Some(img_display_width) = img_display_width {
-            self.img_pos = Vector2::new(self.panel_size.width as f32 * 0.5, self.panel_size.height as f32 * 0.5);
+            self.img_pos = Vector2::new(
+                self.panel_size.width as f32 * 0.5,
+                self.panel_size.height as f32 * 0.5,
+            );
             self.img_display_width = img_display_width;
             self.image_fit = true;
         }
+    }
+
+    fn pause_playback(window: &mut Window, playback_manager: &mut PlaybackManager) {
+        playback_manager.pause_playback();
+        let filename = playback_manager
+            .current_filename()
+            .to_str()
+            .unwrap()
+            .to_owned();
+        window.set_title_filename(filename.as_ref());
     }
 }
