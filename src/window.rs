@@ -61,6 +61,6 @@ impl Window {
         // Separator character used to be ⬕
         // But that one does not display correctly on Ubuntu 18.04
 
-        format!("E M U L S I O N / {}", name)
+        format!("E M U L S I O N : {}", name)
     }
 }
