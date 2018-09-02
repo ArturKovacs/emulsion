@@ -97,12 +97,12 @@ impl<'callback_ref> Ui<'callback_ref> {
         let textured_program = program!(display,
             140 => {
                 vertex: shaders::VERTEX_140,
-                fragment: shaders::UI_FRAGMENT_140
+                fragment: shaders::TEXTURE_SHADOW_F_140
             },
 
             110 => {
                 vertex: shaders::VERTEX_110,
-                fragment: shaders::UI_FRAGMENT_110
+                fragment: shaders::TEXTURE_SHADOW_F_110
             },
         ).unwrap();
 

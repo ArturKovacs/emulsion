@@ -168,7 +168,7 @@ impl<'callback_ref> ElementFunctions<'callback_ref> for Slider<'callback_ref> {
             color: color,
             size: size,
             shadow_color: Into::<[f32; 3]>::into(self.shadow_color),
-            shadow_offset: 0.8f32,
+            shadow_offset: 0.7f32,
         };
         target
             .draw(

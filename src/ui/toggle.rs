@@ -19,6 +19,7 @@ pub struct Toggle<'callback_ref> {
     click: bool,
 }
 
+// TODO Rename this to button.
 impl<'callback_ref> Toggle<'callback_ref> {
     pub fn new<F>(
         texture: Rc<SrgbTexture2d>,
@@ -48,9 +49,9 @@ impl<'callback_ref> Toggle<'callback_ref> {
         self.position
     }
 
-    pub fn is_on(&self) -> bool {
-        self.is_on
-    }
+    //pub fn is_on(&self) -> bool {
+    //    self.is_on
+    //}
 
     pub fn set_position(&mut self, pos: Vector2<f32>) {
         self.position = pos;
@@ -106,9 +107,14 @@ impl<'callback_ref> ElementFunctions<'callback_ref> for Toggle<'callback_ref> {
             matrix: Into::<[[f32; 4]; 4]>::into(transform),
             tex: sampler,
             texture_size: texture_size,
-            brighten: if self.hover { 0.15f32 } else { 0.0f32 },
+            //brighten: if self.hover { 0.15f32 } else { 0.0f32 },
+            brighten: 0.0f32,
             shadow_color: Into::<[f32; 3]>::into(self.shadow_color),
-            shadow_offset: if self.click { 0.7f32 } else { 0.8f32 }
+            shadow_offset: if self.click {
+                0.5f32
+            } else {
+                if self.hover { 0.7 } else { 1.0f32 }
+            }
         };
         let image_draw_params = glium::DrawParameters {
             viewport: Some(*context.viewport),

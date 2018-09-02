@@ -7,7 +7,7 @@ in vec2 v_tex_coords;
 out vec4 f_color;
 
 void main() {
-    const float shadow_size = 12.0;
+    const float shadow_size = 8.0;
     float shadow_pixel_offset = shadow_size * shadow_offset;
     vec2 tex_cood_from_edge = vec2(0.5) - abs(v_tex_coords - vec2(0.5));
     vec2 shadow_along_axes = 

@@ -335,8 +335,6 @@ impl PicturePanel {
             return;
         }
 
-        let panel_size = self.get_panel_size(window_size);
-
         self.update_projection_transform();
 
         if self.image_fit {

@@ -45,7 +45,7 @@ fn set_theme<'callback_ref>(
     let shadow_color = if light_theme {
         Vector3::new(0.0, 0.0, 0.0f32)
     } else {
-        Vector3::new(0.4, 0.4, 0.4f32)
+        Vector3::new(0.0, 0.0, 0.0f32)
     };
 
     slider.set_shadow_color(shadow_color);
@@ -120,6 +120,12 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
         let help_toggle =
             ui.create_toggle(question.clone(), Vector2::new(32f32, 4f32), false, || {});
 
+        {
+            help_toggle.borrow_mut().set_callback(move || {
+
+            });
+        }
+
         let theme_toggle = ui.create_toggle(
             moon_texture.clone(),
             Vector2::new(32f32, 4f32),
@@ -144,10 +150,10 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
             let help_toggle_clone = help_toggle.clone();
             theme_toggle.borrow_mut().set_callback(move || {
                 let mut theme_toggle = theme_toggle_clone.borrow_mut();
-                let is_light = theme_toggle.is_on();
-                configuration.borrow_mut().light_theme = is_light;
+                let mut config = configuration.borrow_mut();
+                config.light_theme = !config.light_theme;
                 set_theme(
-                    is_light,
+                    config.light_theme,
                     &mut slider_clone.borrow_mut(),
                     &mut theme_toggle,
                     &mut help_toggle_clone.borrow_mut(),
@@ -225,7 +231,7 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
         let color = if config.light_theme {
             [0.95, 0.95, 0.95, 1.0f32]
         } else {
-            [0.05, 0.05, 0.05, 1.0f32]
+            [0.08, 0.08, 0.08, 1.0f32]
         };
 
         self.ui.draw(target, &color);
