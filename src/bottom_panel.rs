@@ -109,12 +109,12 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
             ui.create_toggle(question.clone(), Vector2::new(32f32, 4f32), false, || {});
 
         {
-            let help_visible = RefCell::new(false);
+            //let help_visible = RefCell::new(false);
             help_toggle.borrow_mut().set_callback(move || {
                 //let mut help_toggle = help_toggle_clone.borrow_mut();
-                let mut help_visible = help_visible.borrow_mut();
-                *help_visible = !*help_visible;
-                picture_panel.borrow_mut().set_show_usage(*help_visible);
+                let mut picture_panel = picture_panel.borrow_mut();
+                let show_usage = !picture_panel.show_usage();
+                picture_panel.set_show_usage(show_usage);
             });
         }
 

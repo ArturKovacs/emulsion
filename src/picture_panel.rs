@@ -174,6 +174,10 @@ impl PicturePanel {
         self.show_usage = show_usage;
     }
 
+    pub fn show_usage(&self) -> bool {
+        self.show_usage
+    }
+
     pub fn handle_event(
         &mut self,
         event: &glutin::Event,

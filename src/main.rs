@@ -106,10 +106,10 @@ impl<'a> Program<'a> {
         let exe_path = env::current_exe().unwrap();
         let exe_parent = exe_path.parent().unwrap();
         let config_file_path = exe_parent.join(config_file_name);
-        let config = if let Ok(config) = Configuration::load(config_file_path.as_path()) {
-            RefCell::new(config)
+        let (config, first_run) = if let Ok(config) = Configuration::load(config_file_path.as_path()) {
+            (RefCell::new(config), false)
         } else {
-            RefCell::new(Default::default())
+            (RefCell::new(Default::default()), true)
         };
 
         let mut events_loop = glutin::EventsLoop::new();
@@ -124,6 +124,7 @@ impl<'a> Program<'a> {
             target.finish().unwrap();
         }
         let mut picture_panel = PicturePanel::new(window.display(), BottomPanel::HEIGHT as u32);
+        picture_panel.set_show_usage(first_run);
         let playback_manager = RefCell::new(PlaybackManager::new());
 
         // Load image
