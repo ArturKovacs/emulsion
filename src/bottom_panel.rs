@@ -1,36 +1,22 @@
 use std::cell::RefCell;
 use std::env;
-use std::path::Path;
 use std::rc::Rc;
 
 use glium;
 use glium::glutin;
 use glium::glutin::WindowEvent;
-use glium::texture::{RawImage2d, SrgbTexture2d};
-
-use image;
+use glium::texture::SrgbTexture2d;
 
 use cgmath::{Vector2, Vector3};
 
+use util::*;
 use configuration::Configuration;
+use picture_panel::PicturePanel;
 use playback_manager::{LoadRequest, PlaybackManager};
 use ui::slider::Slider;
 use ui::toggle::Toggle;
 use ui::Ui;
 use window::*;
-
-fn load_texture_without_cache(display: &glium::Display, image_path: &Path) -> SrgbTexture2d {
-    let image = image::open(image_path).unwrap().to_rgba();
-
-    texture_from_image(display, image)
-}
-
-fn texture_from_image(display: &glium::Display, image: image::RgbaImage) -> SrgbTexture2d {
-    let image_dimensions = image.dimensions();
-    let image = RawImage2d::from_raw_rgba(image.into_raw(), image_dimensions);
-
-    SrgbTexture2d::with_mipmaps(display, image, glium::texture::MipmapsOption::NoMipmap).unwrap()
-}
 
 fn set_theme<'callback_ref>(
     light_theme: bool,
@@ -74,6 +60,7 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
 
     pub fn new(
         window: &mut Window,
+        picture_panel: &'callback_ref RefCell<PicturePanel>,
         playback_manager: &'callback_ref RefCell<PlaybackManager>,
         configuration: &'callback_ref RefCell<Configuration>,
     ) -> Self {
@@ -117,12 +104,17 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
             });
         }
 
+        
         let help_toggle =
             ui.create_toggle(question.clone(), Vector2::new(32f32, 4f32), false, || {});
 
         {
+            let help_visible = RefCell::new(false);
             help_toggle.borrow_mut().set_callback(move || {
-
+                //let mut help_toggle = help_toggle_clone.borrow_mut();
+                let mut help_visible = help_visible.borrow_mut();
+                *help_visible = !*help_visible;
+                picture_panel.borrow_mut().set_show_usage(*help_visible);
             });
         }
 
@@ -151,6 +143,7 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
             theme_toggle.borrow_mut().set_callback(move || {
                 let mut theme_toggle = theme_toggle_clone.borrow_mut();
                 let mut config = configuration.borrow_mut();
+
                 config.light_theme = !config.light_theme;
                 set_theme(
                     config.light_theme,

@@ -20,6 +20,9 @@ use configuration::Configuration;
 use playback_manager::*;
 use window::*;
 
+use env;
+use util::*;
+
 #[derive(Copy, Clone)]
 struct Vertex {
     position: [f32; 2],
@@ -56,19 +59,15 @@ pub struct PicturePanel {
 
     file_hover_state: FileHoverState,
 
+    usage_texture: glium::texture::SrgbTexture2d,
+    show_usage: bool,
+    color_program: glium::Program,
+
     should_sleep: bool,
 }
 
 impl PicturePanel {
     pub fn new(display: &glium::Display, bottom: u32) -> Self {
-        // Clear the screen right at the start so that the user sees the background color
-        // whilst the image is loading.
-        {
-            let mut target = display.draw();
-            target.clear_color(0.9, 0.9, 0.9, 0.0);
-            target.finish().unwrap();
-        }
-
         // building the vertex buffer, which contains all the vertices that we will draw
         let vertex_buffer = {
             glium::VertexBuffer::new(
@@ -112,6 +111,23 @@ impl PicturePanel {
             },
         ).unwrap();
 
+        let color_program = program!(display,
+            140 => {
+                vertex: shaders::VERTEX_140,
+                fragment: shaders::COLOR_F_140
+            },
+
+            110 => {
+                vertex: shaders::VERTEX_110,
+                fragment: shaders::COLOR_F_110
+            },
+        ).unwrap();
+
+        let exe_parent = env::current_exe().unwrap().parent().unwrap().to_owned();
+        let resource_dir = exe_parent.join("resource");
+
+        let usage_texture = load_texture_without_cache(display, resource_dir.join("usage.png").as_ref());
+
         PicturePanel {
             vertex_buffer,
             index_buffer,
@@ -128,6 +144,10 @@ impl PicturePanel {
             },
 
             file_hover_state: FileHoverState::Idle,
+
+            usage_texture: usage_texture,
+            show_usage: false,
+            color_program: color_program,
 
             ignore_one_mouse_move: false,
 
@@ -148,6 +168,10 @@ impl PicturePanel {
 
     pub fn set_image(&mut self, image_texture: Option<Rc<glium::texture::SrgbTexture2d>>) {
         self.image_texture = image_texture;
+    }
+
+    pub fn set_show_usage(&mut self, show_usage: bool) {
+        self.show_usage = show_usage;
     }
 
     pub fn handle_event(
@@ -341,6 +365,16 @@ impl PicturePanel {
             self.fit_image_to_panel();
         }
 
+        let image_draw_params = glium::DrawParameters {
+            viewport: Some(glium::Rect {
+                left: 0,
+                bottom: self.bottom,
+                width: window_size.width as u32,
+                height: window_size.height as u32 - self.bottom,
+            }),
+            ..Default::default()
+        };
+
         if let Some(ref texture) = self.image_texture {
             let img_w = texture.width() as f32;
             let img_h = texture.height() as f32;
@@ -373,15 +407,73 @@ impl PicturePanel {
                 bright_shade: if config.light_theme { 0.95f32 } else { 0.3f32 },
                 tex: sampler
             };
-            let image_draw_params = glium::DrawParameters {
-                viewport: Some(glium::Rect {
-                    left: 0,
-                    bottom: self.bottom,
-                    width: window_size.width as u32,
-                    height: window_size.height as u32 - self.bottom,
-                }),
+            target
+                .draw(
+                    &self.vertex_buffer,
+                    &self.index_buffer,
+                    &self.program,
+                    &uniforms,
+                    &image_draw_params,
+                )
+                .unwrap();
+        }
+
+        if self.show_usage {
+            let mut usage_bg_draw_params = image_draw_params.clone();
+            usage_bg_draw_params.blend = glium::Blend {
+                color: glium::BlendingFunction::Addition {
+                    source: glium::LinearBlendingFactor::SourceAlpha,
+                    destination: glium::LinearBlendingFactor::OneMinusSourceAlpha,
+                },
                 ..Default::default()
             };
+
+            let transform = Matrix4::from_nonuniform_scale(2.0, 2.0, 1.0);
+            let transform = Matrix4::from_translation(Vector3::new(-1.0, -1.0, 0.0)) * transform;
+
+            let uniforms = uniform! {
+                matrix: Into::<[[f32; 4]; 4]>::into(transform),
+                color: [0.0, 0.0, 0.0, 0.75f32],
+            };
+
+            target
+                .draw(
+                    &self.vertex_buffer,
+                    &self.index_buffer,
+                    &self.color_program,
+                    &uniforms,
+                    &usage_bg_draw_params,
+                )
+                .unwrap();
+
+
+            let sampler = self.usage_texture.sampled();
+
+            let img_w = self.usage_texture.width() as f32;
+            let img_h = self.usage_texture.height() as f32;
+
+            // Model tranform
+            let corner_x = (self.panel_size.width as f32 * 0.5 - img_w * 0.5).floor();
+            let corner_y = (self.panel_size.height as f32 * 0.5 -img_h * 0.5).floor();
+            let transform =
+                Matrix4::from_nonuniform_scale(img_w, img_h, 1.0);
+            let transform =
+                Matrix4::from_translation(Vector3::new(corner_x, corner_y, 0.0)) * transform;
+            let transform = cgmath::ortho(
+                0.0,
+                self.panel_size.width as f32,
+                self.panel_size.height as f32,
+                0.0,
+                -1.0,
+                1.0,
+            ) * transform;
+
+            let uniforms = uniform! {
+                matrix: Into::<[[f32; 4]; 4]>::into(transform),
+                bright_shade: if config.light_theme { 0.95f32 } else { 0.3f32 },
+                tex: sampler
+            };
+
             target
                 .draw(
                     &self.vertex_buffer,

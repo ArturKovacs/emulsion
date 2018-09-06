@@ -4,6 +4,8 @@ USAGE
 Click on the question mark to toggle this screen.
 Click the sun/moon to change theme.
 
+Quit Emulsion:							Esc
+
 Previous Image:							A or Left Arrow
 Next Image:								D or Right Arrow
 

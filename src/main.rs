@@ -44,6 +44,8 @@ use window::*;
 mod configuration;
 use configuration::Configuration;
 
+mod util;
+
 // ========================================================
 // Glorious main function
 // ========================================================
@@ -75,7 +77,7 @@ struct Program<'a> {
     config_file_path: PathBuf,
 
     window: &'a mut Window,
-    picture_panel: &'a mut PicturePanel,
+    picture_panel: &'a RefCell<PicturePanel>,
     playback_manager: &'a RefCell<PlaybackManager>,
     bottom_panel: BottomPanel<'a>,
 }
@@ -112,6 +114,15 @@ impl<'a> Program<'a> {
 
         let mut events_loop = glutin::EventsLoop::new();
         let mut window = Window::new(&events_loop, &config.borrow());
+        // Clear the screen right at the start so that the user sees the background color
+        // whilst the image is loading.
+        {
+            let mut target = window.display().draw();
+            let config = config.borrow();
+            let bg_color = Self::get_bg_color(config.light_theme);
+            target.clear_color(bg_color[0], bg_color[1], bg_color[2], bg_color[3]);
+            target.finish().unwrap();
+        }
         let mut picture_panel = PicturePanel::new(window.display(), BottomPanel::HEIGHT as u32);
         let playback_manager = RefCell::new(PlaybackManager::new());
 
@@ -129,13 +140,14 @@ impl<'a> Program<'a> {
         // Just quickly display the loaded image here before we load the remaining parts of the program
         Self::draw_picture(&mut window, &mut picture_panel, &config.borrow());
 
-        let bottom_panel = BottomPanel::new(&mut window, &playback_manager, &config);
+        let picture_panel = RefCell::new(picture_panel);
+        let bottom_panel = BottomPanel::new(&mut window, &picture_panel, &playback_manager, &config);
 
         let mut program = Program {
             configuration: &config,
             config_file_path: config_file_path.clone(),
             window: &mut window,
-            picture_panel: &mut picture_panel,
+            picture_panel: &picture_panel,
             playback_manager: &playback_manager,
             bottom_panel,
         };
@@ -179,21 +191,21 @@ impl<'a> Program<'a> {
                 }
 
                 // Pre events
-                self.picture_panel.pre_events();
+                self.picture_panel.borrow_mut().pre_events();
 
                 // Dispatch event
                 self.bottom_panel.handle_event(&event, &self.window);
                 // Playback manager is borrowed only after the bottom panel button callbacks
                 // are finished
                 let mut playback_manager = self.playback_manager.borrow_mut();
-                self.picture_panel
+                self.picture_panel.borrow_mut()
                     .handle_event(&event, &mut self.window, &mut playback_manager);
 
                 // Update screen after a resize event or refresh
                 if let Event::WindowEvent { event, .. } = event {
                     match event {
                         WindowEvent::Resized(..) | WindowEvent::Refresh => {
-                            self.draw(&playback_manager)
+                            self.draw(&playback_manager, &mut self.picture_panel.borrow_mut())
                         }
                         _ => (),
                     }
@@ -201,12 +213,12 @@ impl<'a> Program<'a> {
             });
 
             let mut playback_manager = self.playback_manager.borrow_mut();
+            let mut picture_panel = self.picture_panel.borrow_mut();
             let load_requested = *playback_manager.load_request() != LoadRequest::None;
             playback_manager.update_image(&mut self.window);
-            self.picture_panel
-                .set_image(playback_manager.image_texture().ref_clone());
-
-            self.draw(&playback_manager);
+            picture_panel.set_image(playback_manager.image_texture().ref_clone());
+            
+            self.draw(&playback_manager, &mut picture_panel);
 
             // Update dirctory after draw
             if load_requested {
@@ -217,7 +229,7 @@ impl<'a> Program<'a> {
 
             let should_sleep = {
                 playback_manager.should_sleep()
-                    && self.picture_panel.should_sleep()
+                    && picture_panel.should_sleep()
                     && !load_requested
             };
 
@@ -229,7 +241,7 @@ impl<'a> Program<'a> {
         }
     }
 
-    fn draw(&mut self, playback_manager: &PlaybackManager) {
+    fn draw(&mut self, playback_manager: &PlaybackManager, picture_panel: &mut PicturePanel) {
         match self.window.display().gl_window().get_inner_size() {
             Some(window_size) => if window_size.width <= 0.0 || window_size.height <= 0.0 {
                 return;
@@ -243,7 +255,7 @@ impl<'a> Program<'a> {
         let bg_color = Self::get_bg_color(config.light_theme);
         target.clear_color(bg_color[0], bg_color[1], bg_color[2], bg_color[3]);
 
-        self.picture_panel.draw(&mut target, &self.window, &config);
+        picture_panel.draw(&mut target, &self.window, &config);
         self.bottom_panel
             .draw(&mut target, playback_manager, &config);
 
