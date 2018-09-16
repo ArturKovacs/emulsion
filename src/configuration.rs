@@ -9,6 +9,8 @@ pub struct Configuration {
     pub light_theme: bool,
     pub window_width: u32,
     pub window_height: u32,
+    pub window_x: i32,
+    pub window_y: i32,
 }
 
 impl Configuration {
@@ -34,6 +36,8 @@ impl Default for Configuration {
             light_theme: true,
             window_width: 512,
             window_height: 512,
+            window_x: 32,
+            window_y: 32,
         }
     }
 }

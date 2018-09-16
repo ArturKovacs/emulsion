@@ -8,7 +8,6 @@ build = "build.rs"
 winres = "0.1"
 
 [dependencies]
-glium = "0.22"
 image = "0.19"
 cgmath = "0.16"
 error-chain = "0.12"
@@ -19,8 +18,8 @@ serde_derive = "1.0"
 rmp-serde = "0.13"
 rand = "0.5"
 
-[dependencies.glutin]
-version = "0.17"
+[dependencies.glium]
+version = "0.22"
 features = [
     "icon_loading"
 ]

@@ -95,8 +95,7 @@ impl<'callback_ref> ElementFunctions<'callback_ref> for Toggle<'callback_ref> {
         // Projection
         let transform = context.projection_transform * transform;
 
-        let sampler = self
-            .texture
+        let sampler = self.texture
             .sampled()
             .wrap_function(glium::uniforms::SamplerWrapFunction::Clamp)
             .magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest);

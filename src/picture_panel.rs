@@ -126,7 +126,8 @@ impl PicturePanel {
         let exe_parent = env::current_exe().unwrap().parent().unwrap().to_owned();
         let resource_dir = exe_parent.join("resource");
 
-        let usage_texture = load_texture_without_cache(display, resource_dir.join("usage.png").as_ref());
+        let usage_texture =
+            load_texture_without_cache(display, resource_dir.join("usage.png").as_ref());
 
         PicturePanel {
             vertex_buffer,
@@ -450,7 +451,6 @@ impl PicturePanel {
                 )
                 .unwrap();
 
-
             let sampler = self.usage_texture.sampled();
 
             let img_w = self.usage_texture.width() as f32;
@@ -458,9 +458,8 @@ impl PicturePanel {
 
             // Model tranform
             let corner_x = (self.panel_size.width as f32 * 0.5 - img_w * 0.5).floor();
-            let corner_y = (self.panel_size.height as f32 * 0.5 -img_h * 0.5).floor();
-            let transform =
-                Matrix4::from_nonuniform_scale(img_w, img_h, 1.0);
+            let corner_y = (self.panel_size.height as f32 * 0.5 - img_h * 0.5).floor();
+            let transform = Matrix4::from_nonuniform_scale(img_w, img_h, 1.0);
             let transform =
                 Matrix4::from_translation(Vector3::new(corner_x, corner_y, 0.0)) * transform;
             let transform = cgmath::ortho(

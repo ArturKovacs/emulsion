@@ -2,7 +2,7 @@ use std;
 
 use glium;
 use glium::glutin;
-use glium::glutin::dpi::LogicalSize;
+use glium::glutin::dpi::{LogicalPosition, LogicalSize};
 
 use configuration::Configuration;
 
@@ -13,6 +13,7 @@ pub struct Window {
 impl Window {
     pub fn new(events_loop: &glutin::EventsLoop, config: &Configuration) -> Self {
         use glium::glutin::Icon;
+        use glium::glutin::MouseCursor;
 
         let exe_parent = std::env::current_exe()
             .unwrap()
@@ -28,19 +29,26 @@ impl Window {
             ))
         });
 
-        let window = glutin::WindowBuilder::new()
+        let mut window = glutin::WindowBuilder::new()
             .with_title("Loading")
+            .with_fullscreen(None)
             .with_dimensions(LogicalSize::new(
                 config.window_width as f64,
                 config.window_height as f64,
             ))
-            .with_fullscreen(None)
             .with_window_icon(Some(icon))
             .with_visibility(true);
 
         //let context = glutin::ContextBuilder::new().with_gl(GlRequest::Specific(Api::OpenGl, (3, 1)));
         let context = glutin::ContextBuilder::new().with_gl_profile(glutin::GlProfile::Core);
         let display = glium::Display::new(window, context, events_loop).unwrap();
+
+        display.gl_window().set_position(LogicalPosition::new(
+            config.window_x as f64,
+            config.window_y as f64,
+        ));
+
+        display.gl_window().set_cursor(MouseCursor::Default);
 
         let resulting_window = Window { display };
 

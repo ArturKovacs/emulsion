@@ -9,13 +9,13 @@ use glium::texture::SrgbTexture2d;
 
 use cgmath::{Vector2, Vector3};
 
-use util::*;
 use configuration::Configuration;
 use picture_panel::PicturePanel;
 use playback_manager::{LoadRequest, PlaybackManager};
 use ui::slider::Slider;
 use ui::toggle::Toggle;
 use ui::Ui;
+use util::*;
 use window::*;
 
 fn set_theme<'callback_ref>(
@@ -104,7 +104,6 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
             });
         }
 
-        
         let help_toggle =
             ui.create_toggle(question.clone(), Vector2::new(32f32, 4f32), false, || {});
 

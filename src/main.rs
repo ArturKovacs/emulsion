@@ -106,11 +106,12 @@ impl<'a> Program<'a> {
         let exe_path = env::current_exe().unwrap();
         let exe_parent = exe_path.parent().unwrap();
         let config_file_path = exe_parent.join(config_file_name);
-        let (config, first_run) = if let Ok(config) = Configuration::load(config_file_path.as_path()) {
-            (RefCell::new(config), false)
-        } else {
-            (RefCell::new(Default::default()), true)
-        };
+        let (config, first_run) =
+            if let Ok(config) = Configuration::load(config_file_path.as_path()) {
+                (RefCell::new(config), false)
+            } else {
+                (RefCell::new(Default::default()), true)
+            };
 
         let mut events_loop = glutin::EventsLoop::new();
         let mut window = Window::new(&events_loop, &config.borrow());
@@ -142,7 +143,8 @@ impl<'a> Program<'a> {
         Self::draw_picture(&mut window, &mut picture_panel, &config.borrow());
 
         let picture_panel = RefCell::new(picture_panel);
-        let bottom_panel = BottomPanel::new(&mut window, &picture_panel, &playback_manager, &config);
+        let bottom_panel =
+            BottomPanel::new(&mut window, &picture_panel, &playback_manager, &config);
 
         let mut program = Program {
             configuration: &config,
@@ -177,11 +179,16 @@ impl<'a> Program<'a> {
                                 }
                             }
                         }
+                        WindowEvent::Moved(position) => {
+                            let mut config = self.configuration.borrow_mut();
+                            config.window_x = position.x as i32;
+                            config.window_y = position.y as i32;
+                            // Don't you dare saving to file here.
+                        }
                         WindowEvent::Resized(size) => {
                             let mut config = self.configuration.borrow_mut();
                             config.window_width = size.width as u32;
                             config.window_height = size.height as u32;
-                            // Don't you dare saving to file here.
                         }
                         WindowEvent::Focused(false) => {
                             let config = self.configuration.borrow();
@@ -199,8 +206,11 @@ impl<'a> Program<'a> {
                 // Playback manager is borrowed only after the bottom panel button callbacks
                 // are finished
                 let mut playback_manager = self.playback_manager.borrow_mut();
-                self.picture_panel.borrow_mut()
-                    .handle_event(&event, &mut self.window, &mut playback_manager);
+                self.picture_panel.borrow_mut().handle_event(
+                    &event,
+                    &mut self.window,
+                    &mut playback_manager,
+                );
 
                 // Update screen after a resize event or refresh
                 if let Event::WindowEvent { event, .. } = event {
@@ -218,7 +228,7 @@ impl<'a> Program<'a> {
             let load_requested = *playback_manager.load_request() != LoadRequest::None;
             playback_manager.update_image(&mut self.window);
             picture_panel.set_image(playback_manager.image_texture().ref_clone());
-            
+
             self.draw(&playback_manager, &mut picture_panel);
 
             // Update dirctory after draw
@@ -229,9 +239,7 @@ impl<'a> Program<'a> {
             }
 
             let should_sleep = {
-                playback_manager.should_sleep()
-                    && picture_panel.should_sleep()
-                    && !load_requested
+                playback_manager.should_sleep() && picture_panel.should_sleep() && !load_requested
             };
 
             // Let other processes run for a bit.
