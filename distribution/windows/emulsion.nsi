@@ -125,7 +125,6 @@ Section /o "Associate supported files" SecAssociate
     !insertmacro EmulsionRegisterExtension "png" "PNG Image"
     !insertmacro EmulsionRegisterExtension "bmp" "BMP Image"
     !insertmacro EmulsionRegisterExtension "tga" "TGA Image"
-    !insertmacro EmulsionRegisterExtension "gif" "GIF Image"
     !insertmacro EmulsionRegisterExtension "webp" "WEBP Image"
     !insertmacro EmulsionRegisterExtension "tif" "TIF Image"
     !insertmacro EmulsionRegisterExtension "tiff" "TIFF Image"
