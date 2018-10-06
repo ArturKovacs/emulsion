@@ -360,7 +360,7 @@ impl PicturePanel {
             None => return,
         };
 
-        if window_size.width <= 0.0 || window_size.height <= 0.0 {
+        if window_size.width <= 0.0 || window_size.height <= self.bottom as f64 {
             return;
         }
 
