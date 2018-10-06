@@ -142,7 +142,7 @@ SectionEnd
 ;Descriptions
     ;Language strings
     LangString DESC_SecEmulsion ${LANG_ENGLISH} "The program itself."
-    LangString DESC_SecAssociate ${LANG_ENGLISH} "Associate jpg, jpeg, png, bmp, tga, gif, webp, tif, tiff, ico, hdr, pbm, pam, ppm, and pgm files with Emulsion"
+    LangString DESC_SecAssociate ${LANG_ENGLISH} "Associate jpg, jpeg, png, bmp, tga, webp, tif, tiff, ico, hdr, pbm, pam, ppm, and pgm files with Emulsion"
 
     ;Assign language strings to sections
     !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
