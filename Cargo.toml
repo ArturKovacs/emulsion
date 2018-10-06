@@ -1,6 +1,6 @@
 [package]
 name = "emulsion"
-version = "1.0.0"
+version = "1.1.0"
 authors = ["Artur Barnabas <kovacs.artur.barnabas@gmail.com>"]
 build = "build.rs"
 
@@ -8,7 +8,7 @@ build = "build.rs"
 winres = "0.1"
 
 [dependencies]
-image = "0.19"
+image = "0.20"
 cgmath = "0.16"
 error-chain = "0.12"
 sys-info = "0.5"
