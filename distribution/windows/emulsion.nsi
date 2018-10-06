@@ -27,7 +27,7 @@
 
     ;Name and file
     Name "Emulsion"
-    OutFile "Emulsion Installer.exe"
+    OutFile "Emulsion-Installer.exe"
 
     ;Default installation folder
     ;InstallDir "$LOCALAPPDATA\Emulsion"
