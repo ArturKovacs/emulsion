@@ -41,7 +41,7 @@ pub struct PicturePanel {
     index_buffer: glium::IndexBuffer<u16>,
     program: glium::Program,
     image_texture: Option<Rc<glium::texture::SrgbTexture2d>>,
-    img_display_width: u32,
+    img_texel_size: f32,
     image_fit: bool,
     img_pos: Vector2<f32>,
     projection_transform: Matrix4<f32>,
@@ -134,7 +134,8 @@ impl PicturePanel {
             index_buffer,
             program,
             image_texture: None,
-            img_display_width: 1,
+            //img_display_width: 1,
+            img_texel_size: 1.0,
             image_fit: true,
             img_pos: Vector2::new(0.0, 0.0),
             projection_transform: Matrix4::identity(),
@@ -236,20 +237,12 @@ impl PicturePanel {
                                     self.fit_image_to_panel();
                                 }
                                 VirtualKeyCode::Q => {
-                                    let texture_width =
-                                        if let Some(ref texture) = self.image_texture {
-                                            Some(texture.width())
-                                        } else {
-                                            None
-                                        };
-                                    if let Some(texture_width) = texture_width {
-                                        let panel_center = Vector2::new(
-                                            self.panel_size.width as f32 * 0.5,
-                                            self.panel_size.height as f32 * 0.5,
-                                        );
-                                        self.zoom_image(panel_center, texture_width);
-                                        self.image_fit = false;
-                                    }
+                                    let panel_center = Vector2::new(
+                                        self.panel_size.width as f32 * 0.5,
+                                        self.panel_size.height as f32 * 0.5,
+                                    );
+                                    self.zoom_image(panel_center, 1.0);
+                                    self.image_fit = false;
                                 }
                                 _ => (),
                             }
@@ -318,11 +311,10 @@ impl PicturePanel {
                         1.0 / (delta.abs() + 1.0)
                     };
 
-                    let new_image_display_width =
-                        (self.img_display_width as f32 * delta).max(1.0) as u32;
+                    let new_image_texel_size = (self.img_texel_size * delta).max(0.0);
                     let last_mouse_pos = self.last_mouse_pos;
 
-                    self.zoom_image(last_mouse_pos, new_image_display_width);
+                    self.zoom_image(last_mouse_pos, new_image_texel_size);
                     self.image_fit = false;
                 }
                 WindowEvent::Focused(gained_focus) => {
@@ -385,7 +377,7 @@ impl PicturePanel {
             let img_h = texture.height() as f32;
 
             let img_height_over_width = img_h / img_w;
-            let image_display_width = self.img_display_width as f32;
+            let image_display_width = self.img_texel_size * img_w;
 
             // Model tranform
             let image_display_height = image_display_width * img_height_over_width;
@@ -401,7 +393,7 @@ impl PicturePanel {
             let sampler = texture
                 .sampled()
                 .wrap_function(glium::uniforms::SamplerWrapFunction::Clamp);
-            let sampler = if self.get_texel_size() >= 4f32 {
+            let sampler = if self.img_texel_size >= 4f32 {
                 sampler.magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest)
             } else {
                 sampler.magnify_filter(glium::uniforms::MagnifySamplerFilter::Linear)
@@ -500,15 +492,6 @@ impl PicturePanel {
         );
     }
 
-    fn get_texel_size(&self) -> f32 {
-        if let Some(ref image_texture) = self.image_texture {
-            let img_w = image_texture.width() as f32;
-            self.img_display_width as f32 / img_w
-        } else {
-            0f32
-        }
-    }
-
     fn get_panel_size(&self, window_size: LogicalSize) -> LogicalSize {
         LogicalSize {
             width: window_size.width,
@@ -516,35 +499,36 @@ impl PicturePanel {
         }
     }
 
-    fn zoom_image(&mut self, anchor: Vector2<f32>, image_display_width: u32) {
-        self.img_pos = (image_display_width as f32 / self.img_display_width as f32)
+    fn zoom_image(&mut self, anchor: Vector2<f32>, image_texel_size: f32) {
+        self.img_pos = (image_texel_size / self.img_texel_size)
             * (self.img_pos - anchor) + anchor;
-        self.img_display_width = image_display_width;
+        self.img_texel_size = image_texel_size;
     }
 
     fn fit_image_to_panel(&mut self) {
-        let img_display_width = if let Some(ref texture) = self.image_texture {
+        let img_texel_size = if let Some(ref texture) = self.image_texture {
             let panel_aspect = self.panel_size.width as f32 / self.panel_size.height as f32;
             let img_aspect = texture.width() as f32 / texture.height() as f32;
 
-            let img_display_width = if img_aspect > panel_aspect {
+            let texel_size_to_fit_width = self.panel_size.width as f32 / texture.width() as f32;
+            let img_texel_size = if img_aspect > panel_aspect {
                 // The image is relatively wider than the panel
-                self.panel_size.width as u32
+                texel_size_to_fit_width
             } else {
-                (self.panel_size.width as f32 * (img_aspect / panel_aspect)) as u32
+                texel_size_to_fit_width * (img_aspect / panel_aspect)
             };
 
-            Some(img_display_width)
+            Some(img_texel_size)
         } else {
             None
         };
 
-        if let Some(img_display_width) = img_display_width {
+        if let Some(img_texel_size) = img_texel_size {
             self.img_pos = Vector2::new(
                 self.panel_size.width as f32 * 0.5,
                 self.panel_size.height as f32 * 0.5,
             );
-            self.img_display_width = img_display_width;
+            self.img_texel_size = img_texel_size;
             self.image_fit = true;
         }
     }

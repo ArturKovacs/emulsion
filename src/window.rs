@@ -29,7 +29,7 @@ impl Window {
             ))
         });
 
-        let mut window = glutin::WindowBuilder::new()
+        let window = glutin::WindowBuilder::new()
             .with_title("Loading")
             .with_fullscreen(None)
             .with_dimensions(LogicalSize::new(
@@ -39,7 +39,6 @@ impl Window {
             .with_window_icon(Some(icon))
             .with_visibility(true);
 
-        //let context = glutin::ContextBuilder::new().with_gl(GlRequest::Specific(Api::OpenGl, (3, 1)));
         let context = glutin::ContextBuilder::new().with_gl_profile(glutin::GlProfile::Core);
         let display = glium::Display::new(window, context, events_loop).unwrap();
 
