@@ -70,6 +70,17 @@ impl ImageCache {
         }
     }
 
+    pub fn cached_from_dir(&self) -> Vec<bool> {
+        let mut result = Vec::with_capacity(self.dir_files.len());
+
+        for i in 0..self.dir_files.len() {
+            let file_name = self.dir_files[i].file_name();
+            result.push(self.texture_cache.contains_key(&file_name));
+        }
+
+        result
+    }
+
     pub fn current_filename(&self) -> OsString {
         match self.dir_files.get(self.current_index) {
             Some(entry) => entry.file_name(),

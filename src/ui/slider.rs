@@ -17,6 +17,7 @@ pub struct Slider<'callback_ref> {
     value: u32,
     hover: bool,
     click: bool,
+    step_bg: Vec<bool>,
 }
 
 impl<'callback_ref> Slider<'callback_ref> {
@@ -41,6 +42,7 @@ impl<'callback_ref> Slider<'callback_ref> {
             value,
             hover: false,
             click: false,
+            step_bg: Vec::new(),
         }
     }
 
@@ -63,6 +65,10 @@ impl<'callback_ref> Slider<'callback_ref> {
     pub fn set_steps(&mut self, steps: u32, value: u32) {
         self.steps = steps;
         self.value = value;
+    }
+
+    pub fn set_step_bg(&mut self, step_bg: Vec<bool>) {
+        self.step_bg = step_bg;
     }
 
     pub fn set_shadow_color(&mut self, color: Vector3<f32>) {
@@ -126,8 +132,39 @@ impl<'callback_ref> ElementFunctions<'callback_ref> for Slider<'callback_ref> {
         };
 
         // -----------------------
+        // Draw all the bars (step_bg) at the background of the slider
+        let bar_width = self.size.x / self.steps as f32;
+        let bar_scale = Matrix4::from_nonuniform_scale(bar_width, height, 1.0);
+        let bar_color = [0.4, 0.4, 0.4, 1.0f32];
+        for (i, &has_bg) in self.step_bg.iter().enumerate() {
+            if has_bg {
+                let bar_pos = Vector3::new(
+                    self.position.x + bar_width * i as f32,
+                    self.position.y,
+                    0.0
+                );
+                let mut transform = bar_scale;
+                transform = Matrix4::from_translation(bar_pos) * transform;
+                transform = context.projection_transform * transform;
+                let uniforms = uniform! {
+                    matrix: Into::<[[f32; 4]; 4]>::into(transform),
+                    color: bar_color,
+                };
+                target
+                    .draw(
+                        context.unit_quad_vertices,
+                        context.unit_quad_indices,
+                        context.colored_program,
+                        &uniforms,
+                        &image_draw_params,
+                    )
+                    .unwrap();
+            }
+        }
+
+        // -----------------------
         // Draw vertical line at slider value
-        // Do this first so the shadow we draw later will cover this line as well
+        // Do this before the shadow so the shadow we draw later will cover this line as well
         let value_ratio = (self.value as f32 + Self::DISPLAY_OFFSET) / (self.steps as f32);
         let slider_pos = Vector3::new(
             self.position.x + value_ratio * self.size.x,

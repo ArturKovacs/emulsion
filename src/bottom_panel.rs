@@ -217,9 +217,12 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
     ) {
         let curr_file_index = playback_manager.current_file_index() as u32;
         let curr_dir_len = playback_manager.current_dir_len() as u32;
-        self.slider
-            .borrow_mut()
-            .set_steps(curr_dir_len, curr_file_index);
+        {
+            let mut slider = self.slider.borrow_mut();
+            slider.set_steps(curr_dir_len, curr_file_index);
+            slider.set_step_bg(playback_manager.cached_from_dir());
+        }
+
         let color = if config.light_theme {
             [0.95, 0.95, 0.95, 1.0f32]
         } else {

@@ -134,6 +134,10 @@ impl PlaybackManager {
         self.image_cache.update_directory()
     }
 
+    pub fn cached_from_dir(&self) -> Vec<bool> {
+        self.image_cache.cached_from_dir()
+    }
+
     pub fn should_sleep(&self) -> bool {
         self.should_sleep
     }
