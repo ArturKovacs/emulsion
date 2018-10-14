@@ -18,6 +18,7 @@ pub struct Slider<'callback_ref> {
     hover: bool,
     click: bool,
     step_bg: Vec<bool>,
+    step_bg_color: [f32; 4],
 }
 
 impl<'callback_ref> Slider<'callback_ref> {
@@ -43,6 +44,7 @@ impl<'callback_ref> Slider<'callback_ref> {
             hover: false,
             click: false,
             step_bg: Vec::new(),
+            step_bg_color: [0.4, 0.4, 0.4, 1.0f32],
         }
     }
 
@@ -69,6 +71,10 @@ impl<'callback_ref> Slider<'callback_ref> {
 
     pub fn set_step_bg(&mut self, step_bg: Vec<bool>) {
         self.step_bg = step_bg;
+    }
+
+    pub fn set_step_bg_color(&mut self, color: [f32; 4]) {
+        self.step_bg_color = color;
     }
 
     pub fn set_shadow_color(&mut self, color: Vector3<f32>) {
@@ -135,7 +141,6 @@ impl<'callback_ref> ElementFunctions<'callback_ref> for Slider<'callback_ref> {
         // Draw all the bars (step_bg) at the background of the slider
         let bar_width = self.size.x / self.steps as f32;
         let bar_scale = Matrix4::from_nonuniform_scale(bar_width, height, 1.0);
-        let bar_color = [0.4, 0.4, 0.4, 1.0f32];
         for (i, &has_bg) in self.step_bg.iter().enumerate() {
             if has_bg {
                 let bar_pos = Vector3::new(
@@ -148,7 +153,7 @@ impl<'callback_ref> ElementFunctions<'callback_ref> for Slider<'callback_ref> {
                 transform = context.projection_transform * transform;
                 let uniforms = uniform! {
                     matrix: Into::<[[f32; 4]; 4]>::into(transform),
-                    color: bar_color,
+                    color: self.step_bg_color,
                 };
                 target
                     .draw(
@@ -171,7 +176,7 @@ impl<'callback_ref> ElementFunctions<'callback_ref> for Slider<'callback_ref> {
             self.position.y,
             0.0,
         );
-        let color = [0.2, 0.2, 0.2, 1.0f32];
+        let color = [0.25, 0.25, 0.25, 1.0f32];
 
         let mut transform = Matrix4::from_nonuniform_scale(1.0, height, 1.0);
         transform = Matrix4::from_translation(slider_pos) * transform;

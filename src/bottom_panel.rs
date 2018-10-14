@@ -38,6 +38,13 @@ fn set_theme<'callback_ref>(
     theme_toggle.set_shadow_color(shadow_color);
     help_toggle.set_shadow_color(shadow_color);
 
+    let buffered_step_shade = if light_theme {
+        0.75f32
+    } else {
+        0.125f32
+    };
+    slider.set_step_bg_color([buffered_step_shade, buffered_step_shade, buffered_step_shade, 1.0f32]);
+
     if light_theme {
         theme_toggle.set_texture(moon_texture.clone());
         help_toggle.set_texture(question_texture.clone());
