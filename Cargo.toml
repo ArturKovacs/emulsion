@@ -19,7 +19,7 @@ rmp-serde = "0.13"
 rand = "0.5"
 
 [dependencies.glium]
-version = "0.22"
+version = "0.23"
 features = [
     "icon_loading"
 ]

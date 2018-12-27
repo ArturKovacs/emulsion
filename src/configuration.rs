@@ -34,8 +34,8 @@ impl Default for Configuration {
     fn default() -> Self {
         Configuration {
             light_theme: true,
-            window_width: 512,
-            window_height: 512,
+            window_width: 580,
+            window_height: 558,
             window_x: 32,
             window_y: 32,
         }

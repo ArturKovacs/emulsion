@@ -8,6 +8,7 @@ use configuration::Configuration;
 
 pub struct Window {
     display: glium::Display,
+    fullscreen: bool,
 }
 
 impl Window {
@@ -37,7 +38,7 @@ impl Window {
                 config.window_height as f64,
             ))
             .with_window_icon(Some(icon))
-            .with_visibility(true);
+            .with_visibility(false);
 
         let context = glutin::ContextBuilder::new().with_gl_profile(glutin::GlProfile::Core);
         let display = glium::Display::new(window, context, events_loop).unwrap();
@@ -46,12 +47,30 @@ impl Window {
             config.window_x as f64,
             config.window_y as f64,
         ));
-
+        display.gl_window().show();
         display.gl_window().set_cursor(MouseCursor::Default);
 
-        let resulting_window = Window { display };
+        let resulting_window = Window {
+            display,
+            fullscreen: false
+        };
 
         resulting_window
+    }
+
+    pub fn set_fullscreen(&mut self, fullscreen: bool) {
+        self.fullscreen = fullscreen;
+        let window = self.display.gl_window();
+        let monitor = if fullscreen {
+            Some(window.get_current_monitor())
+        } else {
+            None
+        };
+        window.set_fullscreen(monitor);
+    }
+
+    pub fn fullscreen(&self) -> bool {
+        self.fullscreen
     }
 
     pub fn display<'a>(&'a self) -> &'a glium::Display {

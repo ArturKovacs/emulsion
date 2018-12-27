@@ -59,6 +59,7 @@ pub struct Ui<'callback_ref> {
     colored_program: Program,
     cursor_pos: glutin::dpi::LogicalPosition,
     height: f32,
+    enabled: bool,
 }
 
 impl<'callback_ref> Ui<'callback_ref> {
@@ -140,7 +141,12 @@ impl<'callback_ref> Ui<'callback_ref> {
             colored_program,
             cursor_pos: glutin::dpi::LogicalPosition::new(0.0, 0.0),
             height,
+            enabled: true,
         }
+    }
+
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
     }
 
     pub fn window_event(
@@ -148,6 +154,8 @@ impl<'callback_ref> Ui<'callback_ref> {
         event: &glutin::WindowEvent,
         window_size: glutin::dpi::LogicalSize,
     ) {
+        if !self.enabled { return; }
+
         let event = match event {
             glutin::WindowEvent::CursorMoved { position, .. } => {
                 self.cursor_pos.x = position.x;
@@ -187,6 +195,10 @@ impl<'callback_ref> Ui<'callback_ref> {
 
     pub fn draw(&self, target: &mut Frame, bg_color: &[f32; 4]) {
         use cgmath::ortho;
+
+        if !self.enabled || self.height == 0f32 {
+            return;
+        }
 
         let width = target.get_dimensions().0 as f32;
 

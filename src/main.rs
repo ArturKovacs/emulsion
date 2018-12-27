@@ -124,7 +124,7 @@ impl<'a> Program<'a> {
             target.clear_color(bg_color[0], bg_color[1], bg_color[2], bg_color[3]);
             target.finish().unwrap();
         }
-        let mut picture_panel = PicturePanel::new(window.display(), BottomPanel::HEIGHT as u32);
+        let mut picture_panel = PicturePanel::new(window.display(), BottomPanel::INITIAL_HEIGHT);
         picture_panel.set_show_usage(first_run);
         let playback_manager = RefCell::new(PlaybackManager::new());
 
@@ -174,7 +174,13 @@ impl<'a> Program<'a> {
                             if let Some(keycode) = input.virtual_keycode {
                                 if input.state == glutin::ElementState::Pressed {
                                     if keycode == VirtualKeyCode::Escape {
-                                        running = false
+                                        if self.window.fullscreen() {
+                                            self.picture_panel.borrow_mut().toggle_fullscreen(
+                                                &mut self.window, &mut self.bottom_panel
+                                            );
+                                        } else {
+                                            running = false;
+                                        }
                                     }
                                 }
                             }
@@ -209,6 +215,7 @@ impl<'a> Program<'a> {
                 self.picture_panel.borrow_mut().handle_event(
                     &event,
                     &mut self.window,
+                    &mut self.bottom_panel,
                     &mut playback_manager,
                 );
 

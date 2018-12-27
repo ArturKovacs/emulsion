@@ -1,6 +1,7 @@
 use std::mem;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::time::{SystemTime, Duration};
 
 use glium;
 use glium::glutin::dpi::LogicalSize;
@@ -19,6 +20,7 @@ use shaders;
 use configuration::Configuration;
 use playback_manager::*;
 use window::*;
+use bottom_panel::BottomPanel;
 
 use env;
 use util::*;
@@ -52,10 +54,14 @@ pub struct PicturePanel {
     // triggered with 0, 0 corrdinates when the window regains focus by
     // the user clicking into it.
     // To work around this we ignore the first mouse move event after the window gains focus.
-    ignore_one_mouse_move: bool,
+    ignore_mouse_move_once: bool,
 
+    only_update_mouse_pos_once: bool,
+
+    last_click_time: SystemTime,
     last_mouse_pos: Vector2<f32>,
     panning: bool,
+    moving_window: bool,
 
     file_hover_state: FileHoverState,
 
@@ -151,13 +157,22 @@ impl PicturePanel {
             show_usage: false,
             color_program: color_program,
 
-            ignore_one_mouse_move: false,
+            ignore_mouse_move_once: false,
+            only_update_mouse_pos_once: false,
 
+            last_click_time: SystemTime::UNIX_EPOCH,
             last_mouse_pos: Vector2::new(0.0, 0.0),
             panning: false,
+            moving_window: false,
 
             should_sleep: true,
         }
+    }
+
+    pub fn set_bottom_pos(&mut self, bottom: u32) {
+        self.bottom = bottom;
+        let panel_size = self.panel_size;
+        self.update_panel_size(panel_size);
     }
 
     pub fn pre_events(&mut self) {
@@ -180,10 +195,19 @@ impl PicturePanel {
         self.show_usage
     }
 
+    pub fn toggle_fullscreen(&mut self, window: &mut Window, bottom_panel: &mut BottomPanel) {
+        let fullscreen = !window.fullscreen();
+        window.set_fullscreen(fullscreen);
+        self.only_update_mouse_pos_once = true;
+        self.set_bottom_pos(if fullscreen { 0 } else { BottomPanel::INITIAL_HEIGHT });
+        bottom_panel.set_enabled(!fullscreen);
+    }
+
     pub fn handle_event(
         &mut self,
         event: &glutin::Event,
         window: &mut Window,
+        bottom_panel: &mut BottomPanel,
         playback_manager: &mut PlaybackManager,
     ) {
         if let glutin::Event::WindowEvent { event, .. } = event {
@@ -192,24 +216,27 @@ impl PicturePanel {
             match event {
                 WindowEvent::KeyboardInput { input, .. } => {
                     if let Some(keycode) = input.virtual_keycode {
+                        if keycode == VirtualKeyCode::Space {
+                            self.panning = input.state == glutin::ElementState::Pressed;
+                        }
                         if input.state == glutin::ElementState::Pressed {
                             match keycode {
                                 VirtualKeyCode::Right | VirtualKeyCode::D => {
                                     playback_manager.request_load(LoadRequest::LoadNext);
                                 }
-                                VirtualKeyCode::Left | VirtualKeyCode::A => {
+                                VirtualKeyCode::Left => {
                                     playback_manager.request_load(LoadRequest::LoadPrevious);
                                 }
-                                VirtualKeyCode::Space => match playback_manager.playback_state() {
-                                    PlaybackState::Forward => {
-                                        Self::pause_playback(window, playback_manager)
+                                VirtualKeyCode::A => {
+                                    if input.modifiers.alt {
+                                        self.toggle_playback(window, playback_manager);
+                                    } else {
+                                        playback_manager.request_load(LoadRequest::LoadPrevious);
                                     }
-                                    PlaybackState::Paused => {
-                                        playback_manager.start_playback_forward();
-                                        window.set_title_filename("Playing");
-                                    }
-                                    _ => (),
-                                },
+                                }
+                                VirtualKeyCode::V => if input.modifiers.alt {
+                                    self.toggle_playback(window, playback_manager);
+                                }
                                 VirtualKeyCode::P => if input.modifiers.ctrl {
                                     match playback_manager.playback_state() {
                                         PlaybackState::RandomPresent => {
@@ -246,50 +273,65 @@ impl PicturePanel {
                                 }
                                 _ => (),
                             }
-                        } else {
                         }
                     }
                 }
                 WindowEvent::Resized(new_window_size) => {
                     let new_panel_size = self.get_panel_size(*new_window_size);
-                    if self.image_fit {
-                        self.fit_image_to_panel();
-                    } else {
-                        let prev_panel_size = Vector2::new(
-                            self.panel_size.width as f32,
-                            self.panel_size.height as f32,
-                        );
-                        let new_panel_size =
-                            Vector2::new(new_panel_size.width as f32, new_panel_size.height as f32);
-                        let center_offset = (new_panel_size - prev_panel_size) * 0.5f32;
-                        self.img_pos += center_offset;
-                    }
-                    self.panel_size = new_panel_size;
+                    self.update_panel_size(new_panel_size);
                 }
                 WindowEvent::MouseInput { state, button, .. } => {
-                    if *button == glutin::MouseButton::Left {
-                        if *state == glutin::ElementState::Released {
-                            self.panning = false;
-                        } else {
-                            if (self.last_mouse_pos.y as f64) < self.panel_size.height {
-                                self.panning = true;
+                    match *button {
+                        glutin::MouseButton::Left => {
+                            if *state == glutin::ElementState::Released {
+                                self.moving_window = false;
+                            } else {
+                                if self.mouse_is_on_panel() {
+                                    let now = SystemTime::now();
+                                    let duration_since_last_click = 
+                                        now.duration_since(self.last_click_time).unwrap();
+                                    self.last_click_time = now;
+                                    if duration_since_last_click < Duration::from_millis(250) {
+                                        self.toggle_fullscreen(window, bottom_panel);
+                                    }
+                                    if !window.fullscreen() { self.moving_window = true; }
+                                }
                             }
                         }
+                        glutin::MouseButton::Middle => {
+                            if *state == glutin::ElementState::Released {
+                                self.panning = false;
+                            } else {
+                                if self.mouse_is_on_panel() { self.panning = true; }
+                            }
+                        }
+                        _ => ()
                     }
                 }
-                WindowEvent::CursorMoved { position, .. } => {
-                    if self.ignore_one_mouse_move {
-                        self.ignore_one_mouse_move = false;
+                WindowEvent::CursorMoved { position, .. } => if self.ignore_mouse_move_once {
+                    self.ignore_mouse_move_once = false;
+                } else {
+                    let pos_vec = Vector2::new(position.x as f32, position.y as f32);
+                    if self.only_update_mouse_pos_once {
+                        self.last_mouse_pos = pos_vec;
+                        self.only_update_mouse_pos_once = false;
                     } else {
-                        let pos_vec = Vector2::new(position.x as f32, position.y as f32);
+                        let delta_pos = pos_vec - self.last_mouse_pos;
                         // Update transform
                         if self.panning {
-                            self.img_pos += pos_vec - self.last_mouse_pos;
+                            self.img_pos += delta_pos;
                             self.should_sleep = false;
                             self.image_fit = false;
                         }
-
-                        self.last_mouse_pos = pos_vec;
+                        if self.moving_window {
+                            let mut pos = window.display().gl_window().get_position().unwrap();
+                            pos.x += delta_pos.x as f64;
+                            pos.y += delta_pos.y as f64;
+                            window.display().gl_window().set_position(pos);
+                        }
+                        else {
+                            self.last_mouse_pos = pos_vec;
+                        }
                     }
                 }
                 WindowEvent::MouseWheel { delta, .. } => {
@@ -319,7 +361,7 @@ impl PicturePanel {
                 }
                 WindowEvent::Focused(gained_focus) => {
                     if *gained_focus {
-                        self.ignore_one_mouse_move = true;
+                        self.ignore_mouse_move_once = true;
                     }
                 }
                 WindowEvent::HoveredFile(file_name) => {
@@ -492,6 +534,22 @@ impl PicturePanel {
         );
     }
 
+    fn update_panel_size(&mut self, new_panel_size: LogicalSize) {
+        if self.image_fit {
+            self.fit_image_to_panel();
+        } else {
+            let prev_panel_size = Vector2::new(
+                self.panel_size.width as f32,
+                self.panel_size.height as f32,
+            );
+            let new_panel_size =
+                Vector2::new(new_panel_size.width as f32, new_panel_size.height as f32);
+            let center_offset = (new_panel_size - prev_panel_size) * 0.5f32;
+            self.img_pos += center_offset;
+        }
+        self.panel_size = new_panel_size;
+    }
+
     fn get_panel_size(&self, window_size: LogicalSize) -> LogicalSize {
         LogicalSize {
             width: window_size.width,
@@ -541,5 +599,22 @@ impl PicturePanel {
             .unwrap()
             .to_owned();
         window.set_title_filename(filename.as_ref());
+    }
+
+    fn mouse_is_on_panel(&self) -> bool {
+        (self.last_mouse_pos.y as f64) < self.panel_size.height
+    }
+
+    fn toggle_playback(&mut self, window: &mut Window, playback_manager: &mut PlaybackManager) {
+        match playback_manager.playback_state() {
+            PlaybackState::Forward => {
+                Self::pause_playback(window, playback_manager)
+            }
+            PlaybackState::Paused => {
+                playback_manager.start_playback_forward();
+                window.set_title_filename("Playing");
+            }
+            _ => (),
+        }
     }
 }

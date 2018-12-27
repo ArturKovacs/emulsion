@@ -17,6 +17,7 @@ pub struct Slider<'callback_ref> {
     value: u32,
     hover: bool,
     click: bool,
+    step_bg_enabled: bool,
     step_bg: Vec<bool>,
     step_bg_color: [f32; 4],
 }
@@ -43,8 +44,9 @@ impl<'callback_ref> Slider<'callback_ref> {
             value,
             hover: false,
             click: false,
+            step_bg_enabled: true,
             step_bg: Vec::new(),
-            step_bg_color: [0.4, 0.4, 0.4, 1.0f32],
+            step_bg_color: [0.0, 0.4, 0.4, 1.0f32],
         }
     }
 
@@ -67,6 +69,10 @@ impl<'callback_ref> Slider<'callback_ref> {
     pub fn set_steps(&mut self, steps: u32, value: u32) {
         self.steps = steps;
         self.value = value;
+    }
+
+    pub fn set_step_bg_enabled(&mut self, enabled: bool) {
+        self.step_bg_enabled = enabled;
     }
 
     pub fn set_step_bg(&mut self, step_bg: Vec<bool>) {
@@ -139,31 +145,33 @@ impl<'callback_ref> ElementFunctions<'callback_ref> for Slider<'callback_ref> {
 
         // -----------------------
         // Draw all the bars (step_bg) at the background of the slider
-        let bar_width = self.size.x / self.steps as f32;
-        let bar_scale = Matrix4::from_nonuniform_scale(bar_width, height, 1.0);
-        for (i, &has_bg) in self.step_bg.iter().enumerate() {
-            if has_bg {
-                let bar_pos = Vector3::new(
-                    self.position.x + bar_width * i as f32,
-                    self.position.y,
-                    0.0
-                );
-                let mut transform = bar_scale;
-                transform = Matrix4::from_translation(bar_pos) * transform;
-                transform = context.projection_transform * transform;
-                let uniforms = uniform! {
-                    matrix: Into::<[[f32; 4]; 4]>::into(transform),
-                    color: self.step_bg_color,
-                };
-                target
-                    .draw(
-                        context.unit_quad_vertices,
-                        context.unit_quad_indices,
-                        context.colored_program,
-                        &uniforms,
-                        &image_draw_params,
-                    )
-                    .unwrap();
+        if self.step_bg_enabled {
+            let bar_width = self.size.x / self.steps as f32;
+            let bar_scale = Matrix4::from_nonuniform_scale(bar_width, height, 1.0);
+            for (i, &has_bg) in self.step_bg.iter().enumerate() {
+                if has_bg {
+                    let bar_pos = Vector3::new(
+                        self.position.x + bar_width * i as f32,
+                        self.position.y,
+                        0.0
+                    );
+                    let mut transform = bar_scale;
+                    transform = Matrix4::from_translation(bar_pos) * transform;
+                    transform = context.projection_transform * transform;
+                    let uniforms = uniform! {
+                        matrix: Into::<[[f32; 4]; 4]>::into(transform),
+                        color: self.step_bg_color,
+                    };
+                    target
+                        .draw(
+                            context.unit_quad_vertices,
+                            context.unit_quad_indices,
+                            context.colored_program,
+                            &uniforms,
+                            &image_draw_params,
+                        )
+                        .unwrap();
+                }
             }
         }
 

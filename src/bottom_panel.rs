@@ -38,12 +38,7 @@ fn set_theme<'callback_ref>(
     theme_toggle.set_shadow_color(shadow_color);
     help_toggle.set_shadow_color(shadow_color);
 
-    let buffered_step_shade = if light_theme {
-        0.75f32
-    } else {
-        0.125f32
-    };
-    slider.set_step_bg_color([buffered_step_shade, buffered_step_shade, buffered_step_shade, 1.0f32]);
+    slider.set_step_bg_color([0.2, 0.6, 0.3, 1f32]);
 
     if light_theme {
         theme_toggle.set_texture(moon_texture.clone());
@@ -62,7 +57,7 @@ pub struct BottomPanel<'callback_ref> {
 }
 
 impl<'callback_ref> BottomPanel<'callback_ref> {
-    pub const HEIGHT: i32 = 32;
+    pub const INITIAL_HEIGHT: u32 = 32;
     pub const CONTROLS_MAX_WIDTH: i32 = 1024;
 
     pub fn new(
@@ -71,7 +66,7 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
         playback_manager: &'callback_ref RefCell<PlaybackManager>,
         configuration: &'callback_ref RefCell<Configuration>,
     ) -> Self {
-        let mut ui = Ui::new(window.display(), Self::HEIGHT as f32);
+        let mut ui = Ui::new(window.display(), Self::INITIAL_HEIGHT as f32);
 
         let exe_parent = env::current_exe().unwrap().parent().unwrap().to_owned();
         let resource_dir = exe_parent.join("resource");
@@ -103,7 +98,9 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
         );
         {
             let slider_clone = slider.clone();
-            slider.borrow_mut().set_callback(move || {
+            let mut borrowed = slider.borrow_mut();
+            borrowed.set_step_bg_enabled(cfg!(debug_assertions));
+            borrowed.set_callback(move || {
                 let slider = slider_clone.borrow();
                 playback_manager
                     .borrow_mut()
@@ -170,6 +167,10 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
             theme_toggle,
             help_toggle,
         }
+    }
+
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.ui.set_enabled(enabled);
     }
 
     pub fn handle_event(&mut self, event: &glutin::Event, window: &Window) {

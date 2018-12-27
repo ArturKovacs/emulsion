@@ -31,11 +31,25 @@ pub mod errors {
 pub use self::errors::Result;
 use self::errors::*;
 
+struct ImageDescriptor {
+    dir_entry: fs::DirEntry,
+    frame_count: Option<u32>, // it is evaluated in an on-demand fashion
+}
+
+impl ImageDescriptor {
+    fn from_entry(dir_entry: fs::DirEntry) -> ImageDescriptor {
+        ImageDescriptor {
+            dir_entry: dir_entry,
+            frame_count: None
+        }
+    }
+}
+
 pub struct ImageCache {
     dir_path: PathBuf,
     //current_name: OsString,
     current_index: usize,
-    dir_files: Vec<fs::DirEntry>,
+    dir_files: Vec<ImageDescriptor>,
 
     remaining_capacity: isize,
     total_capacity: isize,
@@ -74,7 +88,7 @@ impl ImageCache {
         let mut result = Vec::with_capacity(self.dir_files.len());
 
         for i in 0..self.dir_files.len() {
-            let file_name = self.dir_files[i].file_name();
+            let file_name = self.dir_files[i].dir_entry.file_name();
             result.push(self.texture_cache.contains_key(&file_name));
         }
 
@@ -83,7 +97,7 @@ impl ImageCache {
 
     pub fn current_filename(&self) -> OsString {
         match self.dir_files.get(self.current_index) {
-            Some(entry) => entry.file_name(),
+            Some(desc) => desc.dir_entry.file_name(),
             None => OsString::new(),
         }
     }
@@ -104,8 +118,8 @@ impl ImageCache {
         let curr_filename = self.current_filename();
         self.dir_files = Self::collect_directory(self.dir_path.as_path())?;
 
-        for (index, entry) in self.dir_files.iter().enumerate() {
-            if entry.file_name() == curr_filename {
+        for (index, desc) in self.dir_files.iter().enumerate() {
+            if desc.dir_entry.file_name() == curr_filename {
                 self.current_index = index;
                 return Ok(());
             }
@@ -132,6 +146,7 @@ impl ImageCache {
                     self.dir_path.to_str().unwrap()
                 )
             })?
+            .dir_entry
             .path();
 
         let result = self.load_specific(display, &path)?;
@@ -173,8 +188,8 @@ impl ImageCache {
             self.remaining_capacity = self.total_capacity;
             self.change_directory(parent, target_file_name.clone())?;
         } else {
-            for (index, entry) in self.dir_files.iter().enumerate() {
-                if entry.file_name() == target_file_name {
+            for (index, desc) in self.dir_files.iter().enumerate() {
+                if desc.dir_entry.file_name() == target_file_name {
                     self.current_index = index;
                 }
             }
@@ -298,7 +313,7 @@ impl ImageCache {
             target_index += self.dir_files.len() as isize;
         }
 
-        let target_path = self.dir_files.get(target_index as usize).unwrap().path();
+        let target_path = self.dir_files[target_index as usize].dir_entry.path();
         let result = self.load_specific(display, &target_path)?;
         self.current_index = target_index as usize;
 
@@ -394,7 +409,8 @@ impl ImageCache {
         }
 
         if self.remaining_capacity > self.curr_est_size as isize {
-            if let Some(file) = self.dir_files.get(index) {
+            if let Some(desc) = self.dir_files.get(index) {
+                let file = &desc.dir_entry;
                 let file_path = file.path();
                 let file_name = if let Some(file_name) = file_path.file_name() {
                     file_name.to_owned()
@@ -431,8 +447,8 @@ impl ImageCache {
         self.dir_files = Self::collect_directory(dir_path.as_path())?;
 
         // Look up the index of the filename in the directory
-        for (index, entry) in self.dir_files.iter().enumerate() {
-            if entry.file_name() == filename {
+        for (index, desc) in self.dir_files.iter().enumerate() {
+            if desc.dir_entry.file_name() == filename {
                 self.current_index = index;
                 self.dir_path = dir_path;
                 return Ok(());
@@ -446,26 +462,26 @@ impl ImageCache {
         ).into())
     }
 
-    fn collect_directory(path: &Path) -> Result<Vec<fs::DirEntry>> {
+    fn collect_directory(path: &Path) -> Result<Vec<ImageDescriptor>> {
         let mut dir_files: Vec<_> = fs::read_dir(path)?
-            .filter_map(|x| match x.ok() {
-                Some(entry) => match entry.file_type().ok() {
-                    Some(file_type) => if file_type.is_file() {
+            .filter_map(|x| match x {
+                Ok(entry) => match entry.file_type() {
+                    Ok(file_type) => if file_type.is_file() {
                         if is_file_supported(entry.path().as_path()) {
-                            Some(entry)
+                            Some(ImageDescriptor::from_entry(entry))
                         } else {
                             None
                         }
                     } else {
                         None
                     },
-                    None => None,
+                    Err(_) => None,
                 },
-                None => None,
+                Err(_) => None,
             })
             .collect();
 
-        dir_files.sort_unstable_by(|a, b| a.file_name().cmp(&b.file_name()));
+        dir_files.sort_unstable_by(|a, b| a.dir_entry.file_name().cmp(&b.dir_entry.file_name()));
 
         Ok(dir_files)
     }
