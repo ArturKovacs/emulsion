@@ -222,7 +222,7 @@ impl<'a> Program<'a> {
                 // Update screen after a resize event or refresh
                 if let Event::WindowEvent { event, .. } = event {
                     match event {
-                        WindowEvent::Resized(..) | WindowEvent::Refresh => {
+                        WindowEvent::Refresh => {
                             self.draw(&playback_manager, &mut self.picture_panel.borrow_mut())
                         }
                         _ => (),
@@ -272,8 +272,7 @@ impl<'a> Program<'a> {
         target.clear_color(bg_color[0], bg_color[1], bg_color[2], bg_color[3]);
 
         picture_panel.draw(&mut target, &self.window, &config);
-        self.bottom_panel
-            .draw(&mut target, playback_manager, &config);
+        self.bottom_panel.draw(&mut target, playback_manager, &config);
 
         target.finish().unwrap();
     }

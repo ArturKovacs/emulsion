@@ -4,7 +4,7 @@ use std::rc::Rc;
 use std::time::{SystemTime, Duration};
 
 use glium;
-use glium::glutin::dpi::LogicalSize;
+use glium::glutin::dpi::{LogicalSize, LogicalPosition};
 use glium::glutin::{VirtualKeyCode, WindowEvent};
 use glium::index::PrimitiveType;
 
@@ -294,7 +294,12 @@ impl PicturePanel {
                                     if duration_since_last_click < Duration::from_millis(250) {
                                         self.toggle_fullscreen(window, bottom_panel);
                                     }
-                                    if !window.fullscreen() { self.moving_window = true; }
+                                    if !window.fullscreen() {
+                                        self.moving_window = true;
+                                        //let window = window.display().gl_window();
+                                        //window.set_maximized(true);
+                                        //window.set_maximized(false);
+                                    }
                                 }
                             }
                         }
@@ -316,18 +321,34 @@ impl PicturePanel {
                         self.last_mouse_pos = pos_vec;
                         self.only_update_mouse_pos_once = false;
                     } else {
-                        let delta_pos = pos_vec - self.last_mouse_pos;
                         // Update transform
                         if self.panning {
+                            let delta_pos = pos_vec - self.last_mouse_pos;
                             self.img_pos += delta_pos;
                             self.should_sleep = false;
                             self.image_fit = false;
                         }
                         if self.moving_window {
-                            let mut pos = window.display().gl_window().get_position().unwrap();
-                            pos.x += delta_pos.x as f64;
-                            pos.y += delta_pos.y as f64;
-                            window.display().gl_window().set_position(pos);
+                            const BORDER: f32 = 80.0;
+
+                            let window = window.display().gl_window();
+                            let monitor = window.get_current_monitor();
+                            let monitor_height = monitor.get_dimensions().height as f32;
+                            let window_pos = window.get_position().unwrap();
+                            let mut window_pos = Vector2::new(
+                                window_pos.x as f32, window_pos.y as f32
+                            );
+                            
+                            let mut global_cursor_pos = pos_vec + window_pos;
+                            global_cursor_pos.y =
+                                global_cursor_pos.y.max(BORDER).min(monitor_height - BORDER);
+                            
+                            let pos_vec = global_cursor_pos - window_pos;
+                            let delta_pos = pos_vec - self.last_mouse_pos;
+                            window_pos += delta_pos;
+                            window.set_position(LogicalPosition::new(
+                                window_pos.x as f64, window_pos.y as f64
+                            ));
                         }
                         else {
                             self.last_mouse_pos = pos_vec;
