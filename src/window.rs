@@ -8,6 +8,7 @@ use configuration::Configuration;
 
 pub struct Window {
     display: glium::Display,
+    size_before_fullscreen: LogicalSize,
     fullscreen: bool,
 }
 
@@ -30,13 +31,15 @@ impl Window {
             ))
         });
 
+        let window_size = LogicalSize::new(
+            config.window_width as f64,
+            config.window_height as f64,
+        );
+
         let window = glutin::WindowBuilder::new()
             .with_title("Loading")
             .with_fullscreen(None)
-            .with_dimensions(LogicalSize::new(
-                config.window_width as f64,
-                config.window_height as f64,
-            ))
+            .with_dimensions(window_size)
             .with_window_icon(Some(icon))
             .with_visibility(false);
 
@@ -52,6 +55,7 @@ impl Window {
 
         let resulting_window = Window {
             display,
+            size_before_fullscreen: window_size,
             fullscreen: false
         };
 
@@ -62,11 +66,16 @@ impl Window {
         self.fullscreen = fullscreen;
         let window = self.display.gl_window();
         let monitor = if fullscreen {
+            self.size_before_fullscreen = window.get_inner_size().unwrap();
             Some(window.get_current_monitor())
         } else {
             None
         };
         window.set_fullscreen(monitor);
+    }
+
+    pub fn size_before_fullscreen(&self) -> LogicalSize {
+        self.size_before_fullscreen
     }
 
     pub fn fullscreen(&self) -> bool {

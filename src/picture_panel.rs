@@ -293,17 +293,13 @@ impl PicturePanel {
                                     self.last_click_time = now;
                                     if duration_since_last_click < Duration::from_millis(250) {
                                         self.toggle_fullscreen(window, bottom_panel);
-                                    }
-                                    if !window.fullscreen() {
+                                    } else {
                                         self.moving_window = true;
-                                        //let window = window.display().gl_window();
-                                        //window.set_maximized(true);
-                                        //window.set_maximized(false);
                                     }
                                 }
                             }
                         }
-                        glutin::MouseButton::Middle => {
+                        glutin::MouseButton::Right => {
                             if *state == glutin::ElementState::Released {
                                 self.panning = false;
                             } else {
@@ -316,6 +312,7 @@ impl PicturePanel {
                 WindowEvent::CursorMoved { position, .. } => if self.ignore_mouse_move_once {
                     self.ignore_mouse_move_once = false;
                 } else {
+                    // TODO: WRAP CURSOR AROUND WINDOW WHEN NEEDED
                     let pos_vec = Vector2::new(position.x as f32, position.y as f32);
                     if self.only_update_mouse_pos_once {
                         self.last_mouse_pos = pos_vec;
@@ -329,28 +326,50 @@ impl PicturePanel {
                             self.image_fit = false;
                         }
                         if self.moving_window {
-                            const BORDER: f32 = 80.0;
+                            if window.fullscreen() {
+                                // Disable fullscreen, teleport window
+                                // so that the cursor position relative to the window
+                                // remains the same proportionaly
 
-                            let window = window.display().gl_window();
-                            let monitor = window.get_current_monitor();
-                            let monitor_height = monitor.get_dimensions().height as f32;
-                            let window_pos = window.get_position().unwrap();
-                            let mut window_pos = Vector2::new(
-                                window_pos.x as f32, window_pos.y as f32
-                            );
-                            
-                            let mut global_cursor_pos = pos_vec + window_pos;
-                            global_cursor_pos.y =
-                                global_cursor_pos.y.max(BORDER).min(monitor_height - BORDER);
-                            
-                            let pos_vec = global_cursor_pos - window_pos;
-                            let delta_pos = pos_vec - self.last_mouse_pos;
-                            window_pos += delta_pos;
-                            window.set_position(LogicalPosition::new(
-                                window_pos.x as f64, window_pos.y as f64
-                            ));
-                        }
-                        else {
+                                let window_size =
+                                    window.display().gl_window().get_inner_size().unwrap();
+                                let cursor_screen_pos = self.last_mouse_pos;
+                                let relative_pos_target = Vector2::new(
+                                    cursor_screen_pos.x / window_size.width as f32,
+                                    cursor_screen_pos.y / window_size.height as f32
+                                );
+                                self.toggle_fullscreen(window, bottom_panel);
+                                let window_small_size = window.size_before_fullscreen();
+                                let cursor_window_pos = Vector2::new(
+                                    relative_pos_target.x * window_small_size.width as f32,
+                                    relative_pos_target.y * window_small_size.height as f32
+                                );
+                                let window_pos = cursor_screen_pos - cursor_window_pos;
+                                window.display().gl_window().set_position(LogicalPosition::new(
+                                    window_pos.x as f64, window_pos.y as f64
+                                ));
+                            } else {
+                                const BORDER: f32 = 80.0;
+                                let window = window.display().gl_window();
+                                let monitor = window.get_current_monitor();
+                                let monitor_height = monitor.get_dimensions().height as f32;
+                                let window_pos = window.get_position().unwrap();
+                                let mut window_pos = Vector2::new(
+                                    window_pos.x as f32, window_pos.y as f32
+                                );
+                                
+                                let mut global_cursor_pos = pos_vec + window_pos;
+                                global_cursor_pos.y =
+                                    global_cursor_pos.y.max(BORDER).min(monitor_height - BORDER);
+                                
+                                let pos_vec = global_cursor_pos - window_pos;
+                                let delta_pos = pos_vec - self.last_mouse_pos;
+                                window_pos += delta_pos;
+                                window.set_position(LogicalPosition::new(
+                                    window_pos.x as f64, window_pos.y as f64
+                                ));
+                            }
+                        } else {
                             self.last_mouse_pos = pos_vec;
                         }
                     }
