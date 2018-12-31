@@ -5,7 +5,6 @@ use glium::texture::{RawImage2d, SrgbTexture2d};
 
 use image;
 
-
 pub fn load_texture_without_cache(display: &glium::Display, image_path: &Path) -> SrgbTexture2d {
     let image = image::open(image_path).unwrap().to_rgba();
 

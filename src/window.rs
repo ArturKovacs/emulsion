@@ -31,10 +31,7 @@ impl Window {
             ))
         });
 
-        let window_size = LogicalSize::new(
-            config.window_width as f64,
-            config.window_height as f64,
-        );
+        let window_size = LogicalSize::new(config.window_width as f64, config.window_height as f64);
 
         let window = glutin::WindowBuilder::new()
             .with_title("Loading")
@@ -56,7 +53,7 @@ impl Window {
         let resulting_window = Window {
             display,
             size_before_fullscreen: window_size,
-            fullscreen: false
+            fullscreen: false,
         };
 
         resulting_window

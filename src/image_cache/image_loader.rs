@@ -18,7 +18,7 @@ pub mod errors {
     use image;
     use std::io;
 
-    error_chain!{
+    error_chain! {
         foreign_links {
             Io(io::Error) #[doc = "Error during IO"];
             TextureCreationError(texture::TextureCreationError);

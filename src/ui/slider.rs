@@ -150,11 +150,8 @@ impl<'callback_ref> ElementFunctions<'callback_ref> for Slider<'callback_ref> {
             let bar_scale = Matrix4::from_nonuniform_scale(bar_width, height, 1.0);
             for (i, &has_bg) in self.step_bg.iter().enumerate() {
                 if has_bg {
-                    let bar_pos = Vector3::new(
-                        self.position.x + bar_width * i as f32,
-                        self.position.y,
-                        0.0
-                    );
+                    let bar_pos =
+                        Vector3::new(self.position.x + bar_width * i as f32, self.position.y, 0.0);
                     let mut transform = bar_scale;
                     transform = Matrix4::from_translation(bar_pos) * transform;
                     transform = context.projection_transform * transform;

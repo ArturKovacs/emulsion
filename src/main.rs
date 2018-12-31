@@ -176,7 +176,8 @@ impl<'a> Program<'a> {
                                     if keycode == VirtualKeyCode::Escape {
                                         if self.window.fullscreen() {
                                             self.picture_panel.borrow_mut().toggle_fullscreen(
-                                                &mut self.window, &mut self.bottom_panel
+                                                &mut self.window,
+                                                &mut self.bottom_panel,
                                             );
                                         } else {
                                             running = false;
@@ -259,9 +260,11 @@ impl<'a> Program<'a> {
 
     fn draw(&mut self, playback_manager: &PlaybackManager, picture_panel: &mut PicturePanel) {
         match self.window.display().gl_window().get_inner_size() {
-            Some(window_size) => if window_size.width <= 0.0 || window_size.height <= 0.0 {
-                return;
-            },
+            Some(window_size) => {
+                if window_size.width <= 0.0 || window_size.height <= 0.0 {
+                    return;
+                }
+            }
             None => return,
         }
 
@@ -272,7 +275,8 @@ impl<'a> Program<'a> {
         target.clear_color(bg_color[0], bg_color[1], bg_color[2], bg_color[3]);
 
         picture_panel.draw(&mut target, &self.window, &config);
-        self.bottom_panel.draw(&mut target, playback_manager, &config);
+        self.bottom_panel
+            .draw(&mut target, playback_manager, &config);
 
         target.finish().unwrap();
     }

@@ -18,7 +18,7 @@ pub mod errors {
     use image_cache::image_loader;
     use std::io;
 
-    error_chain!{
+    error_chain! {
         foreign_links {
             Io(io::Error) #[doc = "Error during IO"];
             TextureCreationError(texture::TextureCreationError);
@@ -40,7 +40,7 @@ impl ImageDescriptor {
     fn from_entry(dir_entry: fs::DirEntry) -> ImageDescriptor {
         ImageDescriptor {
             dir_entry: dir_entry,
-            frame_count: None
+            frame_count: None,
         }
     }
 }
@@ -129,7 +129,8 @@ impl ImageCache {
             "Could not find file '{}' in directory '{}'",
             curr_filename.to_str().unwrap(),
             self.dir_path.to_str().unwrap()
-        ).into())
+        )
+        .into())
     }
 
     pub fn load_at_index(
@@ -137,7 +138,8 @@ impl ImageCache {
         display: &glium::Display,
         index: usize,
     ) -> Result<(Rc<SrgbTexture2d>, OsString)> {
-        let path = self.dir_files
+        let path = self
+            .dir_files
             .get(index)
             .ok_or_else(|| {
                 format!(
@@ -176,7 +178,8 @@ impl ImageCache {
             )),
         };
 
-        let parent = path.parent()
+        let parent = path
+            .parent()
             .ok_or("Could not get parent directory")?
             .to_owned();
 
@@ -339,7 +342,8 @@ impl ImageCache {
                     {
                         let size_estimate =
                             get_image_size_estimate((image.width(), image.height())) as isize;
-                        match self.texture_cache
+                        match self
+                            .texture_cache
                             .entry(path.file_name().unwrap().to_owned())
                         {
                             Entry::Vacant(entry) => {
@@ -459,22 +463,25 @@ impl ImageCache {
             "Could not find file '{}' in directory '{}'",
             filename.to_str().unwrap(),
             dir_path.to_str().unwrap()
-        ).into())
+        )
+        .into())
     }
 
     fn collect_directory(path: &Path) -> Result<Vec<ImageDescriptor>> {
         let mut dir_files: Vec<_> = fs::read_dir(path)?
             .filter_map(|x| match x {
                 Ok(entry) => match entry.file_type() {
-                    Ok(file_type) => if file_type.is_file() {
-                        if is_file_supported(entry.path().as_path()) {
-                            Some(ImageDescriptor::from_entry(entry))
+                    Ok(file_type) => {
+                        if file_type.is_file() {
+                            if is_file_supported(entry.path().as_path()) {
+                                Some(ImageDescriptor::from_entry(entry))
+                            } else {
+                                None
+                            }
                         } else {
                             None
                         }
-                    } else {
-                        None
-                    },
+                    }
                     Err(_) => None,
                 },
                 Err(_) => None,

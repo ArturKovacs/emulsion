@@ -1,10 +1,10 @@
 use std::mem;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::time::{SystemTime, Duration};
+use std::time::{Duration, SystemTime};
 
 use glium;
-use glium::glutin::dpi::{LogicalSize, LogicalPosition};
+use glium::glutin::dpi::{LogicalPosition, LogicalSize};
 use glium::glutin::{VirtualKeyCode, WindowEvent};
 use glium::index::PrimitiveType;
 
@@ -17,10 +17,10 @@ use cgmath::{Matrix4, Vector2, Vector3};
 
 use shaders;
 
+use bottom_panel::BottomPanel;
 use configuration::Configuration;
 use playback_manager::*;
 use window::*;
-use bottom_panel::BottomPanel;
 
 use env;
 use util::*;
@@ -96,7 +96,8 @@ impl PicturePanel {
                         tex_coords: [1.0, 0.0],
                     },
                 ],
-            ).unwrap()
+            )
+            .unwrap()
         };
 
         // building the index buffer
@@ -115,7 +116,8 @@ impl PicturePanel {
                 vertex: shaders::VERTEX_110,
                 fragment: shaders::FRAGMENT_110
             },
-        ).unwrap();
+        )
+        .unwrap();
 
         let color_program = program!(display,
             140 => {
@@ -127,7 +129,8 @@ impl PicturePanel {
                 vertex: shaders::VERTEX_110,
                 fragment: shaders::COLOR_F_110
             },
-        ).unwrap();
+        )
+        .unwrap();
 
         let exe_parent = env::current_exe().unwrap().parent().unwrap().to_owned();
         let resource_dir = exe_parent.join("resource");
@@ -199,7 +202,11 @@ impl PicturePanel {
         let fullscreen = !window.fullscreen();
         window.set_fullscreen(fullscreen);
         self.only_update_mouse_pos_once = true;
-        self.set_bottom_pos(if fullscreen { 0 } else { BottomPanel::INITIAL_HEIGHT });
+        self.set_bottom_pos(if fullscreen {
+            0
+        } else {
+            BottomPanel::INITIAL_HEIGHT
+        });
         bottom_panel.set_enabled(!fullscreen);
     }
 
@@ -211,168 +218,45 @@ impl PicturePanel {
         playback_manager: &mut PlaybackManager,
     ) {
         if let glutin::Event::WindowEvent { event, .. } = event {
-            //let window_size = window.display().gl_window().get_inner_size().unwrap();
-            //let panel_size = self.get_panel_size(window_size);
             match event {
                 WindowEvent::KeyboardInput { input, .. } => {
-                    if let Some(keycode) = input.virtual_keycode {
-                        if keycode == VirtualKeyCode::Space {
-                            self.panning = input.state == glutin::ElementState::Pressed;
-                        }
-                        if input.state == glutin::ElementState::Pressed {
-                            match keycode {
-                                VirtualKeyCode::Right | VirtualKeyCode::D => {
-                                    playback_manager.request_load(LoadRequest::LoadNext);
-                                }
-                                VirtualKeyCode::Left => {
-                                    playback_manager.request_load(LoadRequest::LoadPrevious);
-                                }
-                                VirtualKeyCode::A => {
-                                    if input.modifiers.alt {
-                                        self.toggle_playback(window, playback_manager);
-                                    } else {
-                                        playback_manager.request_load(LoadRequest::LoadPrevious);
-                                    }
-                                }
-                                VirtualKeyCode::V => if input.modifiers.alt {
-                                    self.toggle_playback(window, playback_manager);
-                                }
-                                VirtualKeyCode::P => if input.modifiers.ctrl {
-                                    match playback_manager.playback_state() {
-                                        PlaybackState::RandomPresent => {
-                                            Self::pause_playback(window, playback_manager)
-                                        }
-                                        PlaybackState::Paused => {
-                                            playback_manager.start_random_presentation();
-                                            window.set_title_filename("Presenting In Random Order");
-                                        }
-                                        _ => (),
-                                    }
-                                } else {
-                                    match playback_manager.playback_state() {
-                                        PlaybackState::Present => {
-                                            Self::pause_playback(window, playback_manager)
-                                        }
-                                        PlaybackState::Paused => {
-                                            playback_manager.start_presentation();
-                                            window.set_title_filename("Presenting");
-                                        }
-                                        _ => (),
-                                    }
-                                },
-                                VirtualKeyCode::F => {
-                                    self.fit_image_to_panel();
-                                }
-                                VirtualKeyCode::Q => {
-                                    let panel_center = Vector2::new(
-                                        self.panel_size.width as f32 * 0.5,
-                                        self.panel_size.height as f32 * 0.5,
-                                    );
-                                    self.zoom_image(panel_center, 1.0);
-                                    self.image_fit = false;
-                                }
-                                _ => (),
-                            }
-                        }
-                    }
+                    self.handle_keyboard(window, playback_manager, input);
                 }
                 WindowEvent::Resized(new_window_size) => {
                     let new_panel_size = self.get_panel_size(*new_window_size);
                     self.update_panel_size(new_panel_size);
                 }
-                WindowEvent::MouseInput { state, button, .. } => {
-                    match *button {
-                        glutin::MouseButton::Left => {
-                            if *state == glutin::ElementState::Released {
-                                self.moving_window = false;
-                            } else {
-                                if self.mouse_is_on_panel() {
-                                    let now = SystemTime::now();
-                                    let duration_since_last_click = 
-                                        now.duration_since(self.last_click_time).unwrap();
-                                    self.last_click_time = now;
-                                    if duration_since_last_click < Duration::from_millis(250) {
-                                        self.toggle_fullscreen(window, bottom_panel);
-                                    } else {
-                                        self.moving_window = true;
-                                    }
+                WindowEvent::MouseInput { state, button, .. } => match *button {
+                    glutin::MouseButton::Left => {
+                        if *state == glutin::ElementState::Released {
+                            self.moving_window = false;
+                        } else {
+                            if self.mouse_is_on_panel() {
+                                let now = SystemTime::now();
+                                let duration_since_last_click =
+                                    now.duration_since(self.last_click_time).unwrap();
+                                self.last_click_time = now;
+                                if duration_since_last_click < Duration::from_millis(250) {
+                                    self.toggle_fullscreen(window, bottom_panel);
+                                } else {
+                                    self.moving_window = true;
                                 }
                             }
                         }
-                        glutin::MouseButton::Right => {
-                            if *state == glutin::ElementState::Released {
-                                self.panning = false;
-                            } else {
-                                if self.mouse_is_on_panel() { self.panning = true; }
-                            }
-                        }
-                        _ => ()
                     }
-                }
-                WindowEvent::CursorMoved { position, .. } => if self.ignore_mouse_move_once {
-                    self.ignore_mouse_move_once = false;
-                } else {
-                    // TODO: WRAP CURSOR AROUND WINDOW WHEN NEEDED
-                    let pos_vec = Vector2::new(position.x as f32, position.y as f32);
-                    if self.only_update_mouse_pos_once {
-                        self.last_mouse_pos = pos_vec;
-                        self.only_update_mouse_pos_once = false;
-                    } else {
-                        // Update transform
-                        if self.panning {
-                            let delta_pos = pos_vec - self.last_mouse_pos;
-                            self.img_pos += delta_pos;
-                            self.should_sleep = false;
-                            self.image_fit = false;
-                        }
-                        if self.moving_window {
-                            if window.fullscreen() {
-                                // Disable fullscreen, teleport window
-                                // so that the cursor position relative to the window
-                                // remains the same proportionaly
-
-                                let window_size =
-                                    window.display().gl_window().get_inner_size().unwrap();
-                                let cursor_screen_pos = self.last_mouse_pos;
-                                let relative_pos_target = Vector2::new(
-                                    cursor_screen_pos.x / window_size.width as f32,
-                                    cursor_screen_pos.y / window_size.height as f32
-                                );
-                                self.toggle_fullscreen(window, bottom_panel);
-                                let window_small_size = window.size_before_fullscreen();
-                                let cursor_window_pos = Vector2::new(
-                                    relative_pos_target.x * window_small_size.width as f32,
-                                    relative_pos_target.y * window_small_size.height as f32
-                                );
-                                let window_pos = cursor_screen_pos - cursor_window_pos;
-                                window.display().gl_window().set_position(LogicalPosition::new(
-                                    window_pos.x as f64, window_pos.y as f64
-                                ));
-                            } else {
-                                const BORDER: f32 = 80.0;
-                                let window = window.display().gl_window();
-                                let monitor = window.get_current_monitor();
-                                let monitor_height = monitor.get_dimensions().height as f32;
-                                let window_pos = window.get_position().unwrap();
-                                let mut window_pos = Vector2::new(
-                                    window_pos.x as f32, window_pos.y as f32
-                                );
-                                
-                                let mut global_cursor_pos = pos_vec + window_pos;
-                                global_cursor_pos.y =
-                                    global_cursor_pos.y.max(BORDER).min(monitor_height - BORDER);
-                                
-                                let pos_vec = global_cursor_pos - window_pos;
-                                let delta_pos = pos_vec - self.last_mouse_pos;
-                                window_pos += delta_pos;
-                                window.set_position(LogicalPosition::new(
-                                    window_pos.x as f64, window_pos.y as f64
-                                ));
-                            }
+                    glutin::MouseButton::Right => {
+                        if *state == glutin::ElementState::Released {
+                            self.panning = false;
                         } else {
-                            self.last_mouse_pos = pos_vec;
+                            if self.mouse_is_on_panel() {
+                                self.panning = true;
+                            }
                         }
                     }
+                    _ => (),
+                },
+                WindowEvent::CursorMoved { position, .. } => {
+                    self.handle_cursor_move(window, bottom_panel, position);
                 }
                 WindowEvent::MouseWheel { delta, .. } => {
                     use glium::glutin::MouseScrollDelta;
@@ -428,6 +312,7 @@ impl PicturePanel {
         }
     }
 
+    /// Draws this panel onto `target`
     pub fn draw(&mut self, target: &mut Frame, window: &Window, config: &Configuration) {
         let window_size = match window.display().gl_window().get_inner_size() {
             Some(size) => size,
@@ -563,6 +448,153 @@ impl PicturePanel {
         }
     }
 
+    fn handle_keyboard(
+        &mut self,
+        window: &mut Window,
+        playback_manager: &mut PlaybackManager,
+        input: &glium::glutin::KeyboardInput,
+    ) {
+        if let Some(keycode) = input.virtual_keycode {
+            if keycode == VirtualKeyCode::Space {
+                self.panning = input.state == glutin::ElementState::Pressed;
+            }
+            if input.state == glutin::ElementState::Pressed {
+                match keycode {
+                    VirtualKeyCode::Right | VirtualKeyCode::D => {
+                        playback_manager.request_load(LoadRequest::LoadNext);
+                    }
+                    VirtualKeyCode::Left => {
+                        playback_manager.request_load(LoadRequest::LoadPrevious);
+                    }
+                    VirtualKeyCode::A => {
+                        if input.modifiers.alt {
+                            self.toggle_playback(window, playback_manager);
+                        } else {
+                            playback_manager.request_load(LoadRequest::LoadPrevious);
+                        }
+                    }
+                    VirtualKeyCode::V => {
+                        if input.modifiers.alt {
+                            self.toggle_playback(window, playback_manager);
+                        }
+                    }
+                    VirtualKeyCode::P => {
+                        if input.modifiers.ctrl {
+                            match playback_manager.playback_state() {
+                                PlaybackState::RandomPresent => {
+                                    Self::pause_playback(window, playback_manager)
+                                }
+                                PlaybackState::Paused => {
+                                    playback_manager.start_random_presentation();
+                                    window.set_title_filename("Presenting In Random Order");
+                                }
+                                _ => (),
+                            }
+                        } else {
+                            match playback_manager.playback_state() {
+                                PlaybackState::Present => {
+                                    Self::pause_playback(window, playback_manager)
+                                }
+                                PlaybackState::Paused => {
+                                    playback_manager.start_presentation();
+                                    window.set_title_filename("Presenting");
+                                }
+                                _ => (),
+                            }
+                        }
+                    }
+                    VirtualKeyCode::F => {
+                        self.fit_image_to_panel();
+                    }
+                    VirtualKeyCode::Q => {
+                        let panel_center = Vector2::new(
+                            self.panel_size.width as f32 * 0.5,
+                            self.panel_size.height as f32 * 0.5,
+                        );
+                        self.zoom_image(panel_center, 1.0);
+                        self.image_fit = false;
+                    }
+                    _ => (),
+                }
+            }
+        }
+    }
+
+    fn handle_cursor_move(
+        &mut self,
+        window: &mut Window,
+        bottom_panel: &mut BottomPanel,
+        position: &LogicalPosition,
+    ) {
+        if self.ignore_mouse_move_once {
+            self.ignore_mouse_move_once = false;
+        } else {
+            // TODO: WRAP CURSOR AROUND WINDOW WHEN NEEDED
+            let pos_vec = Vector2::new(position.x as f32, position.y as f32);
+            if self.only_update_mouse_pos_once {
+                self.last_mouse_pos = pos_vec;
+                self.only_update_mouse_pos_once = false;
+            } else {
+                // Update transform
+                if self.panning {
+                    let delta_pos = pos_vec - self.last_mouse_pos;
+                    self.img_pos += delta_pos;
+                    self.should_sleep = false;
+                    self.image_fit = false;
+                }
+                if self.moving_window {
+                    if window.fullscreen() {
+                        // Disable fullscreen, teleport window
+                        // so that the cursor position relative to the window
+                        // remains the same proportionaly
+
+                        let window_size = window.display().gl_window().get_inner_size().unwrap();
+                        let cursor_screen_pos = self.last_mouse_pos;
+                        let relative_pos_target = Vector2::new(
+                            cursor_screen_pos.x / window_size.width as f32,
+                            cursor_screen_pos.y / window_size.height as f32,
+                        );
+                        self.toggle_fullscreen(window, bottom_panel);
+                        let window_small_size = window.size_before_fullscreen();
+                        let cursor_window_pos = Vector2::new(
+                            relative_pos_target.x * window_small_size.width as f32,
+                            relative_pos_target.y * window_small_size.height as f32,
+                        );
+                        let window_pos = cursor_screen_pos - cursor_window_pos;
+                        window
+                            .display()
+                            .gl_window()
+                            .set_position(LogicalPosition::new(
+                                window_pos.x as f64,
+                                window_pos.y as f64,
+                            ));
+                    } else {
+                        const BORDER: f32 = 80.0;
+                        let window = window.display().gl_window();
+                        let monitor = window.get_current_monitor();
+                        let monitor_height = monitor.get_dimensions().height as f32;
+                        let window_pos = window.get_position().unwrap();
+                        let mut window_pos = Vector2::new(window_pos.x as f32, window_pos.y as f32);
+
+                        let mut global_cursor_pos = pos_vec + window_pos;
+                        global_cursor_pos.y =
+                            global_cursor_pos.y.max(BORDER).min(monitor_height - BORDER);
+
+                        let pos_vec = global_cursor_pos - window_pos;
+                        let delta_pos = pos_vec - self.last_mouse_pos;
+                        window_pos += delta_pos;
+                        window.set_position(LogicalPosition::new(
+                            window_pos.x as f64,
+                            window_pos.y as f64,
+                        ));
+                    }
+                } else {
+                    self.last_mouse_pos = pos_vec;
+                }
+            }
+        }
+    }
+
     fn update_projection_transform(&mut self) {
         self.projection_transform = cgmath::ortho(
             0.0,
@@ -578,10 +610,8 @@ impl PicturePanel {
         if self.image_fit {
             self.fit_image_to_panel();
         } else {
-            let prev_panel_size = Vector2::new(
-                self.panel_size.width as f32,
-                self.panel_size.height as f32,
-            );
+            let prev_panel_size =
+                Vector2::new(self.panel_size.width as f32, self.panel_size.height as f32);
             let new_panel_size =
                 Vector2::new(new_panel_size.width as f32, new_panel_size.height as f32);
             let center_offset = (new_panel_size - prev_panel_size) * 0.5f32;
@@ -598,8 +628,7 @@ impl PicturePanel {
     }
 
     fn zoom_image(&mut self, anchor: Vector2<f32>, image_texel_size: f32) {
-        self.img_pos = (image_texel_size / self.img_texel_size)
-            * (self.img_pos - anchor) + anchor;
+        self.img_pos = (image_texel_size / self.img_texel_size) * (self.img_pos - anchor) + anchor;
         self.img_texel_size = image_texel_size;
     }
 
@@ -647,9 +676,7 @@ impl PicturePanel {
 
     fn toggle_playback(&mut self, window: &mut Window, playback_manager: &mut PlaybackManager) {
         match playback_manager.playback_state() {
-            PlaybackState::Forward => {
-                Self::pause_playback(window, playback_manager)
-            }
+            PlaybackState::Forward => Self::pause_playback(window, playback_manager),
             PlaybackState::Paused => {
                 playback_manager.start_playback_forward();
                 window.set_title_filename("Playing");

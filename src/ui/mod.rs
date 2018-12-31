@@ -87,7 +87,8 @@ impl<'callback_ref> Ui<'callback_ref> {
                         tex_coords: [1.0, 1.0],
                     },
                 ],
-            ).unwrap()
+            )
+            .unwrap()
         };
 
         // building the index buffer
@@ -105,7 +106,8 @@ impl<'callback_ref> Ui<'callback_ref> {
                 vertex: shaders::VERTEX_110,
                 fragment: shaders::TEXTURE_SHADOW_F_110
             },
-        ).unwrap();
+        )
+        .unwrap();
 
         let colored_shadowed_program = program!(display,
             140 => {
@@ -117,7 +119,8 @@ impl<'callback_ref> Ui<'callback_ref> {
                 vertex: shaders::VERTEX_110,
                 fragment: shaders::COLOR_SHADOW_F_110
             },
-        ).unwrap();
+        )
+        .unwrap();
 
         let colored_program = program!(display,
             140 => {
@@ -129,7 +132,8 @@ impl<'callback_ref> Ui<'callback_ref> {
                 vertex: shaders::VERTEX_110,
                 fragment: shaders::COLOR_F_110
             },
-        ).unwrap();
+        )
+        .unwrap();
 
         Ui {
             toggles: Vec::new(),
@@ -154,7 +158,9 @@ impl<'callback_ref> Ui<'callback_ref> {
         event: &glutin::WindowEvent,
         window_size: glutin::dpi::LogicalSize,
     ) {
-        if !self.enabled { return; }
+        if !self.enabled {
+            return;
+        }
 
         let event = match event {
             glutin::WindowEvent::CursorMoved { position, .. } => {
