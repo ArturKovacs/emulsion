@@ -488,7 +488,9 @@ impl ImageCache {
             })
             .collect();
 
-        dir_files.sort_unstable_by(|a, b| a.dir_entry.file_name().cmp(&b.dir_entry.file_name()));
+        dir_files.sort_unstable_by(|a, b| {
+            alphanumeric_sort::compare_os_str(&a.dir_entry.file_name(), &b.dir_entry.file_name())
+        });
 
         Ok(dir_files)
     }
