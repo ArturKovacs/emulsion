@@ -31,19 +31,19 @@ mod shaders;
 mod ui;
 
 mod picture_panel;
-use picture_panel::PicturePanel;
+use crate::picture_panel::PicturePanel;
 
 mod bottom_panel;
-use bottom_panel::BottomPanel;
+use crate::bottom_panel::BottomPanel;
 
 mod playback_manager;
-use playback_manager::{LoadRequest, PlaybackManager};
+use crate::playback_manager::{LoadRequest, PlaybackManager};
 
 mod window;
-use window::*;
+use crate::window::*;
 
 mod configuration;
-use configuration::Configuration;
+use crate::configuration::Configuration;
 
 mod util;
 
@@ -166,7 +166,7 @@ impl<'a> Program<'a> {
         // the main loop
         while running {
             events_loop.poll_events(|event| {
-                use glutin::Event;
+                use crate::glutin::Event;
                 if let Event::WindowEvent { ref event, .. } = event {
                     match event {
                         // Break from the main loop when the window is closed.

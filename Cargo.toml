@@ -2,6 +2,7 @@
 name = "emulsion"
 version = "1.3.0"
 authors = ["Artur Barnabas <kovacs.artur.barnabas@gmail.com>"]
+edition = "2018"
 build = "build.rs"
 
 [target.'cfg(windows)'.build-dependencies]

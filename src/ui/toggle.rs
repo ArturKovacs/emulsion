@@ -7,7 +7,7 @@ use glium::{Frame, Surface};
 
 use cgmath::{Matrix4, Vector2, Vector3};
 
-use ui::{DrawContext, ElementFunctions, Event};
+use crate::ui::{DrawContext, ElementFunctions, Event};
 
 pub struct Toggle<'callback_ref> {
     texture: Rc<SrgbTexture2d>,

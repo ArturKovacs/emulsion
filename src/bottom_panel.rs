@@ -9,14 +9,14 @@ use glium::texture::SrgbTexture2d;
 
 use cgmath::{Vector2, Vector3};
 
-use configuration::Configuration;
-use picture_panel::PicturePanel;
-use playback_manager::{LoadRequest, PlaybackManager};
-use ui::slider::Slider;
-use ui::toggle::Toggle;
-use ui::Ui;
-use util::*;
-use window::*;
+use crate::configuration::Configuration;
+use crate::picture_panel::PicturePanel;
+use crate::playback_manager::{LoadRequest, PlaybackManager};
+use crate::ui::slider::Slider;
+use crate::ui::toggle::Toggle;
+use crate::ui::Ui;
+use crate::util::*;
+use crate::window::*;
 
 fn set_theme<'callback_ref>(
     light_theme: bool,
@@ -174,7 +174,7 @@ impl<'callback_ref> BottomPanel<'callback_ref> {
     }
 
     pub fn handle_event(&mut self, event: &glutin::Event, window: &Window) {
-        use glutin::Event;
+        use crate::glutin::Event;
         if let Event::WindowEvent { ref event, .. } = event {
             let window_size = window.display().gl_window().get_inner_size().unwrap();
             self.ui.window_event(event, window_size);

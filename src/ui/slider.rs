@@ -6,7 +6,7 @@ use glium::{Frame, Surface};
 
 use cgmath::{Matrix4, Vector2, Vector3};
 
-use ui::{DrawContext, ElementFunctions, Event};
+use crate::ui::{DrawContext, ElementFunctions, Event};
 
 pub struct Slider<'callback_ref> {
     callback: Rc<Fn() + 'callback_ref>,

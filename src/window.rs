@@ -4,7 +4,7 @@ use glium;
 use glium::glutin;
 use glium::glutin::dpi::{LogicalPosition, LogicalSize};
 
-use configuration::Configuration;
+use crate::configuration::Configuration;
 
 pub struct Window {
     display: glium::Display,

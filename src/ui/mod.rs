@@ -8,12 +8,12 @@ use glium::{Display, DrawParameters, Frame, IndexBuffer, Program, Rect, Surface,
 use cgmath::{Matrix4, Vector2};
 
 pub mod toggle;
-use ui::toggle::Toggle;
+use crate::ui::toggle::Toggle;
 
 pub mod slider;
-use ui::slider::Slider;
+use crate::ui::slider::Slider;
 
-use shaders;
+use crate::shaders;
 
 #[derive(Copy, Clone)]
 struct Vertex {
