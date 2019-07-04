@@ -15,7 +15,7 @@ use self::image_loader::*;
 pub mod errors {
     use glium::texture;
     use image;
-    use image_cache::image_loader;
+    use crate::image_cache::image_loader;
     use std::io;
 
     error_chain! {

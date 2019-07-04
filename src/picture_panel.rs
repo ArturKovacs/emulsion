@@ -15,15 +15,15 @@ use cgmath;
 use cgmath::SquareMatrix;
 use cgmath::{Matrix4, Vector2, Vector3};
 
-use shaders;
+use crate::shaders;
 
-use bottom_panel::BottomPanel;
-use configuration::Configuration;
-use playback_manager::*;
-use window::*;
+use crate::bottom_panel::BottomPanel;
+use crate::configuration::Configuration;
+use crate::playback_manager::*;
+use crate::window::*;
 
-use env;
-use util::*;
+use crate::env;
+use crate::util::*;
 
 #[derive(Copy, Clone)]
 struct Vertex {

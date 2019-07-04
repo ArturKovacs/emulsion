@@ -11,10 +11,10 @@ use sys_info;
 
 use glium;
 
-use window::Window;
+use crate::window::Window;
 
-use image_cache;
-use image_cache::ImageCache;
+use crate::image_cache;
+use crate::image_cache::ImageCache;
 
 #[derive(PartialEq)]
 pub enum LoadRequest {
