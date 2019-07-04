@@ -514,6 +514,24 @@ impl PicturePanel {
                         self.zoom_image(panel_center, 1.0);
                         self.image_fit = false;
                     }
+                    VirtualKeyCode::Delete => {
+                        if trash::is_implemented() {
+                            let path = playback_manager.current_file_path();
+                            if let Err(e) = trash::remove(&path) {
+                                eprintln!(
+                                    "Could not move file to trash. File: '{}', reason: '{:?}'",
+                                    path.display(),
+                                    e
+                                );
+                            } else {
+                                playback_manager.update_directory().unwrap();
+                                let curr_index = playback_manager.current_file_index();
+                                playback_manager.request_load(LoadRequest::LoadAtIndex(curr_index));
+                                let new_path = playback_manager.current_file_path();
+                                assert_ne!(path, new_path);
+                            }
+                        }
+                    }
                     _ => (),
                 }
             }

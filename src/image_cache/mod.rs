@@ -114,6 +114,16 @@ impl ImageCache {
         self.dir_files.len()
     }
 
+    /// Fetches the contents of the folder and stores the list of image filenames to know which 
+    /// files will be the next and previous.
+    /// 
+    /// Tries to locate the image that was the current image before calling the function and
+    /// keeping it current. If that filename is not found, than it tries to preserve the previous
+    /// file index instead of the filename. If there is no such an index in the folder, it resets
+    /// the index to 0 making the current file the first one in the folder.
+    /// 
+    /// Returns the error that might occure while fetching the files from the directory. Otherwise
+    /// returns `Ok(())`
     pub fn update_directory(&mut self) -> Result<()> {
         let curr_filename = self.current_filename();
         self.dir_files = Self::collect_directory(self.dir_path.as_path())?;
@@ -125,12 +135,14 @@ impl ImageCache {
             }
         }
 
-        Err(format!(
-            "Could not find file '{}' in directory '{}'",
-            curr_filename.to_str().unwrap(),
-            self.dir_path.to_str().unwrap()
-        )
-        .into())
+        if self.dir_files.len() > self.current_index {
+            return Ok(());
+        } else if self.dir_files.len() > 0 {
+            self.current_index = 0;
+            return Ok(());
+        }
+
+        Ok(())
     }
 
     pub fn load_at_index(

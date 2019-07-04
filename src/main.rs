@@ -14,6 +14,7 @@ extern crate serde_derive;
 extern crate rmp_serde;
 extern crate rand;
 extern crate alphanumeric_sort;
+extern crate trash;
 
 use std::cell::RefCell;
 use std::env;

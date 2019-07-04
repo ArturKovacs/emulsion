@@ -19,6 +19,10 @@ rmp-serde = "0.13"
 rand = "0.5"
 alphanumeric-sort = "1.0"
 
+[dependencies.trash]
+git = "https://github.com/ArturKovacs/trash.git"
+rev = "d49bce8d346e10c08910520383ed4054a3948535"
+
 [dependencies.glium]
 version = "0.23"
 features = [
