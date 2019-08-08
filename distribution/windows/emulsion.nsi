@@ -1,6 +1,5 @@
 ;NSIS Modern User Interface
-;Basic Example Script
-;Written by Joost Verburg
+
 
 ;--------------------------------
 ;Includes and related defines
@@ -20,7 +19,6 @@
     !include "MUI2.nsh"
     !include "FileAssociation.nsh"
 
-    
     
 ;--------------------------------
 ;General
@@ -83,15 +81,24 @@ FunctionEnd
 !macro EmulsionRegisterExtension ExtensionName Description
     ;WriteRegStr SHCTX "Software\Classes\.${ExtensionName}" "" "${PROGRAM_NAME}"
     ;!insertmacro APP_ASSOCIATE "${ExtensionName}" "${PROGRAM_NAME}.${ExtensionName}" "${Description}" "$\"$INSTDIR\emulsion.exe$\",0" "Open with ${PROGRAM_NAME}" "$\"$INSTDIR\emulsion.exe$\" $\"%1$\""
-    ${RegisterExtension} "$INSTDIR\emulsion.exe" ".${ExtensionName}" "${PROGRAM_NAME}.${ExtensionName}"
+    ${RegisterExtension} "$INSTDIR\emulsion.exe" ".${ExtensionName}" "${Description}"
 !macroend
 
-!macro EmulsionUnregisterExtension ExtensionName
-    ${UnRegisterExtension} ".${ExtensionName}" "${PROGRAM_NAME}.${ExtensionName}"
+!macro EmulsionUnregisterExtension ExtensionName Description
+    ${UnRegisterExtension} ".${ExtensionName}" "${Description}"
 !macroend
 
 ;--------------------------------
 ;Installer Sections
+
+; These are the programs that are needed by Emulsion.
+Section -Prerequisites
+    SetOutPath "$INSTDIR\prerequisites"
+    File ".\prerequisites\vc_redist.x64.exe"
+    ExecWait "$INSTDIR\prerequisites\vc_redist.x64.exe"
+    Goto endVcRedist
+    endVcRedist:
+SectionEnd
 
 Section "Emulsion" SecEmulsion
     SectionIn RO
@@ -176,20 +183,19 @@ Section Uninstall
     DeleteRegKey SHCTX "${REG_PROG_PATH}"
     DeleteRegKey SHCTX "${REG_UNINST_PATH}"
     
-    !insertmacro EmulsionUnregisterExtension "jpg"
-    !insertmacro EmulsionUnregisterExtension "jpeg"
-    !insertmacro EmulsionUnregisterExtension "png"
-    !insertmacro EmulsionUnregisterExtension "bmp"
-    !insertmacro EmulsionUnregisterExtension "tga"
-    !insertmacro EmulsionUnregisterExtension "gif"
-    !insertmacro EmulsionUnregisterExtension "webp"
-    !insertmacro EmulsionUnregisterExtension "tif"
-    !insertmacro EmulsionUnregisterExtension "tiff"
-    !insertmacro EmulsionUnregisterExtension "ico"
-    !insertmacro EmulsionUnregisterExtension "hdr"
-    !insertmacro EmulsionUnregisterExtension "pbm"
-    !insertmacro EmulsionUnregisterExtension "pam"
-    !insertmacro EmulsionUnregisterExtension "ppm"
-    !insertmacro EmulsionUnregisterExtension "pgm"
+    !insertmacro EmulsionUnregisterExtension "jpg" "JPG Image"
+    !insertmacro EmulsionUnregisterExtension "jpeg" "JPEG Image"
+    !insertmacro EmulsionUnregisterExtension "png" "PNG Image"
+    !insertmacro EmulsionUnregisterExtension "bmp" "BMP Image"
+    !insertmacro EmulsionUnregisterExtension "tga" "TGA Image"
+    !insertmacro EmulsionUnregisterExtension "webp" "WEBP Image"
+    !insertmacro EmulsionUnregisterExtension "tif" "TIF Image"
+    !insertmacro EmulsionUnregisterExtension "tiff" "TIFF Image"
+    !insertmacro EmulsionUnregisterExtension "ico" "ICO Image"
+    !insertmacro EmulsionUnregisterExtension "hdr" "HDR Image"
+    !insertmacro EmulsionUnregisterExtension "pbm" "PBM Image"
+    !insertmacro EmulsionUnregisterExtension "pam" "PAM Image"
+    !insertmacro EmulsionUnregisterExtension "ppm" "PPM Image"
+    !insertmacro EmulsionUnregisterExtension "pgm" "PGM Image"
     
 SectionEnd
