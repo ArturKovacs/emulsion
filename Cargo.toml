@@ -26,3 +26,9 @@ version = "0.23"
 features = [
     "icon_loading"
 ]
+
+[workspace]
+members = [
+    "subcrates/gelatin",
+]
+

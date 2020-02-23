@@ -1,0 +1,216 @@
+//! Idk man
+
+pub mod application;
+pub mod button;
+// pub mod horizontal_layout_container;
+pub mod line_layout_container;
+pub mod misc;
+pub mod shaders;
+pub mod window;
+
+pub use glium;
+
+use cgmath::Matrix4;
+use glium::glutin;
+use glium::{implement_vertex, Frame, IndexBuffer, Program, Rect, VertexBuffer};
+use std::any::Any;
+use std::rc::Rc;
+use std::vec::Vec;
+
+use misc::*;
+
+pub trait WidgetData {
+    fn placement(&mut self) -> &mut WidgetPlacement;
+
+    /// The area that this widget visually occupies placed relative to the top left corner of the
+    /// window in logical pixels. This area does not include the widget's margins.
+    fn drawn_bounds(&mut self) -> &mut LogicalRect;
+
+    fn apply_horizontal_alignement(&mut self, available_space: LogicalRect, width: f32) {
+        self.drawn_bounds().pos.vec.x = available_space.pos.vec.x;
+        match self.placement().horizontal_align {
+            Alignment::Start => {
+                self.drawn_bounds().pos.vec.x += self.placement().margin_left;
+            }
+            Alignment::Center => {
+                let space_between_margins = available_space.size.vec.x
+                    - self.placement().margin_left
+                    - self.placement().margin_right;
+                self.drawn_bounds().pos.vec.x +=
+                    self.placement().margin_left + space_between_margins * 0.5 - width * 0.5;
+            }
+            Alignment::End => {
+                self.drawn_bounds().pos.vec.x =
+                    available_space.right() - (self.placement().margin_right + width);
+            }
+        }
+    }
+    fn apply_vertical_alignement(&mut self, available_space: LogicalRect, height: f32) {
+        self.drawn_bounds().pos.vec.y = available_space.pos.vec.y;
+        match self.placement().vertical_align {
+            Alignment::Start => {
+                self.drawn_bounds().pos.vec.y += self.placement().margin_top;
+            }
+            Alignment::Center => {
+                let space_between_margins = available_space.size.vec.y
+                    - self.placement().margin_top
+                    - self.placement().margin_bottom;
+                self.drawn_bounds().pos.vec.y +=
+                    self.placement().margin_top + space_between_margins * 0.5 - height * 0.5;
+            }
+            Alignment::End => {
+                self.drawn_bounds().pos.vec.y =
+                    available_space.bottom() - (self.placement().margin_bottom + height);
+            }
+        }
+    }
+    fn default_layout(&mut self, available_space: LogicalRect) {
+        *self.drawn_bounds() = available_space;
+        match self.placement().width {
+            Length::Fixed(width) => {
+                self.drawn_bounds().size.vec.x = width;
+                self.apply_horizontal_alignement(available_space, width);
+            }
+            Length::Stretch { min, max } => {
+                let mut width = available_space.size.vec.x;
+                width -= self.placement().margin_left + self.placement().margin_right;
+                width = width.max(min).min(max);
+                self.drawn_bounds().size.vec.x = width;
+                if width < max {
+                    self.apply_horizontal_alignement(available_space, width);
+                } else {
+                    self.drawn_bounds().pos.vec.x += self.placement().margin_left;
+                }
+            }
+        }
+        match self.placement().height {
+            Length::Fixed(height) => {
+                self.drawn_bounds().size.vec.y = height;
+                self.apply_vertical_alignement(available_space, height);
+            }
+            Length::Stretch { min, max } => {
+                let mut height = available_space.size.vec.y;
+                height -= self.placement().margin_top + self.placement().margin_bottom;
+                height = height.max(min).min(max);
+                self.drawn_bounds().size.vec.y = height;
+                if height > max {
+                    self.apply_vertical_alignement(available_space, height);
+                }
+                self.drawn_bounds().pos.vec.y += self.placement().margin_top;
+            }
+        }
+    }
+}
+
+pub trait Widget: Any {
+    /// When this is false, the window containing the widget
+    /// will be re-rendered entirely and will run a new event loop
+    /// immediately after this one, without sleeping.
+    fn is_valid(&self) -> bool;
+
+    /// This function is called when the window is being re-rendered.
+    /// The widget is responsible for setting the correct transformation.
+    /// A widget can get information for finding a proper
+    /// transformation from [insert name of the appropriate layout function here]
+    fn draw(&self, target: &mut Frame, context: &DrawContext);
+
+    fn layout(&self, available_space: LogicalRect);
+
+    fn handle_event(&self, event: &Event);
+
+    /// The implementer is expected to `push` its children into the provided vector.
+    fn children(&self, children: &mut Vec<Rc<dyn Widget>>);
+
+    fn placement(&self) -> WidgetPlacement;
+}
+
+#[macro_export]
+macro_rules! add_common_widget_functions {
+    ($data_field:ident) => {
+        pub fn set_margin_left(&self, pixels: f32) {
+            let mut borrowed = self.$data_field.borrow_mut();
+            borrowed.placement.margin_left = pixels;
+            borrowed.rendered_valid = false;
+        }
+        pub fn set_margin_right(&self, pixels: f32) {
+            let mut borrowed = self.$data_field.borrow_mut();
+            borrowed.placement.margin_right = pixels;
+            borrowed.rendered_valid = false;
+        }
+        pub fn set_margin_top(&self, pixels: f32) {
+            let mut borrowed = self.$data_field.borrow_mut();
+            borrowed.placement.margin_top = pixels;
+            borrowed.rendered_valid = false;
+        }
+        pub fn set_margin_bottom(&self, pixels: f32) {
+            let mut borrowed = self.$data_field.borrow_mut();
+            borrowed.placement.margin_bottom = pixels;
+            borrowed.rendered_valid = false;
+        }
+        pub fn set_horizontal_align(&self, align: Alignment) {
+            let mut borrowed = self.$data_field.borrow_mut();
+            borrowed.placement.horizontal_align = align;
+            borrowed.rendered_valid = false;
+        }
+        pub fn set_vertical_align(&self, align: Alignment) {
+            let mut borrowed = self.$data_field.borrow_mut();
+            borrowed.placement.vertical_align = align;
+            borrowed.rendered_valid = false;
+        }
+        pub fn set_fixed_size(&self, size: LogicalVector) {
+            let mut borrowed = self.$data_field.borrow_mut();
+            borrowed.placement.width = Length::Fixed(size.vec.x);
+            borrowed.placement.height = Length::Fixed(size.vec.y);
+            borrowed.rendered_valid = false;
+        }
+        pub fn set_width(&self, width: Length) {
+            let mut borrowed = self.$data_field.borrow_mut();
+            borrowed.placement.width = width;
+            borrowed.rendered_valid = false;
+        }
+        pub fn set_height(&self, height: Length) {
+            let mut borrowed = self.$data_field.borrow_mut();
+            borrowed.placement.height = height;
+            borrowed.rendered_valid = false;
+        }
+    };
+}
+
+pub struct Event {
+    /// The position of the cursor in virtual pixels
+    /// relative to the bottom left corner of the window.
+    pub cursor_pos: LogicalVector,
+    pub kind: EventKind,
+}
+pub enum EventKind {
+    MouseMove,
+    MouseButton { state: glutin::event::ElementState, button: glutin::event::MouseButton },
+    MouseScroll { delta: LogicalVector },
+    KeyInput { input: glutin::event::KeyboardInput },
+}
+
+#[derive(Copy, Clone)]
+pub struct Vertex {
+    pub position: [f32; 2],
+    pub tex_coords: [f32; 2],
+}
+
+implement_vertex!(Vertex, position, tex_coords);
+
+pub struct DrawContext<'a> {
+    pub unit_quad_vertices: &'a VertexBuffer<Vertex>,
+    pub unit_quad_indices: &'a IndexBuffer<u16>,
+    pub textured_program: &'a Program,
+    pub colored_shadowed_program: &'a Program,
+    pub colored_program: &'a Program,
+    pub viewport: &'a Rect,
+    pub projection_transform: &'a Matrix4<f32>,
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+        assert_eq!(2 + 2, 4);
+    }
+}
