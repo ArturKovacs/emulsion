@@ -9,13 +9,15 @@ use glium::{uniform, Frame, Surface};
 use crate::add_common_widget_functions;
 use crate::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
 use crate::{DrawContext, Event, EventKind, Widget, WidgetData};
+use crate::picture::Picture;
 
 struct ButtonData {
     pub placement: WidgetPlacement,
     pub drawn_bounds: LogicalRect,
+
     pub click: bool,
     pub hover: bool,
-
+    pub icon: Option<Rc<Picture>>,
     pub on_click: Option<Rc<dyn Fn()>>,
 
     pub rendered_valid: bool,
@@ -41,6 +43,7 @@ impl Button {
                 click: false,
                 hover: false,
                 on_click: None,
+                icon: None,
                 drawn_bounds: Default::default(),
                 rendered_valid: false,
             }),
@@ -55,6 +58,12 @@ impl Button {
         let mut borrowed = self.data.borrow_mut();
         borrowed.on_click = Some(Rc::new(callback));
     }
+
+    pub fn set_icon(&self, img: Option<Rc<Picture>>) {
+        let mut borrowed = self.data.borrow_mut();
+        borrowed.icon = img;
+        borrowed.rendered_valid = false;
+    }
 }
 
 impl Widget for Button {
@@ -67,9 +76,6 @@ impl Widget for Button {
         {
             let borrowed = self.data.borrow();
 
-            // let img_w = borrowed.icon.width() as f32;
-            // let img_h = borrowed.icon.height() as f32;
-
             let img_w = borrowed.drawn_bounds.size.vec.x;
             let img_h = borrowed.drawn_bounds.size.vec.y;
 
@@ -80,29 +86,6 @@ impl Widget for Button {
             // Projection
             let transform = context.projection_transform * transform;
 
-            // let sampler = self
-            //     .texture
-            //     .sampled()
-            //     .wrap_function(glium::uniforms::SamplerWrapFunction::Clamp)
-            //     .magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest);
-
-            let texture_size = [img_w, img_h];
-            // building the uniforms
-            let uniforms = uniform! {
-                matrix: Into::<[[f32; 4]; 4]>::into(transform),
-                // tex: sampler,
-                color: [1.0f32, 0.1, 0.5, 0.5],
-                //texture_size: texture_size,
-                size: texture_size,
-                //brighten: if self.hover { 0.15f32 } else { 0.0f32 },
-                brighten: 0.0f32,
-                shadow_color: Into::<[f32; 3]>::into(Vector3::<f32>::new(0.0, 0.0, 0.0)),
-                shadow_offset: if borrowed.click {
-                    0.5f32
-                } else {
-                    if borrowed.hover { 0.7 } else { 1.0f32 }
-                }
-            };
             let image_draw_params = glium::DrawParameters {
                 viewport: Some(*context.viewport),
                 blend: Blend {
@@ -114,16 +97,62 @@ impl Widget for Button {
                 },
                 ..Default::default()
             };
-            target
-                .draw(
-                    context.unit_quad_vertices,
-                    context.unit_quad_indices,
-                    // context.textured_program,
-                    context.colored_shadowed_program,
-                    &uniforms,
-                    &image_draw_params,
-                )
-                .unwrap();
+            let texture_size = [img_w, img_h];
+            if let Some(ref icon) = borrowed.icon {
+                let texture = icon.texture(context.display).unwrap();
+                let sampler = texture
+                    .sampled()
+                    .wrap_function(glium::uniforms::SamplerWrapFunction::Clamp)
+                    .minify_filter(glium::uniforms::MinifySamplerFilter::Linear)
+                    .magnify_filter(glium::uniforms::MagnifySamplerFilter::Linear);
+                let uniforms = uniform! {
+                    matrix: Into::<[[f32; 4]; 4]>::into(transform),
+                    tex: sampler,
+                    color: [1.0f32, 0.1, 0.5, 0.5],
+                    texture_size: texture_size,
+                    //brighten: if self.hover { 0.15f32 } else { 0.0f32 },
+                    brighten: 0.0f32,
+                    shadow_color: Into::<[f32; 3]>::into(Vector3::<f32>::new(0.0, 0.0, 0.0)),
+                    shadow_offset: if borrowed.click {
+                        0.5f32
+                    } else {
+                        if borrowed.hover { 0.7 } else { 1.0f32 }
+                    }
+                };
+                target
+                    .draw(
+                        context.unit_quad_vertices,
+                        context.unit_quad_indices,
+                        context.textured_program,
+                        &uniforms,
+                        &image_draw_params,
+                    )
+                    .unwrap();
+            } else {
+                // building the uniforms
+                let uniforms = uniform! {
+                    matrix: Into::<[[f32; 4]; 4]>::into(transform),
+                    color: [1.0f32, 0.1, 0.5, 0.5],
+                    size: texture_size,
+                    //brighten: if self.hover { 0.15f32 } else { 0.0f32 },
+                    brighten: 0.0f32,
+                    shadow_color: Into::<[f32; 3]>::into(Vector3::<f32>::new(0.0, 0.0, 0.0)),
+                    shadow_offset: if borrowed.click {
+                        0.5f32
+                    } else {
+                        if borrowed.hover { 0.7 } else { 1.0f32 }
+                    }
+                };
+                target
+                    .draw(
+                        context.unit_quad_vertices,
+                        context.unit_quad_indices,
+                        context.colored_shadowed_program,
+                        &uniforms,
+                        &image_draw_params,
+                    )
+                    .unwrap();
+            }
         }
         self.data.borrow_mut().rendered_valid = true;
     }

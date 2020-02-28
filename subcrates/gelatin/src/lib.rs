@@ -1,23 +1,24 @@
 //! Idk man
 
-pub mod application;
-pub mod button;
-// pub mod horizontal_layout_container;
-pub mod line_layout_container;
-pub mod misc;
-pub mod shaders;
-pub mod window;
-
 pub use glium;
+pub use image;
 
 use cgmath::Matrix4;
 use glium::glutin;
-use glium::{implement_vertex, Frame, IndexBuffer, Program, Rect, VertexBuffer};
+use glium::{implement_vertex, Frame, IndexBuffer, Display, Program, Rect, VertexBuffer};
 use std::any::Any;
 use std::rc::Rc;
 use std::vec::Vec;
 
 use misc::*;
+
+pub mod application;
+pub mod button;
+pub mod line_layout_container;
+pub mod misc;
+pub mod shaders;
+pub mod window;
+pub mod picture;
 
 pub trait WidgetData {
     fn placement(&mut self) -> &mut WidgetPlacement;
@@ -198,6 +199,7 @@ pub struct Vertex {
 implement_vertex!(Vertex, position, tex_coords);
 
 pub struct DrawContext<'a> {
+    pub display: &'a Display,
     pub unit_quad_vertices: &'a VertexBuffer<Vertex>,
     pub unit_quad_indices: &'a IndexBuffer<u16>,
     pub textured_program: &'a Program,

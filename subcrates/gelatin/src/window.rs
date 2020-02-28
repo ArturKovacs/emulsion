@@ -344,6 +344,7 @@ impl Window {
         // Can't change the window during drawing phase. Deal with it.
         let borrowed = self.data.borrow();
         let draw_context = DrawContext {
+            display: &borrowed.display,
             unit_quad_vertices: &borrowed.unit_quad_vertices,
             unit_quad_indices: &borrowed.unit_quad_indices,
             textured_program: &borrowed.textured_program,
