@@ -178,15 +178,8 @@ impl Widget for Button {
                     {
                         let mut borrowed = self.data.borrow_mut();
                         if borrowed.click && borrowed.hover {
-                            match borrowed.on_click.clone() {
-                                Some(callback) => {
-                                    on_click = Some(callback);
-                                }
-                                None => on_click = None,
-                            }
-                        } else {
-                            on_click = None;
-                        }
+                            on_click = borrowed.on_click.clone();
+                        } else { on_click = None; }
                         borrowed.click = false;
                     }
                     if let Some(callback) = on_click {

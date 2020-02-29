@@ -299,7 +299,7 @@ impl Window {
     pub fn redraw(&self) {
         let mut target = self.data.borrow_mut().display.draw();
         let dpi_scaling = self.data.borrow_mut().display.gl_window().window().scale_factor();
-        target.clear_color(0.0, 0.1, 0.1, 1.0);
+        target.clear_color(0.85, 0.85, 0.85, 1.0);
 
         // let mut widgets_clone = self.widgets_clone.borrow_mut();
         // widgets_clone.clear();

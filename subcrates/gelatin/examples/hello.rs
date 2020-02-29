@@ -1,4 +1,6 @@
-use gelatin::{application::*, button::*, line_layout_container::*, misc::*, window::*, picture::*};
+use gelatin::{
+    application::*, button::*, line_layout_container::*, misc::*, window::*, picture::*, slider::*
+};
 
 use std::cell::Cell;
 use std::f32;
@@ -33,15 +35,16 @@ fn main() {
     button2.set_width(Length::Fixed(24.0));
     button2.set_horizontal_align(Alignment::Center);
     
-    let button3 = Rc::new(Button::new());
-    button3.set_margin_top(5.0);
-    button3.set_height(Length::Fixed(24.0));
-    button3.set_width(Length::Stretch { min: 0.0, max: 200.0 });
-    button3.set_horizontal_align(Alignment::Start);
+    let slider = Rc::new(Slider::new());
+    slider.set_margin_top(5.0);
+    slider.set_height(Length::Fixed(24.0));
+    slider.set_width(Length::Stretch { min: 0.0, max: 200.0 });
+    slider.set_horizontal_align(Alignment::Start);
+    slider.set_steps(6);
     
     container.add_child(button.clone());
     container.add_child(button2.clone());
-    container.add_child(button3.clone());
+    container.add_child(slider.clone());
     
     container.set_margin_left(0.0);
     container.set_margin_right(0.0);
@@ -49,19 +52,24 @@ fn main() {
     button.set_margin_right(5.0);
     button2.set_margin_left(5.0);
     button2.set_margin_right(5.0);
-    button3.set_margin_left(5.0);
-    button3.set_margin_right(5.0);
-    {
-        let button_clone = button.clone();
-        let pos = Cell::new(5.0);
-        button.set_on_click(move || {
-            let new_pos = pos.get() + 5.0;
-            pos.set(new_pos);
+    slider.set_margin_left(5.0);
+    slider.set_margin_right(5.0);
 
-            button_clone.set_margin_left(new_pos);
-            button_clone.set_margin_top(new_pos);
-        });
-    }
+    let button_clone = button.clone();
+    let pos = Cell::new(5.0);
+    button.set_on_click(move || {
+        let new_pos = pos.get() + 5.0;
+        pos.set(new_pos);
+
+        button_clone.set_margin_left(new_pos);
+        button_clone.set_margin_top(new_pos);
+    });
+    let button_clone2 = button.clone();
+    let slider_clone = slider.clone();
+    slider.set_on_value_change(move || {
+        let margin = (slider_clone.value() + 1) as f32 * 5.0;
+        button_clone2.set_margin_right(margin);
+    });
     window.set_root(Some(container));
     application.start_event_loop();
 }

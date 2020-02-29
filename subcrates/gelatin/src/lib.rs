@@ -15,6 +15,7 @@ use misc::*;
 pub mod application;
 pub mod button;
 pub mod line_layout_container;
+pub mod slider;
 pub mod misc;
 pub mod shaders;
 pub mod window;
