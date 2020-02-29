@@ -61,7 +61,11 @@ impl Picture {
             PictureData::Cpu(img) => {
                 *borrowed = PictureData::Gpu(Self::cpu_to_texture(img, display));
             }
-            PictureData::Gpu(_) => {}
+            PictureData::Gpu(img) => {
+                // This must be done because `img` was taken from `borrowed` when
+                // `borrowed` was swapped with `tmp_picture`.
+                *borrowed = PictureData::Gpu(img);
+            }
         };
         Ok(())
     }

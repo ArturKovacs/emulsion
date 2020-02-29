@@ -1,4 +1,4 @@
-use gelatin::{application::*, button::*, line_layout_container::*, misc::*, window::*};
+use gelatin::{application::*, button::*, line_layout_container::*, misc::*, window::*, picture::*};
 
 use std::cell::Cell;
 use std::f32;
@@ -14,6 +14,7 @@ fn main() {
     container.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
     container.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
     
+    let image = Rc::new(Picture::new("examples/resource/cogs.png"));
     let button = Rc::new(Button::new());
     button.set_margin_top(5.0);
     //button.set_pos(LogicalVector::new(5.0, 5.0));
@@ -22,6 +23,7 @@ fn main() {
     button.set_width(Length::Fixed(24.0));
     button.set_horizontal_align(Alignment::Center);
     //button.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
+    button.set_icon(Some(image));
     
     let button2 = Rc::new(Button::new());
     button2.set_margin_top(5.0);
