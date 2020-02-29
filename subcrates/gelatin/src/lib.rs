@@ -2,6 +2,7 @@
 
 pub use glium;
 pub use image;
+pub use cgmath;
 
 use cgmath::Matrix4;
 use glium::glutin;
@@ -129,6 +130,15 @@ pub trait Widget: Any {
 #[macro_export]
 macro_rules! add_common_widget_functions {
     ($data_field:ident) => {
+        pub fn set_margin_all(&self, pixels: f32) {
+            let mut borrowed = self.$data_field.borrow_mut();
+            borrowed.placement.margin_left = pixels;
+            borrowed.placement.margin_right = pixels;
+            borrowed.placement.margin_top = pixels;
+            borrowed.placement.margin_bottom = pixels;
+            borrowed.rendered_valid = false;
+        }
+
         pub fn set_margin_left(&self, pixels: f32) {
             let mut borrowed = self.$data_field.borrow_mut();
             borrowed.placement.margin_left = pixels;
@@ -201,6 +211,7 @@ implement_vertex!(Vertex, position, tex_coords);
 
 pub struct DrawContext<'a> {
     pub display: &'a Display,
+    pub dpi_scale_factor: f32,
     pub unit_quad_vertices: &'a VertexBuffer<Vertex>,
     pub unit_quad_indices: &'a IndexBuffer<u16>,
     pub textured_program: &'a Program,
@@ -208,6 +219,18 @@ pub struct DrawContext<'a> {
     pub colored_program: &'a Program,
     pub viewport: &'a Rect,
     pub projection_transform: &'a Matrix4<f32>,
+}
+impl<'a> DrawContext<'a> {
+    pub fn logical_rect_to_viewport(&self, rect: &LogicalRect) -> Rect {
+        let dpi_scale = self.dpi_scale_factor;
+        let window_phys_height = self.viewport.height;
+        Rect {
+            left: (rect.pos.vec.x * dpi_scale) as u32,
+            width: (rect.size.vec.x * dpi_scale) as u32,
+            bottom: window_phys_height - (rect.bottom() * dpi_scale) as u32,
+            height: (rect.size.vec.y * dpi_scale) as u32,
+        }
+    }
 }
 
 #[cfg(test)]

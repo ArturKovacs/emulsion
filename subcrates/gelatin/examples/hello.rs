@@ -19,12 +19,9 @@ fn main() {
     let image = Rc::new(Picture::new("examples/resource/cogs.png"));
     let button = Rc::new(Button::new());
     button.set_margin_top(5.0);
-    //button.set_pos(LogicalVector::new(5.0, 5.0));
-    //button.set_fixed_size(LogicalVector::new(24.0, 24.0));
     button.set_height(Length::Fixed(24.0));
     button.set_width(Length::Fixed(24.0));
     button.set_horizontal_align(Alignment::Center);
-    //button.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
     button.set_icon(Some(image));
     
     let button2 = Rc::new(Button::new());
@@ -56,6 +53,7 @@ fn main() {
     slider.set_margin_right(5.0);
 
     let button_clone = button.clone();
+    // The closure is Fn (i.e. not mutable) so `pos` has to be wrapped in a `Cell`.
     let pos = Cell::new(5.0);
     button.set_on_click(move || {
         let new_pos = pos.get() + 5.0;

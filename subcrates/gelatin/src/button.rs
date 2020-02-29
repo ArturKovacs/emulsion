@@ -3,7 +3,6 @@ use std::rc::Rc;
 
 use cgmath::{Matrix4, Vector3};
 use glium::glutin::event::{ElementState, MouseButton};
-//use glium::texture::SrgbTexture2d;
 use glium::{uniform, Frame, Surface};
 
 use crate::add_common_widget_functions;

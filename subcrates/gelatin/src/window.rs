@@ -106,10 +106,10 @@ impl Window {
             VertexBuffer::new(
                 &display,
                 &[
-                    Vertex { position: [0.0, 0.0], tex_coords: [0.0, 1.0] },
-                    Vertex { position: [0.0, 1.0], tex_coords: [0.0, 0.0] },
-                    Vertex { position: [1.0, 1.0], tex_coords: [1.0, 0.0] },
-                    Vertex { position: [1.0, 0.0], tex_coords: [1.0, 1.0] },
+                    Vertex { position: [0.0, 0.0], tex_coords: [0.0, 0.0] },
+                    Vertex { position: [0.0, 1.0], tex_coords: [0.0, 1.0] },
+                    Vertex { position: [1.0, 1.0], tex_coords: [1.0, 1.0] },
+                    Vertex { position: [1.0, 0.0], tex_coords: [1.0, 0.0] },
                 ],
             )
             .unwrap()
@@ -345,6 +345,7 @@ impl Window {
         let borrowed = self.data.borrow();
         let draw_context = DrawContext {
             display: &borrowed.display,
+            dpi_scale_factor: dpi_scaling as f32,
             unit_quad_vertices: &borrowed.unit_quad_vertices,
             unit_quad_indices: &borrowed.unit_quad_indices,
             textured_program: &borrowed.textured_program,
