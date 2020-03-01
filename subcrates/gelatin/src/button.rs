@@ -7,7 +7,7 @@ use glium::{uniform, Frame, Surface};
 
 use crate::add_common_widget_functions;
 use crate::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
-use crate::{DrawContext, Event, EventKind, Widget, WidgetData};
+use crate::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
 use crate::picture::Picture;
 
 struct ButtonData {
@@ -70,7 +70,7 @@ impl Widget for Button {
         self.data.borrow().rendered_valid
     }
 
-    fn draw(&self, target: &mut Frame, context: &DrawContext) {
+    fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<(), WidgetError> {
         use glium::{Blend, BlendingFunction, LinearBlendingFactor};
         {
             let borrowed = self.data.borrow();
@@ -98,7 +98,7 @@ impl Widget for Button {
             };
             let texture_size = [img_w, img_h];
             if let Some(ref icon) = borrowed.icon {
-                let texture = icon.texture(context.display).unwrap();
+                let texture = icon.texture(context.display)?;
                 let sampler = texture
                     .sampled()
                     .wrap_function(glium::uniforms::SamplerWrapFunction::Clamp)
@@ -154,6 +154,7 @@ impl Widget for Button {
             }
         }
         self.data.borrow_mut().rendered_valid = true;
+        Ok(())
     }
 
     fn layout(&self, available_space: LogicalRect) {

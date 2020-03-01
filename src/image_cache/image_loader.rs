@@ -7,15 +7,14 @@ use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use glium;
+use gelatin::glium;
+use gelatin::image;
 
 use glium::texture::{RawImage2d, SrgbTexture2d};
 
-use image;
-
 pub mod errors {
-    use glium::texture;
-    use image;
+    use gelatin::glium::texture;
+    use gelatin::image;
     use std::io;
 
     error_chain! {

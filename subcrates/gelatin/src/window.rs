@@ -1,9 +1,8 @@
 use glium::glutin::{self, dpi::PhysicalSize, event::WindowEvent, window::WindowId};
-use glium::{program, IndexBuffer, Program, Rect, Surface, VertexBuffer};
+use glium::{program, IndexBuffer, Program, Rect, Surface, VertexBuffer, Display};
 
-use std::cell::RefCell;
+use std::cell::{RefCell, RefMut};
 use std::cmp::Eq;
-use std::convert::AsRef;
 use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
@@ -17,41 +16,28 @@ use crate::{
     DrawContext, Event, EventKind, Vertex, Widget,
 };
 
-#[derive(Clone)]
-struct WidgetReference {
-    pub widget: Rc<dyn Widget>,
+pub struct WindowDisplayRefMut<'a> {
+    window_ref: RefMut<'a, WindowData>,
 }
-impl Deref for WidgetReference {
-    type Target = Rc<dyn Widget>;
+impl<'a> Deref for WindowDisplayRefMut<'a> {
+    type Target = Display;
     fn deref(&self) -> &Self::Target {
-        &self.widget
+        &self.window_ref.display
     }
 }
-impl DerefMut for WidgetReference {
+impl<'a> DerefMut for WindowDisplayRefMut<'a> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.widget
+        &mut self.window_ref.display
     }
 }
-impl Hash for WidgetReference {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        (self.widget.as_ref() as *const dyn Widget).hash(state);
-    }
-}
-impl PartialEq for WidgetReference {
-    fn eq(&self, other: &WidgetReference) -> bool {
-        Rc::ptr_eq(&self.widget, &other.widget)
-    }
-}
-impl Eq for WidgetReference {}
 
 struct WindowData {
     display: glium::Display,
-    //size_before_fullscreen: PhysicalSize<i32>,
-    //fullscreen: bool,
+    size_before_fullscreen: PhysicalSize<u32>,
+    fullscreen: bool,
     redraw_needed: bool,
     cursor_pos: LogicalVector,
-    //widgets: HashSet<WidgetReference>,
-    root_widget: Option<Rc<dyn Widget>>,
+    root_widget: Rc<dyn Widget>,
 
     // Draw data
     unit_quad_vertices: VertexBuffer<Vertex>,
@@ -63,7 +49,6 @@ struct WindowData {
 #[derive(Clone)]
 pub struct Window {
     data: Rc<RefCell<WindowData>>,
-    //widgets_clone: RefCell<Vec<WidgetReference>>,
 }
 impl Hash for Window {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -82,7 +67,7 @@ impl Window {
         //use glium::glutin::window::Icon;
         //let exe_parent = std::env::current_exe().unwrap().parent().unwrap().to_owned();
 
-        let window_size = PhysicalSize::<i32>::new(200, 600);
+        let window_size = PhysicalSize::<u32>::new(200, 600);
 
         let window = glutin::window::WindowBuilder::new()
             .with_title("Loading")
@@ -157,12 +142,12 @@ impl Window {
         let resulting_window = Window {
             data: Rc::new(RefCell::new(WindowData {
                 display,
-                // size_before_fullscreen: window_size,
-                // fullscreen: false,
+                size_before_fullscreen: window_size,
+                fullscreen: false,
                 cursor_pos: Default::default(),
                 redraw_needed: false,
                 //widgets: HashSet::new(),
-                root_widget: None,
+                root_widget: Rc::new(crate::line_layout_container::VerticalLayoutContainer::new()),
 
                 unit_quad_vertices: vertex_buffer,
                 unit_quad_indices: index_buffer,
@@ -170,7 +155,6 @@ impl Window {
                 colored_shadowed_program,
                 colored_program,
             })),
-            //widgets_clone: RefCell::new(Vec::new()),
         };
 
         application.register_window(&resulting_window);
@@ -178,42 +162,14 @@ impl Window {
         resulting_window
     }
 
-    pub fn set_root<T: Widget>(&self, widget: Option<Rc<T>>) {
+    pub fn set_root<T: Widget>(&self, widget: Rc<T>) {
         let mut borrowed = self.data.borrow_mut();
-        match widget {
-            Some(w) => borrowed.root_widget = Some(w),
-            None => borrowed.root_widget = None,
-        }
-        //borrowed.root_widget = Some(widget.take());
+        borrowed.root_widget = widget;
+        borrowed.redraw_needed = true;
     }
-
-    //pub fn add_widget<T: Widget>(&self, widget: Rc<T>) {
-    //    let mut borrowed = self.data.borrow_mut();
-    //    borrowed.widgets.insert(WidgetReference { widget });
-    //}
-
-    //pub fn remove_widget<T: Widget>(&self, widget: Rc<T>) {
-    //    let mut borrowed = self.data.borrow_mut();
-    //    borrowed.widgets.remove(&WidgetReference { widget });
-    //}
 
     pub fn process_event(&self, native_event: WindowEvent) {
         use glutin::event::MouseScrollDelta;
-        // let mut widgets_clone = self.widgets_clone.borrow_mut();
-        // widgets_clone.clear();
-        // for widget in self.data.borrow().widgets.iter() {
-        //     widgets_clone.push(widget.clone());
-        // }
-        // // Doing this widget clone jugling just to
-        // // free the window from being borrowed while the events are being handled
-        // let mut redraw_needed = false;
-        // for widget in widgets_clone.iter() {
-        //     widget.handle_event(&event);
-        //     if !widget.is_valid() {
-        //         redraw_needed = true;
-        //     }
-        // }
-        // self.data.borrow_mut().redraw_needed = redraw_needed;
 
         let event;
         {
@@ -261,22 +217,37 @@ impl Window {
                         kind: EventKind::MouseButton { state, button },
                     });
                 }
+                WindowEvent::DroppedFile(path) => {
+                    event = Some(Event {
+                        cursor_pos: borrowed.cursor_pos,
+                        kind: EventKind::DroppedFile(path),
+                    });
+                }
+                WindowEvent::HoveredFile(path) => {
+                    event = Some(Event {
+                        cursor_pos: borrowed.cursor_pos,
+                        kind: EventKind::HoveredFile(path),
+                    });
+                },
+                WindowEvent::HoveredFileCancelled => {
+                    event = Some(Event {
+                        cursor_pos: borrowed.cursor_pos,
+                        kind: EventKind::HoveredFileCancelled,
+                    });
+                },
                 _ => event = None,
             }
         }
 
         if let Some(event) = event {
-            let cloned;
-            if let Some(ref widget) = self.data.borrow().root_widget {
-                cloned = Some(widget.clone());
-            } else {
-                cloned = None;
-            }
-            if let Some(widget) = cloned {
-                widget.handle_event(&event);
-                self.data.borrow_mut().redraw_needed = !widget.is_valid();
-            }
+            let cloned = self.data.borrow().root_widget.clone();
+            cloned.handle_event(&event);
+            self.data.borrow_mut().redraw_needed = !cloned.is_valid();
         }
+    }
+
+    pub fn display_mut<'a>(&'a self) -> WindowDisplayRefMut<'a> {
+        WindowDisplayRefMut { window_ref: self.data.borrow_mut() }
     }
 
     pub fn get_id(&self) -> WindowId {
@@ -297,22 +268,12 @@ impl Window {
     /// This means that trying to borrow the window *mutably* in a widget's
     /// draw function will fail.
     pub fn redraw(&self) {
+        let root_widget = self.data.borrow().root_widget.clone();
+        // this way self.data is not borrowed while before draw is running.
+        root_widget.before_draw(self);
         let mut target = self.data.borrow_mut().display.draw();
         let dpi_scaling = self.data.borrow_mut().display.gl_window().window().scale_factor();
         target.clear_color(0.85, 0.85, 0.85, 1.0);
-
-        // let mut widgets_clone = self.widgets_clone.borrow_mut();
-        // widgets_clone.clear();
-        // for widget in self.data.borrow().widgets.iter() {
-        //     widgets_clone.push(widget.clone());
-        // }
-
-        let cloned;
-        if let Some(ref widget) = self.data.borrow().root_widget {
-            cloned = Some(widget.clone());
-        } else {
-            cloned = None;
-        }
 
         let dimensions = target.get_dimensions();
         let phys_dimensions =
@@ -324,9 +285,7 @@ impl Window {
         // Invoke the layout functions
         let available_widget_space =
             LogicalRect { pos: LogicalVector::new(0.0, 0.0), size: logical_dimensions };
-        if let Some(ref widget) = cloned {
-            widget.layout(available_widget_space);
-        }
+        root_widget.layout(available_widget_space);
 
         let left = 0f32;
         let right = logical_dimensions.vec.x;
@@ -355,11 +314,41 @@ impl Window {
             projection_transform: &projection_transform,
         };
 
-        if let Some(ref widget) = cloned {
-            widget.draw(&mut target, &draw_context);
-        }
+        // Using the cloned root instead of self.root_widget doesn't make much difference
+        // because self is being borrowed by through the draw_context anyways but it's fine.
+        root_widget.draw(&mut target, &draw_context).unwrap();
 
         //target.clear();
         target.finish().unwrap();
+    }
+
+    pub fn set_fullscreen(&self, fullscreen: bool) {
+        let mut borrowed = self.data.borrow_mut();
+        borrowed.fullscreen = fullscreen;
+        let monitor = if fullscreen {
+            let curr_mon;
+            borrowed.size_before_fullscreen = {
+                let gl_win = borrowed.display.gl_window();
+                curr_mon = gl_win.window().current_monitor();
+                gl_win.window().inner_size()
+            };
+            Some(glutin::window::Fullscreen::Borderless(curr_mon))
+        } else {
+            None
+        };
+        let gl_win = borrowed.display.gl_window();
+        gl_win.window().set_fullscreen(monitor);
+    }
+
+    pub fn set_title_filename(&self, name: &str) {
+        let borrowed = self.data.borrow_mut();
+        borrowed.display
+            .gl_window()
+            .window()
+            .set_title(Self::create_title_filename(name).as_ref());
+    }
+
+    fn create_title_filename(name: &str) -> String {
+        format!("{} : E M U L S I O N", name)
     }
 }

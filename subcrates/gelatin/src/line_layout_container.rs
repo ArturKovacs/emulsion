@@ -8,8 +8,9 @@ use glium::glutin::{
 };
 use glium::{uniform, Frame, Surface};
 
+use crate::window::Window;
 use crate::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement, PickDimension, HorDim, VerDim};
-use crate::{add_common_widget_functions, DrawContext, Event, EventKind, Widget, WidgetData};
+use crate::{add_common_widget_functions, DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
 
 pub type HorizontalLayoutContainer = LineLayoutContainer<HorDim>;
 pub type VerticalLayoutContainer = LineLayoutContainer<VerDim>;
@@ -118,14 +119,22 @@ impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
         self.data.borrow().rendered_valid
     }
 
-    fn draw(&self, target: &mut Frame, context: &DrawContext) {
+    fn before_draw(&self, window: &Window) {
+        let borrowed = self.data.borrow();
+        for child in borrowed.children.iter() {
+            child.before_draw(window);
+        }
+    }
+
+    fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<(), WidgetError> {
         {
             let borrowed = self.data.borrow();
             for child in borrowed.children.iter() {
-                child.draw(target, context);
+                child.draw(target, context)?;
             }
         }
         self.data.borrow_mut().rendered_valid = true;
+        Ok(())
     }
 
     fn layout(&self, mut available_space: LogicalRect) {

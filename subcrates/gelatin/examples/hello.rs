@@ -15,7 +15,7 @@ fn main() {
     container.set_margin_bottom(5.0);
     container.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
     container.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
-    
+
     let image = Rc::new(Picture::new("examples/resource/cogs.png"));
     let button = Rc::new(Button::new());
     button.set_margin_top(5.0);
@@ -23,7 +23,7 @@ fn main() {
     button.set_width(Length::Fixed(24.0));
     button.set_horizontal_align(Alignment::Center);
     button.set_icon(Some(image));
-    
+
     let button2 = Rc::new(Button::new());
     button2.set_margin_top(5.0);
     //button.set_pos(LogicalVector::new(5.0, 5.0));
@@ -31,18 +31,18 @@ fn main() {
     button2.set_height(Length::Fixed(24.0));
     button2.set_width(Length::Fixed(24.0));
     button2.set_horizontal_align(Alignment::Center);
-    
+
     let slider = Rc::new(Slider::new());
     slider.set_margin_top(5.0);
     slider.set_height(Length::Fixed(24.0));
     slider.set_width(Length::Stretch { min: 0.0, max: 200.0 });
     slider.set_horizontal_align(Alignment::Start);
     slider.set_steps(6);
-    
+
     container.add_child(button.clone());
     container.add_child(button2.clone());
     container.add_child(slider.clone());
-    
+
     container.set_margin_left(0.0);
     container.set_margin_right(0.0);
     button.set_margin_left(5.0);
@@ -68,6 +68,6 @@ fn main() {
         let margin = (slider_clone.value() + 1) as f32 * 5.0;
         button_clone2.set_margin_right(margin);
     });
-    window.set_root(Some(container));
+    window.set_root(container);
     application.start_event_loop();
 }

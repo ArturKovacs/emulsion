@@ -5,7 +5,7 @@ use std::mem;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-use glium;
+use gelatin::glium;
 
 use glium::texture::SrgbTexture2d;
 
@@ -13,8 +13,8 @@ mod image_loader;
 use self::image_loader::*;
 
 pub mod errors {
-    use glium::texture;
-    use image;
+    use gelatin::glium::texture;
+    use gelatin::image;
     use crate::image_cache::image_loader;
     use std::io;
 

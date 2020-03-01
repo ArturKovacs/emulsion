@@ -16,8 +16,6 @@ winres = "0.1"
 [dependencies]
 gelatin = { path = "./subcrates/gelatin" }
 sys-info = "=0.5.8"
-image = "0.20"
-cgmath = "0.16"
 error-chain = "0.12"
 backtrace = "0.3"
 serde = "1.0"
@@ -26,11 +24,3 @@ rmp-serde = "0.13"
 rand = "0.5"
 alphanumeric-sort = "1.0"
 trash = "1.0"
-
-[dependencies.glium]
-version = "0.23"
-features = [
-    "icon_loading"
-]
-
-

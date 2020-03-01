@@ -7,7 +7,7 @@ use glium::{uniform, Frame, Surface};
 
 use crate::add_common_widget_functions;
 use crate::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
-use crate::{DrawContext, Event, EventKind, Widget, WidgetData};
+use crate::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
 
 struct SliderData {
     pub placement: WidgetPlacement,
@@ -85,7 +85,7 @@ impl Widget for Slider {
         self.data.borrow().rendered_valid
     }
 
-    fn draw(&self, target: &mut Frame, context: &DrawContext) {
+    fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<(), WidgetError> {
         use glium::{Blend, BlendingFunction, LinearBlendingFactor};
         {
             let borrowed = self.data.borrow();
@@ -164,6 +164,7 @@ impl Widget for Slider {
                 .unwrap();
         }
         self.data.borrow_mut().rendered_valid = true;
+        Ok(())
     }
 
     fn layout(&self, available_space: LogicalRect) {

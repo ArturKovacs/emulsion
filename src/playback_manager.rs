@@ -9,9 +9,10 @@ use rand::{thread_rng, Rng};
 
 use sys_info;
 
-use glium;
+use gelatin::glium;
 
-use crate::window::Window;
+use gelatin::window::Window;
+//use crate::window::Window;
 
 use crate::image_cache;
 use crate::image_cache::ImageCache;
@@ -154,7 +155,7 @@ impl PlaybackManager {
         &self.image_texture
     }
 
-    pub fn update_image(&mut self, window: &mut Window) {
+    pub fn update_image(&mut self, window: &Window) {
         self.should_sleep = true;
 
         // The reason why I reset the load request in such a convoluted way is that
@@ -172,7 +173,7 @@ impl PlaybackManager {
 
         if self.playback_state == PlaybackState::Paused {
             self.image_cache
-                .process_prefetched(window.display())
+                .process_prefetched(&window.display_mut())
                 .unwrap();
             self.image_cache.prefetch_neighbors();
         } else if load_request == LoadRequest::None {
@@ -207,7 +208,7 @@ impl PlaybackManager {
                 self.frame_count_since_playback_start += frame_step;
             } else {
                 self.image_cache
-                    .process_prefetched(window.display())
+                    .process_prefetched(&window.display_mut())
                     .unwrap();
 
                 let nanos_since_last = elapsed_nanos % frame_delta_time_nanos;
@@ -231,22 +232,22 @@ impl PlaybackManager {
         //let should_sleep = load_request == LoadRequest::None && running && !update_screen;
         // Process long operations here
         let load_result = match load_request {
-            LoadRequest::LoadNext => Some(self.image_cache.load_next(window.display())),
-            LoadRequest::LoadPrevious => Some(self.image_cache.load_prev(window.display())),
+            LoadRequest::LoadNext => Some(self.image_cache.load_next(&window.display_mut())),
+            LoadRequest::LoadPrevious => Some(self.image_cache.load_prev(&window.display_mut())),
             LoadRequest::LoadSpecific(ref file_path) => {
                 Some(if let Some(file_name) = file_path.file_name() {
                     self.image_cache
-                        .load_specific(window.display(), file_path.as_ref())
+                        .load_specific(&window.display_mut(), file_path.as_ref())
                         .map(|x| (x, OsString::from(file_name)))
                 } else {
                     Err(String::from("Could not extract filename").into())
                 })
             }
             LoadRequest::LoadAtIndex(index) => {
-                Some(self.image_cache.load_at_index(window.display(), index))
+                Some(self.image_cache.load_at_index(&window.display_mut(), index))
             }
             LoadRequest::Jump(jump_count) => {
-                Some(self.image_cache.load_jump(window.display(), jump_count))
+                Some(self.image_cache.load_jump(&window.display_mut(), jump_count))
             }
             LoadRequest::None => None,
         };

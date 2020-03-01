@@ -10,6 +10,10 @@ use glium::{implement_vertex, Frame, IndexBuffer, Display, Program, Rect, Vertex
 use std::any::Any;
 use std::rc::Rc;
 use std::vec::Vec;
+use std::path::PathBuf;
+use std::fmt;
+use std::error::Error;
+use std::ops::Deref;
 
 use misc::*;
 
@@ -21,6 +25,34 @@ pub mod misc;
 pub mod shaders;
 pub mod window;
 pub mod picture;
+
+#[derive(Debug)]
+pub enum WidgetError {
+    Image(image::ImageError),
+    Custom(Box<dyn Error>),
+}
+impl fmt::Display for WidgetError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            WidgetError::Image(img_err) => write!(f, "WidgetError: Image ({})", img_err)?,
+            WidgetError::Custom(err) => write!(f, "WidgetError: Custom ({})", err)?,
+        }
+        Ok(())
+    }
+}
+impl Error for WidgetError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            WidgetError::Image(img_err) => Some(img_err),
+            WidgetError::Custom(err) => Some(Deref::deref(err)),
+        }
+    }
+}
+impl From<image::ImageError> for WidgetError {
+    fn from(img_err: image::ImageError) -> WidgetError {
+        WidgetError::Image(img_err)
+    }
+}
 
 pub trait WidgetData {
     fn placement(&mut self) -> &mut WidgetPlacement;
@@ -111,11 +143,23 @@ pub trait Widget: Any {
     /// immediately after this one, without sleeping.
     fn is_valid(&self) -> bool;
 
+    /// This function is called before calling the draw function.
+    /// Widgets may use this function to mutate the window. This is however not allowed in the
+    /// `draw` method.
+    ///
+    /// Note that the `Window` uses inner mutability so all window related functions take a
+    /// reference to a seemingly immutable window.
+    fn before_draw(&self, window: &window::Window) {}
+
     /// This function is called when the window is being re-rendered.
+    ///
+    /// WARNING: The window may not be modified from this function. See the `before_draw` function
+    /// to do that.
+    ///
     /// The widget is responsible for setting the correct transformation.
     /// A widget can get information for finding a proper
     /// transformation from [insert name of the appropriate layout function here]
-    fn draw(&self, target: &mut Frame, context: &DrawContext);
+    fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<(), WidgetError>;
 
     fn layout(&self, available_space: LogicalRect);
 
@@ -190,7 +234,7 @@ macro_rules! add_common_widget_functions {
 
 pub struct Event {
     /// The position of the cursor in virtual pixels
-    /// relative to the bottom left corner of the window.
+    /// relative to the top left corner of the window.
     pub cursor_pos: LogicalVector,
     pub kind: EventKind,
 }
@@ -199,6 +243,9 @@ pub enum EventKind {
     MouseButton { state: glutin::event::ElementState, button: glutin::event::MouseButton },
     MouseScroll { delta: LogicalVector },
     KeyInput { input: glutin::event::KeyboardInput },
+    DroppedFile(PathBuf),
+    HoveredFile(PathBuf),
+    HoveredFileCancelled,
 }
 
 #[derive(Copy, Clone)]
@@ -230,13 +277,5 @@ impl<'a> DrawContext<'a> {
             bottom: window_phys_height - (rect.bottom() * dpi_scale) as u32,
             height: (rect.size.vec.y * dpi_scale) as u32,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
     }
 }

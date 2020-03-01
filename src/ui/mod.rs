@@ -1,11 +1,11 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use glium::glutin;
-use glium::texture::SrgbTexture2d;
-use glium::{Display, DrawParameters, Frame, IndexBuffer, Program, Rect, Surface, VertexBuffer};
+use gelatin::glium::glutin;
+use gelatin::glium::texture::SrgbTexture2d;
+use gelatin::glium::{implement_vertex, Display, DrawParameters, Frame, IndexBuffer, Program, Rect, Surface, VertexBuffer};
 
-use cgmath::{Matrix4, Vector2};
+use gelatin::cgmath::{Matrix4, Vector2};
 
 pub mod toggle;
 use crate::ui::toggle::Toggle;
@@ -35,8 +35,8 @@ pub struct DrawContext<'a> {
 
 pub enum Event {
     MouseButton {
-        button: glutin::MouseButton,
-        state: glutin::ElementState,
+        button: glutin::event::MouseButton,
+        state: glutin::event::ElementState,
         position: glutin::dpi::LogicalPosition,
     },
     MouseMove {
