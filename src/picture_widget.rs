@@ -65,7 +65,7 @@ struct PictureWidgetData {
 
     pub click: bool,
     pub hover: bool,
-    pub image_texture: Option<Picture>,
+    //pub image_texture: Option<Picture>,
 
     playback_manager: PlaybackManager,
 
@@ -137,18 +137,19 @@ impl PictureWidgetData {
     }
 
     fn get_texture(&mut self, display: &Display) -> Option<Rc<SrgbTexture2d>> {
-        if let Some(ref mut tex) = self.image_texture {
-            match tex.texture(display) {
-                Ok(img) => Some(img),
-                Err(err) => {
-                    self.image_texture = None;
-                    eprintln!("Can't load image: {}", err);
-                    None
-                }
-            }
-        } else {
-            None
-        }
+        self.playback_manager.image_texture().clone()
+        // if let Some(ref mut tex) = self.image_texture {
+        //     match tex.texture(display) {
+        //         Ok(img) => Some(img),
+        //         Err(err) => {
+        //             self.image_texture = None;
+        //             eprintln!("Can't load image: {}", err);
+        //             None
+        //         }
+        //     }
+        // } else {
+        //     None
+        // }
     }
 }
 
@@ -174,7 +175,7 @@ impl PictureWidget {
                 placement: Default::default(),
                 click: false,
                 hover: false,
-                image_texture: None,
+                //image_texture: None,
                 playback_manager: PlaybackManager::new(),
                 drawn_bounds: Default::default(),
                 rendered_valid: false,
@@ -296,9 +297,31 @@ impl Widget for PictureWidget {
                 }
                 borrowed.rendered_valid = false;
             },
+            EventKind::KeyInput { input } => {
+                use gelatin::glium::glutin::event::VirtualKeyCode;
+                if input.state == ElementState::Pressed {
+                    if let Some(key) = input.virtual_keycode {
+                        let mut borrowed = self.data.borrow_mut();
+                        match key {
+                            VirtualKeyCode::Left | VirtualKeyCode::A => {
+                                borrowed.playback_manager.request_load(LoadRequest::LoadPrevious);
+                            }
+                            VirtualKeyCode::Right | VirtualKeyCode::D => {
+                                borrowed.playback_manager.request_load(LoadRequest::LoadNext);
+                            }
+                            VirtualKeyCode::F => borrowed.image_fit = true,
+                            VirtualKeyCode::Q => {
+                                borrowed.image_fit = false;
+                                borrowed.img_texel_size = 1.0;
+                            }
+                            _ => ()
+                        }
+                    }
+                }
+            }
             EventKind::DroppedFile(ref path) => {
                 let mut borrowed = self.data.borrow_mut();
-                borrowed.image_texture = Some(Picture::LoadRequested(path.clone()));
+                borrowed.playback_manager.request_load(LoadRequest::FilePath(path.clone()));
                 borrowed.rendered_valid = false;
             }
             _ => (),

@@ -22,7 +22,7 @@ pub enum LoadRequest {
     None,
     LoadNext,
     LoadPrevious,
-    LoadSpecific(PathBuf),
+    FilePath(PathBuf),
     LoadAtIndex(usize),
     Jump(i32),
 }
@@ -147,7 +147,7 @@ impl PlaybackManager {
         self.load_request = request;
     }
 
-    pub fn load_request<'a>(&'a self) -> &'a LoadRequest {
+    pub fn curr_load_request<'a>(&'a self) -> &'a LoadRequest {
         &self.load_request
     }
 
@@ -234,7 +234,7 @@ impl PlaybackManager {
         let load_result = match load_request {
             LoadRequest::LoadNext => Some(self.image_cache.load_next(&window.display_mut())),
             LoadRequest::LoadPrevious => Some(self.image_cache.load_prev(&window.display_mut())),
-            LoadRequest::LoadSpecific(ref file_path) => {
+            LoadRequest::FilePath(ref file_path) => {
                 Some(if let Some(file_name) = file_path.file_name() {
                     self.image_cache
                         .load_specific(&window.display_mut(), file_path.as_ref())
