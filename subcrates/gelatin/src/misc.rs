@@ -1,7 +1,7 @@
 use cgmath::Vector2;
 use glium::glutin::dpi;
 
-use std::ops::{Add, Mul, Sub};
+use std::ops::{Add, Mul, Sub, AddAssign};
 
 /// Used to represent logical pixel coordinates and dimensions.
 ///
@@ -28,16 +28,27 @@ impl Add for LogicalVector {
         (self.vec + other.vec).into()
     }
 }
+impl AddAssign for LogicalVector {
+    fn add_assign(&mut self, other: LogicalVector) {
+        self.vec += other.vec;
+    }
+}
 impl Sub for LogicalVector {
     type Output = Self;
     fn sub(self, other: LogicalVector) -> Self::Output {
         (self.vec - other.vec).into()
-    }   
+    }
 }
 impl<T: Into<f32>> Mul<T> for LogicalVector {
     type Output = Self;
     fn mul(self, other: T) -> Self::Output {
         (self.vec * other.into()).into()
+    }
+}
+impl Mul<LogicalVector> for f32 {
+    type Output = LogicalVector;
+    fn mul(self, other: LogicalVector) -> Self::Output {
+        (self * other.vec).into()
     }
 }
 impl<T: Into<f32>> From<Vector2<T>> for LogicalVector {

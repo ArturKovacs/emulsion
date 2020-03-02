@@ -67,7 +67,7 @@ impl Window {
         //use glium::glutin::window::Icon;
         //let exe_parent = std::env::current_exe().unwrap().parent().unwrap().to_owned();
 
-        let window_size = PhysicalSize::<u32>::new(200, 600);
+        let window_size = PhysicalSize::<u32>::new(800, 600);
 
         let window = glutin::window::WindowBuilder::new()
             .with_title("Loading")
@@ -200,10 +200,12 @@ impl Window {
                     let delta;
                     match native_delta {
                         MouseScrollDelta::LineDelta(x, y) => {
-                            delta = LogicalVector::new(x * 12.0, y * 8.0);
+                            delta = LogicalVector::new(x, y);
                         }
                         MouseScrollDelta::PixelDelta(native_pos) => {
-                            delta = LogicalVector::new(native_pos.x as f32, native_pos.y as f32);
+                            delta = LogicalVector::new(
+                                native_pos.x as f32 / 13.0, native_pos.y as f32 / 8.0
+                            );
                         }
                     }
                     event = Some(Event {
@@ -338,17 +340,5 @@ impl Window {
         };
         let gl_win = borrowed.display.gl_window();
         gl_win.window().set_fullscreen(monitor);
-    }
-
-    pub fn set_title_filename(&self, name: &str) {
-        let borrowed = self.data.borrow_mut();
-        borrowed.display
-            .gl_window()
-            .window()
-            .set_title(Self::create_title_filename(name).as_ref());
-    }
-
-    fn create_title_filename(name: &str) -> String {
-        format!("{} : E M U L S I O N", name)
     }
 }

@@ -62,6 +62,7 @@ impl Picture {
 struct PictureWidgetData {
     pub placement: WidgetPlacement,
     pub drawn_bounds: LogicalRect,
+    pub prev_draw_size: LogicalVector,
 
     pub click: bool,
     pub hover: bool,
@@ -90,9 +91,9 @@ impl WidgetData for PictureWidgetData {
     }
 }
 impl PictureWidgetData {
-    fn fit_image_to_panel(&mut self, display: &Display) -> Option<Rc<SrgbTexture2d>> {
+    fn fit_image_to_panel(&mut self, display: &Display) {
         let size = self.drawn_bounds.size.vec;
-        if let Some(texture) = self.get_texture(display) {
+        if let Some(texture) = self.get_texture() {
             let panel_aspect = size.x / size.y;
             let img_aspect = texture.width() as f32 / texture.height() as f32;
 
@@ -109,9 +110,6 @@ impl PictureWidgetData {
             );
             self.img_texel_size = img_texel_size;
             self.image_fit = true;
-            Some(texture)
-        } else {
-            None
         }
     }
 
@@ -122,7 +120,7 @@ impl PictureWidgetData {
             .to_str()
             .unwrap()
             .to_owned();
-        window.set_title_filename(filename.as_ref());
+        Self::set_window_title_filename(window, filename);
     }
 
     fn toggle_playback(&mut self, window: &Window, playback_manager: &mut PlaybackManager) {
@@ -130,26 +128,38 @@ impl PictureWidgetData {
             PlaybackState::Forward => Self::pause_playback(window, playback_manager),
             PlaybackState::Paused => {
                 playback_manager.start_playback_forward();
-                window.set_title_filename("Playing");
+                Self::set_window_title_filename(window, "Playing");
             }
             _ => (),
         }
     }
 
-    fn get_texture(&mut self, display: &Display) -> Option<Rc<SrgbTexture2d>> {
+    fn zoom_image(&mut self, anchor: LogicalVector, image_texel_size: f32) {
+        self.img_pos = (image_texel_size / self.img_texel_size) * (self.img_pos - anchor) + anchor;
+        self.img_texel_size = image_texel_size;
+    }
+
+    fn update_image_transform(&mut self, display: &Display) {
+        if self.image_fit {
+            self.fit_image_to_panel(display);
+        } else {
+            let center_offset = (self.drawn_bounds.size - self.prev_draw_size) * 0.5f32;
+            self.img_pos += center_offset;
+        }
+        self.prev_draw_size = self.drawn_bounds.size;
+    }
+
+    fn set_window_title_filename<T: AsRef<str>>(window: &Window, name: T) {
+        let title = format!("{} : E M U L S I O N", name.as_ref());
+        let display = window.display_mut();
+        display
+            .gl_window()
+            .window()
+            .set_title(title.as_ref());
+    }
+
+    fn get_texture(&self) -> Option<Rc<SrgbTexture2d>> {
         self.playback_manager.image_texture().clone()
-        // if let Some(ref mut tex) = self.image_texture {
-        //     match tex.texture(display) {
-        //         Ok(img) => Some(img),
-        //         Err(err) => {
-        //             self.image_texture = None;
-        //             eprintln!("Can't load image: {}", err);
-        //             None
-        //         }
-        //     }
-        // } else {
-        //     None
-        // }
     }
 }
 
@@ -173,6 +183,7 @@ impl PictureWidget {
         PictureWidget {
             data: RefCell::new(PictureWidgetData {
                 placement: Default::default(),
+                prev_draw_size: Default::default(),
                 click: false,
                 hover: false,
                 //image_texture: None,
@@ -203,17 +214,22 @@ impl Widget for PictureWidget {
     fn before_draw(&self, window: &Window) {
         let mut data = self.data.borrow_mut();
         data.playback_manager.update_image(window);
+        match data.playback_manager.filename() {
+            Some(name) => {
+                PictureWidgetData::set_window_title_filename(window, name.to_str().unwrap());
+            }
+            None => {
+                PictureWidgetData::set_window_title_filename(window, "[ none ]");
+            }
+        }
     }
 
     fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<(), WidgetError> {
         let texture;
         {
             let mut data = self.data.borrow_mut();
-            if data.image_fit {
-                texture = data.fit_image_to_panel(context.display);
-            } else {
-                texture = data.get_texture(context.display)
-            }
+            data.update_image_transform(context.display);
+            texture = data.get_texture();
         }
         {
             let data = self.data.borrow();
@@ -285,17 +301,54 @@ impl Widget for PictureWidget {
                 let mut borrowed = self.data.borrow_mut();
                 borrowed.hover = borrowed.drawn_bounds.contains(event.cursor_pos);
             }
-            EventKind::MouseButton { state, button: MouseButton::Left, .. } => {
-                let mut borrowed = self.data.borrow_mut();
-                match state {
-                    ElementState::Pressed => {
-                        borrowed.click = borrowed.hover;
+            EventKind::MouseButton { state, button, .. } => match button {
+                MouseButton::Left => {
+                    let mut borrowed = self.data.borrow_mut();
+                    if state == ElementState::Pressed {
+                        if borrowed.hover {
+                            let now = Instant::now();
+                            let duration_since_last_click = now.duration_since(
+                                borrowed.last_click_time
+                            );
+                            borrowed.last_click_time = now;
+                            if duration_since_last_click < Duration::from_millis(250) {
+                                // TODO
+                                //borrowed.toggle_fullscreen(window, bottom_panel);
+                            } else {
+                                borrowed.moving_window = true;
+                            }
+                        }
+                    } else {
+                        borrowed.moving_window = false;
                     }
-                    ElementState::Released => {
+                    borrowed.rendered_valid = false;
+                },
+                MouseButton::Right => {
+                    let mut borrowed = self.data.borrow_mut();
+                    if state == ElementState::Pressed {
+                        borrowed.click = borrowed.hover;
+                        borrowed.panning = borrowed.hover;
+                    } else {
+                        borrowed.panning = false;
                         borrowed.click = false;
                     }
-                }
-                borrowed.rendered_valid = false;
+                    borrowed.rendered_valid = false;
+                },
+                _ => {}
+            },
+            EventKind::MouseScroll { delta } => {
+                let mut borrowed = self.data.borrow_mut();
+                let delta = delta.vec.y * 0.375;
+                let delta = if delta > 0.0 {
+                    delta + 1.0
+                } else {
+                    1.0 / (delta.abs() + 1.0)
+                };
+
+                let new_image_texel_size = (borrowed.img_texel_size * delta).max(0.0);
+
+                borrowed.zoom_image(event.cursor_pos, new_image_texel_size);
+                borrowed.image_fit = false;
             },
             EventKind::KeyInput { input } => {
                 use gelatin::glium::glutin::event::VirtualKeyCode;

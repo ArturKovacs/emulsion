@@ -50,6 +50,7 @@ pub struct PlaybackManager {
     should_sleep: bool,
 
     image_texture: Option<Rc<glium::texture::SrgbTexture2d>>,
+    filename: Option<OsString>,
 }
 
 impl PlaybackManager {
@@ -83,6 +84,7 @@ impl PlaybackManager {
             should_sleep: true,
 
             image_texture: None,
+            filename: None,
         };
 
         resulting_window
@@ -153,6 +155,10 @@ impl PlaybackManager {
 
     pub fn image_texture<'a>(&'a self) -> &'a Option<Rc<glium::texture::SrgbTexture2d>> {
         &self.image_texture
+    }
+
+    pub fn filename(&self) -> &Option<OsString> {
+        &self.filename
     }
 
     pub fn update_image(&mut self, window: &Window) {
@@ -255,19 +261,11 @@ impl PlaybackManager {
             match result {
                 Ok((texture, filename)) => {
                     self.image_texture = Some(texture);
-                    // FIXME the program hangs when the title is set during a resize
-                    // this is due to the way glutin/winit is architected.
-                    // An issu already exists in winit proposing to redesign
-                    // the even loop.
-                    // Until that is implemented the title is simply not updated during
-                    // playback.
-                    if self.playback_state == PlaybackState::Paused {
-                        window.set_title_filename(filename.to_str().unwrap());
-                    }
+                    self.filename = Some(filename);
                 }
                 Err(err) => {
                     self.image_texture = None;
-                    window.set_title_filename("[none]");
+                    self.filename = None;
                     let stderr = &mut ::std::io::stderr();
                     let stderr_errmsg = "Error writing to stderr";
                     writeln!(stderr, "Error occured while loading image: {}", err)
