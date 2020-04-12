@@ -37,7 +37,7 @@ fn main() {
     slider.set_height(Length::Fixed(24.0));
     slider.set_width(Length::Stretch { min: 0.0, max: 200.0 });
     slider.set_horizontal_align(Alignment::Start);
-    slider.set_steps(6);
+    slider.set_steps(6, 0);
 
     container.add_child(button.clone());
     container.add_child(button2.clone());

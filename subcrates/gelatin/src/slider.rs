@@ -18,6 +18,7 @@ struct SliderData {
     pub click: bool,
     pub hover: bool,
     pub on_value_change: Option<Rc<dyn Fn()>>,
+    pub shadow_color: [f32; 3],
 
     pub rendered_valid: bool,
 }
@@ -44,6 +45,7 @@ impl Slider {
                 click: false,
                 hover: false,
                 on_value_change: None,
+                shadow_color: [0.0, 0.0, 0.0],
                 drawn_bounds: Default::default(),
                 rendered_valid: false,
             }),
@@ -78,6 +80,12 @@ impl Slider {
     pub fn set_on_value_change<T: Fn() + 'static>(&self, callback: T) {
         let mut borrowed = self.data.borrow_mut();
         borrowed.on_value_change = Some(Rc::new(callback));
+    }
+
+    pub fn set_shadow_color(&self, color: [f32; 3]) {
+        let mut borrowed = self.data.borrow_mut();
+        borrowed.shadow_color = color;
+        borrowed.rendered_valid = false;
     }
 }
 
@@ -151,7 +159,7 @@ impl Widget for Slider {
                 color: [0.0f32, 0.0, 0.0, 0.0],
                 size: [size.x, size.y],
                 brighten: 0.0f32,
-                shadow_color: Into::<[f32; 3]>::into(Vector3::<f32>::new(0.0, 0.0, 0.0)),
+                shadow_color: borrowed.shadow_color,
                 shadow_offset: 0.7f32,
             };
             target

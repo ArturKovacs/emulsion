@@ -38,6 +38,7 @@ struct WindowData {
     redraw_needed: bool,
     cursor_pos: LogicalVector,
     root_widget: Rc<dyn Widget>,
+    bg_color: [f32; 4],
 
     // Draw data
     unit_quad_vertices: VertexBuffer<Vertex>,
@@ -148,6 +149,7 @@ impl Window {
                 redraw_needed: false,
                 //widgets: HashSet::new(),
                 root_widget: Rc::new(crate::line_layout_container::VerticalLayoutContainer::new()),
+                bg_color: [0.85, 0.85, 0.85, 1.0],
 
                 unit_quad_vertices: vertex_buffer,
                 unit_quad_indices: index_buffer,
@@ -166,6 +168,11 @@ impl Window {
         let mut borrowed = self.data.borrow_mut();
         borrowed.root_widget = widget;
         borrowed.redraw_needed = true;
+    }
+
+    pub fn set_bg_color(&self, color: [f32; 4]) {
+        let mut borrowed = self.data.borrow_mut();
+        borrowed.bg_color = color;
     }
 
     pub fn process_event(&self, native_event: WindowEvent) {
@@ -275,7 +282,6 @@ impl Window {
         root_widget.before_draw(self);
         let mut target = self.data.borrow_mut().display.draw();
         let dpi_scaling = self.data.borrow_mut().display.gl_window().window().scale_factor();
-        target.clear_color(0.85, 0.85, 0.85, 1.0);
 
         let dimensions = target.get_dimensions();
         let phys_dimensions =
@@ -304,6 +310,12 @@ impl Window {
 
         // Can't change the window during drawing phase. Deal with it.
         let borrowed = self.data.borrow();
+        target.clear_color(
+            borrowed.bg_color[0],
+            borrowed.bg_color[1],
+            borrowed.bg_color[2],
+            borrowed.bg_color[3]
+        );
         let draw_context = DrawContext {
             display: &borrowed.display,
             dpi_scale_factor: dpi_scaling as f32,

@@ -34,7 +34,7 @@ mod util;
 use std::cell::Cell;
 use std::f32;
 use gelatin::{
-    application::*, button::*, line_layout_container::*, misc::*, picture::*, slider::*
+    application::*, button::*, line_layout_container::*, misc::*, picture::*, slider::*, window::Window
 };
 
 // ========================================================
@@ -57,20 +57,22 @@ fn main() {
     bottom_container.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
 
     let moon = Rc::new(Picture::new("resource/moon.png"));
+    let light = Rc::new(Picture::new("resource/light.png"));
     let theme_button = Rc::new(Button::new());
     theme_button.set_margin_top(5.0);
     theme_button.set_height(Length::Fixed(24.0));
     theme_button.set_width(Length::Fixed(24.0));
     theme_button.set_horizontal_align(Alignment::Center);
-    theme_button.set_icon(Some(moon));
+    theme_button.set_icon(Some(moon.clone()));
 
     let question = Rc::new(Picture::new("resource/question_button.png"));
+    let question_light = Rc::new(Picture::new("resource/question_button_light.png"));
     let help_button = Rc::new(Button::new());
     help_button.set_margin_top(5.0);
     help_button.set_height(Length::Fixed(24.0));
     help_button.set_width(Length::Fixed(24.0));
     help_button.set_horizontal_align(Alignment::Center);
-    help_button.set_icon(Some(question));
+    help_button.set_icon(Some(question.clone()));
 
     let slider = Rc::new(Slider::new());
     slider.set_margin_top(5.0);
@@ -99,23 +101,57 @@ fn main() {
     slider.set_margin_left(4.0);
     slider.set_margin_right(4.0);
 
-    let button_clone = theme_button.clone();
-    let pos = Cell::new(5.0);
-    theme_button.set_on_click(move || {
-        return;
-        let new_pos = pos.get() + 5.0;
-        pos.set(new_pos);
-
-        button_clone.set_margin_left(new_pos);
-        button_clone.set_margin_top(new_pos);
-    });
-    let button_clone2 = theme_button.clone();
+    let theme_button_clone = theme_button.clone();
+    let help_button_clone = help_button.clone();
     let slider_clone = slider.clone();
+    let window_clone = window.clone();
+    let light_theme = Cell::new(true);
+    theme_button.set_on_click(move || {
+        light_theme.set(!light_theme.get());
+        set_theme(
+            light_theme.get(),
+            &slider_clone,
+            &theme_button_clone,
+            &help_button_clone,
+            &window_clone,
+            &moon,
+            &light,
+            &question,
+            &question_light
+        );
+    });
+    let slider_clone2 = slider.clone();
     let image_widget_clone = image_widget.clone();
     slider.set_on_value_change(move || {
-        image_widget_clone.jump_to_index(slider_clone.value());
+        image_widget_clone.jump_to_index(slider_clone2.value());
     });
     window.set_root(vertical_container);
     application.start_event_loop();
 }
 // ========================================================
+
+fn set_theme(
+    light_theme: bool,
+    slider: &Rc<Slider>,
+    theme_button: &Rc<Button>,
+    help_button: &Rc<Button>,
+    window: &Window,
+
+    moon_texture: &Rc<Picture>,
+    light_texture: &Rc<Picture>,
+    question_texture: &Rc<Picture>,
+    question_texture_light: &Rc<Picture>,
+) {
+    
+    if light_theme {
+        slider.set_shadow_color([0.0, 0.0, 0.0]);
+        window.set_bg_color([0.85, 0.85, 0.85, 1.0]);
+        theme_button.set_icon(Some(moon_texture.clone()));
+        help_button.set_icon(Some(question_texture.clone()));
+    } else {
+        slider.set_shadow_color([0.0, 0.0, 0.0]);
+        window.set_bg_color([0.05, 0.05, 0.05, 1.0]);
+        theme_button.set_icon(Some(light_texture.clone()));
+        help_button.set_icon(Some(question_texture_light.clone()));
+    }
+}
