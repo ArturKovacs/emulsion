@@ -50,7 +50,6 @@ impl Picture {
         };
         Ok(())
     }
-
     fn cpu_to_texture(img: RgbaImage, display: &Display) -> SrgbTexture2d {
         let image_dimensions = img.dimensions();
         let image = RawImage2d::from_raw_rgba(img.into_raw(), image_dimensions);
@@ -80,6 +79,7 @@ struct PictureWidgetData {
     panning: bool,
     moving_window: bool,
 
+    slider: Rc<gelatin::slider::Slider>,
     pub rendered_valid: bool,
 }
 impl WidgetData for PictureWidgetData {
@@ -167,7 +167,7 @@ pub struct PictureWidget {
     data: RefCell<PictureWidgetData>,
 }
 impl PictureWidget {
-    pub fn new(display: &Display) -> PictureWidget {
+    pub fn new(display: &Display, slider: Rc<gelatin::slider::Slider>) -> PictureWidget {
         let program = program!(display,
             140 => {
                 vertex: shaders::VERTEX_140,
@@ -198,12 +198,18 @@ impl PictureWidget {
                 last_click_time: Instant::now() - Duration::from_secs(10),
                 last_mouse_pos: Default::default(),
                 panning: false,
+                slider,
                 moving_window: false,
             }),
         }
     }
 
     add_common_widget_functions!(data);
+
+    pub fn jump_to_index(&self, index: u32) {
+        let mut borrowed = self.data.borrow_mut();
+        borrowed.playback_manager.request_load(LoadRequest::LoadAtIndex(index as usize));
+    }
 }
 
 impl Widget for PictureWidget {
@@ -214,6 +220,10 @@ impl Widget for PictureWidget {
     fn before_draw(&self, window: &Window) {
         let mut data = self.data.borrow_mut();
         data.playback_manager.update_image(window);
+        let curr_file_index = data.playback_manager.current_file_index() as u32;
+        let curr_dir_len = data.playback_manager.current_dir_len() as u32;
+        data.slider.set_steps(curr_dir_len, curr_file_index);
+        //data.slider.set_step_bg(data.playback_manager.cached_from_dir());
         match data.playback_manager.filename() {
             Some(name) => {
                 PictureWidgetData::set_window_title_filename(window, name.to_str().unwrap());

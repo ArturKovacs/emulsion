@@ -8,10 +8,10 @@ edition = "2018"
 
 [dependencies]
 cgmath = "0.17"
-image = "0.23.0"
+image = "0.23"
 
 [dependencies.glium]
-version = "0.26"
+version = "0.27"
 features = [
 #    "icon_loading"
 ]

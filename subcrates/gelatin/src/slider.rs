@@ -60,9 +60,10 @@ impl Slider {
         self.data.borrow().value
     }
 
-    pub fn set_steps(&self, steps: u32) {
+    pub fn set_steps(&self, steps: u32, value: u32) {
         let mut borrowed = self.data.borrow_mut();
         borrowed.steps = steps;
+        borrowed.value = value;
         borrowed.rendered_valid = false;
     }
 
@@ -173,32 +174,38 @@ impl Widget for Slider {
     }
 
     fn handle_event(&self, event: &Event) {
+        let check_value_change = || {
+            // We jugle around the `on_value_change` callback so that when it gets called,
+            // `self.data` is not borrowed.
+            let on_value_change;
+            {
+                let mut borrowed = self.data.borrow_mut();
+                borrowed.hover = borrowed.drawn_bounds.contains(event.cursor_pos);
+                if borrowed.click {
+                    let prev_value = borrowed.value;
+                    let relative_cursor_x = event.cursor_pos.vec.x - borrowed.drawn_bounds.pos.vec.x;
+                    let proportion = (relative_cursor_x / borrowed.drawn_bounds.size.vec.x).max(0.0).min(1.0);
+                    let stepsf = borrowed.steps as f32;
+                    borrowed.value = 
+                        (proportion * (1.0 + 1.0 / stepsf) * (stepsf - 1.0)).floor() as u32;
+                    if borrowed.value != prev_value {
+                        on_value_change = borrowed.on_value_change.clone();
+                    } else { on_value_change = None; }
+                } else { on_value_change = None; }
+            }
+            if let Some(callback) = on_value_change { callback(); }
+        };
         match event.kind {
             EventKind::MouseMove => {
-                // We jugle around the `on_value_change` callback so that when it gets called,
-                // `self.data` is not borrowed.
-                let on_value_change;
-                {
-                    let mut borrowed = self.data.borrow_mut();
-                    borrowed.hover = borrowed.drawn_bounds.contains(event.cursor_pos);
-                    if borrowed.click {
-                        let prev_value = borrowed.value;
-                        let relative_cursor_x = event.cursor_pos.vec.x - borrowed.drawn_bounds.pos.vec.x;
-                        let proportion = (relative_cursor_x / borrowed.drawn_bounds.size.vec.x).max(0.0).min(1.0);
-                        let stepsf = borrowed.steps as f32;
-                        borrowed.value = 
-                            (proportion * (1.0 + 1.0 / stepsf) * (stepsf - 1.0)).floor() as u32;
-                        if borrowed.value != prev_value {
-                            on_value_change = borrowed.on_value_change.clone();
-                        } else { on_value_change = None; }
-                    } else { on_value_change = None; }
-                }
-                if let Some(callback) = on_value_change { callback(); }
+                check_value_change();
             }
             EventKind::MouseButton { state, button: MouseButton::Left, .. } => match state {
                 ElementState::Pressed => {
-                    let mut borrowed = self.data.borrow_mut();
-                    borrowed.click = borrowed.hover;
+                    {
+                        let mut borrowed = self.data.borrow_mut();
+                        borrowed.click = borrowed.hover;
+                    }
+                    check_value_change();
                 }
                 ElementState::Released => {
                     let mut borrowed = self.data.borrow_mut();

@@ -49,9 +49,6 @@ fn main() {
     vertical_container.set_margin_all(0.0);
     vertical_container.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
     vertical_container.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
-    let image_widget = Rc::new(PictureWidget::new(&window.display_mut()));
-    image_widget.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
-    image_widget.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
 
     let bottom_container = Rc::new(HorizontalLayoutContainer::new());
     bottom_container.set_margin_top(4.0);
@@ -80,7 +77,11 @@ fn main() {
     slider.set_height(Length::Fixed(24.0));
     slider.set_width(Length::Stretch { min: 0.0, max: 600.0 });
     slider.set_horizontal_align(Alignment::Center);
-    slider.set_steps(6);
+    slider.set_steps(6, 1);
+
+    let image_widget = Rc::new(PictureWidget::new(&window.display_mut(), slider.clone()));
+    image_widget.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
+    image_widget.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
 
     bottom_container.add_child(theme_button.clone());
     bottom_container.add_child(slider.clone());
@@ -101,6 +102,7 @@ fn main() {
     let button_clone = theme_button.clone();
     let pos = Cell::new(5.0);
     theme_button.set_on_click(move || {
+        return;
         let new_pos = pos.get() + 5.0;
         pos.set(new_pos);
 
@@ -109,9 +111,9 @@ fn main() {
     });
     let button_clone2 = theme_button.clone();
     let slider_clone = slider.clone();
+    let image_widget_clone = image_widget.clone();
     slider.set_on_value_change(move || {
-        let margin = (slider_clone.value() + 1) as f32 * 5.0;
-        button_clone2.set_margin_right(margin);
+        image_widget_clone.jump_to_index(slider_clone.value());
     });
     window.set_root(vertical_container);
     application.start_event_loop();
