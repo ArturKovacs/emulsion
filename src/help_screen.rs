@@ -91,19 +91,16 @@ impl Widget for HelpScreen {
             if !borrowed.visible {
                 return Ok(())
             }
-            let img_w = borrowed.drawn_bounds.size.vec.x;
-            let img_h = borrowed.drawn_bounds.size.vec.y;
 
-            let mut pos = borrowed.drawn_bounds.pos.vec;
-            pos.x = pos.x.trunc();
-            pos.y = pos.y.trunc();
+            let w = borrowed.parent_space.size.vec.x;
+            let h = borrowed.parent_space.size.vec.y;
+            let pos = borrowed.parent_space.pos.vec;
             // Model tranform
-            let transform = Matrix4::from_nonuniform_scale(img_w, img_h, 1.0);
+            let transform = Matrix4::from_nonuniform_scale(w, h, 1.0);
             let transform =
                 Matrix4::from_translation(pos.extend(0.0)) * transform;
             // Projection
             let transform = context.projection_transform * transform;
-
             let image_draw_params = gelatin::glium::DrawParameters {
                 viewport: Some(*context.viewport),
                 blend: Blend {
@@ -115,6 +112,36 @@ impl Widget for HelpScreen {
                 },
                 ..Default::default()
             };
+            let uniforms = uniform! {
+                matrix: Into::<[[f32; 4]; 4]>::into(transform),
+                color: [0.0f32, 0.0, 0.0, 0.5],
+            };
+
+            target
+                .draw(
+                    context.unit_quad_vertices,
+                    context.unit_quad_indices,
+                    context.colored_program,
+                    &uniforms,
+                    &image_draw_params,
+                )
+                .unwrap();
+            
+            ///////////////////////////////////////////////////////////////////////////
+            // Draw Help Image
+            //////////////////////////////////////////////////////////////////////////
+            let img_w = borrowed.drawn_bounds.size.vec.x;
+            let img_h = borrowed.drawn_bounds.size.vec.y;
+            let mut pos = borrowed.drawn_bounds.pos.vec;
+            pos.x = pos.x.trunc();
+            pos.y = pos.y.trunc();
+            // Model tranform
+            let transform = Matrix4::from_nonuniform_scale(img_w, img_h, 1.0);
+            let transform =
+                Matrix4::from_translation(pos.extend(0.0)) * transform;
+            // Projection
+            let transform = context.projection_transform * transform;
+
             let texture_size = [img_w, img_h];
             let texture = borrowed.usage_image.texture(context.display)?;
             let sampler = texture
@@ -141,6 +168,9 @@ impl Widget for HelpScreen {
                     &image_draw_params,
                 )
                 .unwrap();
+            //////////////////////////////////////////////////////////////////////////
+
+            //let uniforms
         }
         Ok(())
     }
