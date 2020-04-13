@@ -20,6 +20,8 @@ struct LineLayoutContainerData {
     pub placement: WidgetPlacement,
     pub rendered_valid: bool,
 
+    pub bg_color: [f32; 4],
+
     pub children: Vec<Rc<dyn Widget>>,
 
     /// The idea is that we start the layout by itearting thorugh all the children
@@ -62,6 +64,7 @@ impl<Dim: PickDimension + 'static> LineLayoutContainer<Dim> {
                 drawn_bounds: Default::default(),
                 placement: Default::default(),
                 rendered_valid: false,
+                bg_color: [0.0, 0.0, 0.0, 0.0],
                 children: Vec::new(),
                 start_children: Vec::new(),
                 center_children: Vec::new(),
@@ -72,6 +75,12 @@ impl<Dim: PickDimension + 'static> LineLayoutContainer<Dim> {
     }
 
     add_common_widget_functions!(data);
+
+    pub fn set_bg_color(&self, color: [f32; 4]) {
+        let mut borrowed = self.data.borrow_mut();
+        borrowed.bg_color = color;
+        borrowed.rendered_valid = false;
+    }
 
     pub fn add_child(&self, new_child: Rc<dyn Widget>) {
         let mut borrowed = self.data.borrow_mut();
@@ -129,6 +138,22 @@ impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
     fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<(), WidgetError> {
         {
             let borrowed = self.data.borrow();
+            if borrowed.bg_color[3] > 0.0 {
+                let viewport_rect = context.logical_rect_to_viewport(&borrowed.drawn_bounds);
+                // let viewport_rect = glium::Rect {
+                //     left: 0,
+                //     bottom: 0,
+                //     width: 20,
+                //     height: 20,
+                // };
+                target.clear(
+                    Some(&viewport_rect),
+                    Some((borrowed.bg_color[0], borrowed.bg_color[1], borrowed.bg_color[2], borrowed.bg_color[3])),
+                    false,
+                    None,
+                    None
+                );
+            }
             for child in borrowed.children.iter() {
                 child.draw(target, context)?;
             }
@@ -218,7 +243,8 @@ impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
     }
 
     fn handle_event(&self, event: &Event) {
-        for child in self.data.borrow().children.iter() {
+        let children = self.data.borrow().children.clone();
+        for child in children.iter() {
             child.handle_event(event);
         }
     }

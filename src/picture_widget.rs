@@ -70,6 +70,7 @@ struct PictureWidgetData {
     playback_manager: PlaybackManager,
 
     program: Program,
+    bright_shade: f32,
     img_texel_size: f32,
     image_fit: bool,
     img_pos: LogicalVector,
@@ -192,6 +193,7 @@ impl PictureWidget {
                 rendered_valid: false,
 
                 program,
+                bright_shade: 0.95,
                 img_texel_size: 0.0,
                 image_fit: true,
                 img_pos: Default::default(),
@@ -205,6 +207,12 @@ impl PictureWidget {
     }
 
     add_common_widget_functions!(data);
+
+    pub fn set_bright_shade(&self, shade: f32) {
+        let mut borrowed = self.data.borrow_mut();
+        borrowed.bright_shade = shade;
+        borrowed.rendered_valid = false;
+    }
 
     pub fn jump_to_index(&self, index: u32) {
         let mut borrowed = self.data.borrow_mut();
@@ -279,10 +287,10 @@ impl Widget for PictureWidget {
                     sampler.magnify_filter(gelatin::glium::uniforms::MagnifySamplerFilter::Linear)
                 };
                 // building the uniforms
-                let light_theme = true;
+                
                 let uniforms = uniform! {
                     matrix: Into::<[[f32; 4]; 4]>::into(transform),
-                    bright_shade: if light_theme { 0.95f32 } else { 0.3f32 },
+                    bright_shade: data.bright_shade,
                     tex: sampler
                 };
                 target

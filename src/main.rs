@@ -1,4 +1,4 @@
-#![windows_subsystem = "windows"]
+//#![windows_subsystem = "windows"]
 
 #[macro_use]
 extern crate error_chain;
@@ -51,8 +51,8 @@ fn main() {
     vertical_container.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
 
     let bottom_container = Rc::new(HorizontalLayoutContainer::new());
-    bottom_container.set_margin_top(4.0);
-    bottom_container.set_margin_bottom(4.0);
+    //bottom_container.set_margin_top(4.0);
+    //bottom_container.set_margin_bottom(4.0);
     bottom_container.set_height(Length::Fixed(32.0));
     bottom_container.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
 
@@ -81,15 +81,15 @@ fn main() {
     slider.set_horizontal_align(Alignment::Center);
     slider.set_steps(6, 1);
 
-    let image_widget = Rc::new(PictureWidget::new(&window.display_mut(), slider.clone()));
-    image_widget.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
-    image_widget.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
+    let picture_widget = Rc::new(PictureWidget::new(&window.display_mut(), slider.clone()));
+    picture_widget.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
+    picture_widget.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
 
     bottom_container.add_child(theme_button.clone());
     bottom_container.add_child(slider.clone());
     bottom_container.add_child(help_button.clone());
 
-    vertical_container.add_child(image_widget.clone());
+    vertical_container.add_child(picture_widget.clone());
     vertical_container.add_child(bottom_container.clone());
 
     bottom_container.set_margin_left(0.0);
@@ -103,13 +103,30 @@ fn main() {
 
     let theme_button_clone = theme_button.clone();
     let help_button_clone = help_button.clone();
+    let picture_widget_clone = picture_widget.clone();
+    let bottom_container_clone = bottom_container.clone();
     let slider_clone = slider.clone();
     let window_clone = window.clone();
     let light_theme = Cell::new(true);
+    set_theme(
+        light_theme.get(),
+        &picture_widget_clone,
+        &bottom_container_clone,
+        &slider_clone,
+        &theme_button_clone,
+        &help_button_clone,
+        &window_clone,
+        &moon,
+        &light,
+        &question,
+        &question_light
+    );
     theme_button.set_on_click(move || {
         light_theme.set(!light_theme.get());
         set_theme(
             light_theme.get(),
+            &picture_widget_clone,
+            &bottom_container_clone,
             &slider_clone,
             &theme_button_clone,
             &help_button_clone,
@@ -121,7 +138,7 @@ fn main() {
         );
     });
     let slider_clone2 = slider.clone();
-    let image_widget_clone = image_widget.clone();
+    let image_widget_clone = picture_widget.clone();
     slider.set_on_value_change(move || {
         image_widget_clone.jump_to_index(slider_clone2.value());
     });
@@ -132,23 +149,27 @@ fn main() {
 
 fn set_theme(
     light_theme: bool,
+    picture_widget: &Rc<PictureWidget>,
+    bottom_container: &Rc<HorizontalLayoutContainer>,
     slider: &Rc<Slider>,
     theme_button: &Rc<Button>,
     help_button: &Rc<Button>,
     window: &Window,
-
     moon_texture: &Rc<Picture>,
     light_texture: &Rc<Picture>,
     question_texture: &Rc<Picture>,
     question_texture_light: &Rc<Picture>,
-) {
-    
+) { 
     if light_theme {
+        picture_widget.set_bright_shade(0.96);
+        bottom_container.set_bg_color([1.0, 1.0, 1.0, 1.0]);
         slider.set_shadow_color([0.0, 0.0, 0.0]);
         window.set_bg_color([0.85, 0.85, 0.85, 1.0]);
         theme_button.set_icon(Some(moon_texture.clone()));
         help_button.set_icon(Some(question_texture.clone()));
     } else {
+        picture_widget.set_bright_shade(0.3);
+        bottom_container.set_bg_color([0.1, 0.1, 0.1, 0.1]);
         slider.set_shadow_color([0.0, 0.0, 0.0]);
         window.set_bg_color([0.05, 0.05, 0.05, 1.0]);
         theme_button.set_icon(Some(light_texture.clone()));
