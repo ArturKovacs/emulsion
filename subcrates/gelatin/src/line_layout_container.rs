@@ -140,12 +140,6 @@ impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
             let borrowed = self.data.borrow();
             if borrowed.bg_color[3] > 0.0 {
                 let viewport_rect = context.logical_rect_to_viewport(&borrowed.drawn_bounds);
-                // let viewport_rect = glium::Rect {
-                //     left: 0,
-                //     bottom: 0,
-                //     width: 20,
-                //     height: 20,
-                // };
                 target.clear(
                     Some(&viewport_rect),
                     Some((borrowed.bg_color[0], borrowed.bg_color[1], borrowed.bg_color[2], borrowed.bg_color[3])),

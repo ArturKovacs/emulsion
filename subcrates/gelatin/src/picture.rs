@@ -26,6 +26,11 @@ pub enum PictureData {
     Gpu(SrgbTexture2d),
 }
 
+pub struct PictureMetadata {
+    pub width: u32,
+    pub height: u32,
+}
+
 pub struct Picture {
     data: RefCell<PictureData>,
 }
@@ -37,6 +42,35 @@ impl Picture {
 
     pub fn from_image(img: RgbaImage) -> Picture {
         Picture{data: RefCell::new(PictureData::Cpu(img))}
+    }
+
+    pub fn get_metadata(&self) -> Result<PictureMetadata, ImageError> {
+        let mut borrowed = self.data.borrow_mut();
+        let mut tmp_picture = PictureData::Path("".into());
+        std::mem::swap(&mut *borrowed, &mut tmp_picture);
+        let dimensions;
+        match tmp_picture {
+            PictureData::Path(path) => {
+                let img = image::open(path)?;
+                let rgba = img.into_rgba();
+                dimensions = rgba.dimensions();
+                *borrowed = PictureData::Cpu(rgba);
+            }
+            PictureData::Cpu(img) => {
+                dimensions = img.dimensions();
+                *borrowed = PictureData::Cpu(img);
+            }
+            PictureData::Gpu(img) => {
+                // This must be done because `img` was taken from `borrowed` when
+                // `borrowed` was swapped with `tmp_picture`.
+                dimensions = img.dimensions();
+                *borrowed = PictureData::Gpu(img);
+            }
+        }
+        Ok(PictureMetadata {
+            width: dimensions.0,
+            height: dimensions.1
+        })
     }
 
     pub fn texture(&self, display: &glium::Display) -> Result<PictureTextureRef, ImageError> {

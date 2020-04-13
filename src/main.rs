@@ -1,4 +1,4 @@
-//#![windows_subsystem = "windows"]
+#![windows_subsystem = "windows"]
 
 #[macro_use]
 extern crate error_chain;
@@ -22,6 +22,9 @@ mod shaders;
 
 mod picture_widget;
 use crate::picture_widget::*;
+
+mod help_screen;
+use crate::help_screen::*;
 
 mod playback_manager;
 use crate::playback_manager::{LoadRequest, PlaybackManager};
@@ -50,6 +53,13 @@ fn main() {
     vertical_container.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
     vertical_container.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
 
+    let picture_area_container = Rc::new(VerticalLayoutContainer::new());
+    picture_area_container.set_margin_all(0.0);
+    picture_area_container.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
+    picture_area_container.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
+
+    let help_screen = Rc::new(HelpScreen::new());
+
     let bottom_container = Rc::new(HorizontalLayoutContainer::new());
     //bottom_container.set_margin_top(4.0);
     //bottom_container.set_margin_bottom(4.0);
@@ -73,25 +83,28 @@ fn main() {
     help_button.set_width(Length::Fixed(24.0));
     help_button.set_horizontal_align(Alignment::Center);
     help_button.set_icon(Some(question.clone()));
-
+    
     let slider = Rc::new(Slider::new());
     slider.set_margin_top(5.0);
     slider.set_height(Length::Fixed(24.0));
     slider.set_width(Length::Stretch { min: 0.0, max: 600.0 });
     slider.set_horizontal_align(Alignment::Center);
     slider.set_steps(6, 1);
-
+    
     let picture_widget = Rc::new(PictureWidget::new(&window.display_mut(), slider.clone()));
     picture_widget.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
     picture_widget.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
-
+    
     bottom_container.add_child(theme_button.clone());
     bottom_container.add_child(slider.clone());
     bottom_container.add_child(help_button.clone());
+    
+    picture_area_container.add_child(picture_widget.clone());
+    picture_area_container.add_child(help_screen.clone());
 
-    vertical_container.add_child(picture_widget.clone());
+    vertical_container.add_child(picture_area_container);
     vertical_container.add_child(bottom_container.clone());
-
+    
     bottom_container.set_margin_left(0.0);
     bottom_container.set_margin_right(0.0);
     theme_button.set_margin_left(4.0);
@@ -141,6 +154,12 @@ fn main() {
     let image_widget_clone = picture_widget.clone();
     slider.set_on_value_change(move || {
         image_widget_clone.jump_to_index(slider_clone2.value());
+    });
+    let help_visible = Cell::new(false);
+    help_screen.set_visible(help_visible.get());
+    help_button.set_on_click(move || {
+        help_visible.set(!help_visible.get());
+        help_screen.set_visible(help_visible.get());
     });
     window.set_root(vertical_container);
     application.start_event_loop();

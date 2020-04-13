@@ -229,6 +229,11 @@ macro_rules! add_common_widget_functions {
             borrowed.placement.height = height;
             borrowed.rendered_valid = false;
         }
+        pub fn set_ignore_layout(&self, ignore: bool) {
+            let mut borrowed = self.$data_field.borrow_mut();
+            borrowed.placement.ignore_layout = ignore;
+            borrowed.rendered_valid = false;
+        }
     };
 }
 
