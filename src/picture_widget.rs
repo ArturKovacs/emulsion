@@ -1,7 +1,6 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::path::PathBuf;
 
 use crate::shaders;
 use crate::util;
@@ -32,7 +31,7 @@ struct PictureWidgetData {
 
     program: Program,
     bright_shade: f32,
-    img_texel_size: f32,
+    img_texel_size: f32, /// Size of an image texel in physical display pixels
     image_fit: bool,
     img_pos: LogicalVector,
 
@@ -53,7 +52,7 @@ impl WidgetData for PictureWidgetData {
     }
 }
 impl PictureWidgetData {
-    fn fit_image_to_panel(&mut self, display: &Display) {
+    fn fit_image_to_panel(&mut self, display: &Display, dpi_scale: f32) {
         let size = self.drawn_bounds.size.vec;
         if let Some(texture) = self.get_texture() {
             let panel_aspect = size.x / size.y;
@@ -70,7 +69,7 @@ impl PictureWidgetData {
                 size.x as f32 * 0.5,
                 size.y as f32 * 0.5,
             );
-            self.img_texel_size = img_texel_size;
+            self.img_texel_size = img_texel_size * dpi_scale;
             self.image_fit = true;
         }
     }
@@ -101,9 +100,9 @@ impl PictureWidgetData {
         self.img_texel_size = image_texel_size;
     }
 
-    fn update_image_transform(&mut self, display: &Display) {
+    fn update_image_transform(&mut self, display: &Display, dpi_scale: f32) {
         if self.image_fit {
-            self.fit_image_to_panel(display);
+            self.fit_image_to_panel(display, dpi_scale);
         } else {
             let center_offset = (self.drawn_bounds.size - self.prev_draw_size) * 0.5f32;
             self.img_pos += center_offset;
@@ -207,7 +206,7 @@ impl Widget for PictureWidget {
         let texture;
         {
             let mut data = self.data.borrow_mut();
-            data.update_image_transform(context.display);
+            data.update_image_transform(context.display, context.dpi_scale_factor);
             texture = data.get_texture();
         }
         {
@@ -226,12 +225,15 @@ impl Widget for PictureWidget {
                 let img_h = texture.height() as f32;
 
                 let img_height_over_width = img_h / img_w;
-                let image_display_width = data.img_texel_size * img_w;
-
+                let image_display_width = data.img_texel_size * img_w / context.dpi_scale_factor;
+                
                 // Model tranform
                 let image_display_height = image_display_width * img_height_over_width;
-                let corner_x = (data.img_pos.vec.x - image_display_width * 0.5).floor();
-                let corner_y = (data.img_pos.vec.y - image_display_height * 0.5).floor();
+                let img_pyhs_pos = data.img_pos.vec * context.dpi_scale_factor;
+                let img_phys_siz = 
+                    LogicalVector::new(image_display_width, image_display_height) * context.dpi_scale_factor;
+                let corner_x = (img_pyhs_pos.x - img_phys_siz.vec.x * 0.5).floor() / context.dpi_scale_factor;
+                let corner_y = (img_pyhs_pos.y - img_phys_siz.vec.y * 0.5).floor() / context.dpi_scale_factor;
                 let transform =
                     Matrix4::from_nonuniform_scale(image_display_width, image_display_height, 1.0);
                 let transform =
@@ -279,6 +281,13 @@ impl Widget for PictureWidget {
             EventKind::MouseMove => {
                 let mut borrowed = self.data.borrow_mut();
                 borrowed.hover = borrowed.drawn_bounds.contains(event.cursor_pos);
+                if borrowed.panning {
+                    let delta = event.cursor_pos - borrowed.last_mouse_pos;
+                    borrowed.image_fit = false;
+                    borrowed.img_pos += delta;
+                    borrowed.rendered_valid = false;
+                }
+                borrowed.last_mouse_pos = event.cursor_pos;
             }
             EventKind::MouseButton { state, button, .. } => match button {
                 MouseButton::Left => {
