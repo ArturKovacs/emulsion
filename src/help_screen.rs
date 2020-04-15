@@ -21,11 +21,10 @@ use gelatin::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
 use gelatin::picture::Picture;
 
 struct HelpScreenData {
-    pub placement: WidgetPlacement,
-    pub drawn_bounds: LogicalRect,
-    pub rendered_valid: bool,
-
+    placement: WidgetPlacement,
+    drawn_bounds: LogicalRect,
     visible: bool,
+    rendered_valid: bool,
 
     parent_space: LogicalRect,
     usage_image: Picture,
@@ -37,6 +36,9 @@ impl WidgetData for HelpScreenData {
     }
     fn drawn_bounds(&mut self) -> &mut LogicalRect {
         &mut self.drawn_bounds
+    }
+    fn visible(&mut self) -> &mut bool {
+        &mut self.visible
     }
 }
 
@@ -188,5 +190,9 @@ impl Widget for HelpScreen {
 
     fn placement(&self) -> WidgetPlacement {
         self.data.borrow().placement
+    }
+
+    fn visible(&self) -> bool {
+        self.data.borrow().visible
     }
 }

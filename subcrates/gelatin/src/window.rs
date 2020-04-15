@@ -47,9 +47,9 @@ struct WindowData {
     colored_shadowed_program: Program,
     colored_program: Program,
 }
-#[derive(Clone)]
+
 pub struct Window {
-    data: Rc<RefCell<WindowData>>,
+    data: RefCell<WindowData>,
 }
 impl Hash for Window {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -64,7 +64,7 @@ impl PartialEq for Window {
 impl Eq for Window {}
 
 impl Window {
-    pub fn new(application: &mut Application) -> Self {
+    pub fn new(application: &mut Application) -> Rc<Self> {
         //use glium::glutin::window::Icon;
         //let exe_parent = std::env::current_exe().unwrap().parent().unwrap().to_owned();
 
@@ -140,8 +140,8 @@ impl Window {
         )
         .unwrap();
 
-        let resulting_window = Window {
-            data: Rc::new(RefCell::new(WindowData {
+        let resulting_window = Rc::new(Window {
+            data: RefCell::new(WindowData {
                 display,
                 size_before_fullscreen: window_size,
                 fullscreen: false,
@@ -156,11 +156,10 @@ impl Window {
                 textured_program,
                 colored_shadowed_program,
                 colored_program,
-            })),
-        };
+            }),
+        });
 
-        application.register_window(&resulting_window);
-
+        application.register_window(resulting_window.clone());
         resulting_window
     }
 
@@ -334,6 +333,10 @@ impl Window {
 
         //target.clear();
         target.finish().unwrap();
+    }
+
+    pub fn fullscreen(&self) -> bool {
+        self.data.borrow().fullscreen
     }
 
     pub fn set_fullscreen(&self, fullscreen: bool) {

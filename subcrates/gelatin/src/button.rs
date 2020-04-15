@@ -11,15 +11,16 @@ use crate::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
 use crate::picture::Picture;
 
 struct ButtonData {
-    pub placement: WidgetPlacement,
-    pub drawn_bounds: LogicalRect,
+    placement: WidgetPlacement,
+    drawn_bounds: LogicalRect,
+    visible: bool,
 
-    pub click: bool,
-    pub hover: bool,
-    pub icon: Option<Rc<Picture>>,
-    pub on_click: Option<Rc<dyn Fn()>>,
+    click: bool,
+    hover: bool,
+    icon: Option<Rc<Picture>>,
+    on_click: Option<Rc<dyn Fn()>>,
 
-    pub rendered_valid: bool,
+    rendered_valid: bool,
 }
 impl WidgetData for ButtonData {
     fn placement(&mut self) -> &mut WidgetPlacement {
@@ -27,6 +28,9 @@ impl WidgetData for ButtonData {
     }
     fn drawn_bounds(&mut self) -> &mut LogicalRect {
         &mut self.drawn_bounds
+    }
+    fn visible(&mut self) -> &mut bool {
+        &mut self.visible
     }
 }
 
@@ -39,11 +43,12 @@ impl Button {
         Button {
             data: RefCell::new(ButtonData {
                 placement: Default::default(),
+                drawn_bounds: Default::default(),
+                visible: true,
                 click: false,
                 hover: false,
                 on_click: None,
                 icon: None,
-                drawn_bounds: Default::default(),
                 rendered_valid: false,
             }),
         }
@@ -196,5 +201,9 @@ impl Widget for Button {
 
     fn placement(&self) -> WidgetPlacement {
         self.data.borrow().placement
+    }
+
+    fn visible(&self) -> bool {
+        self.data.borrow().visible
     }
 }

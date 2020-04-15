@@ -16,13 +16,14 @@ pub type HorizontalLayoutContainer = LineLayoutContainer<HorDim>;
 pub type VerticalLayoutContainer = LineLayoutContainer<VerDim>;
 
 struct LineLayoutContainerData {
-    pub drawn_bounds: LogicalRect,
-    pub placement: WidgetPlacement,
-    pub rendered_valid: bool,
+    drawn_bounds: LogicalRect,
+    placement: WidgetPlacement,
+    visible: bool,
+    rendered_valid: bool,
 
-    pub bg_color: [f32; 4],
+    bg_color: [f32; 4],
 
-    pub children: Vec<Rc<dyn Widget>>,
+    children: Vec<Rc<dyn Widget>>,
 
     /// The idea is that we start the layout by itearting thorugh all the children
     /// and adding up the width (and offset from start or end if any) of fixed-width widgets. This
@@ -40,9 +41,9 @@ struct LineLayoutContainerData {
     ///
     /// The list of widgets with different alignement are kept cached within the following
     /// containers, maintaining their order from the children container.
-    pub start_children: Vec<Rc<dyn Widget>>,
-    pub center_children: Vec<Rc<dyn Widget>>,
-    pub end_children: Vec<Rc<dyn Widget>>,
+    start_children: Vec<Rc<dyn Widget>>,
+    center_children: Vec<Rc<dyn Widget>>,
+    end_children: Vec<Rc<dyn Widget>>,
 }
 impl WidgetData for LineLayoutContainerData {
     fn placement(&mut self) -> &mut WidgetPlacement {
@@ -50,6 +51,9 @@ impl WidgetData for LineLayoutContainerData {
     }
     fn drawn_bounds(&mut self) -> &mut LogicalRect {
         &mut self.drawn_bounds
+    }
+    fn visible(&mut self) -> &mut bool {
+        &mut self.visible
     }
 }
 
@@ -65,6 +69,7 @@ impl<Dim: PickDimension + 'static> LineLayoutContainer<Dim> {
                 placement: Default::default(),
                 rendered_valid: false,
                 bg_color: [0.0, 0.0, 0.0, 0.0],
+                visible: true,
                 children: Vec::new(),
                 start_children: Vec::new(),
                 center_children: Vec::new(),
@@ -130,14 +135,19 @@ impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
 
     fn before_draw(&self, window: &Window) {
         let borrowed = self.data.borrow();
-        for child in borrowed.children.iter() {
-            child.before_draw(window);
+        if borrowed.visible {
+            for child in borrowed.children.iter() {
+                child.before_draw(window);
+            }
         }
     }
 
     fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<(), WidgetError> {
         {
             let borrowed = self.data.borrow();
+            if !borrowed.visible {
+                return Ok(());
+            }
             if borrowed.bg_color[3] > 0.0 {
                 let viewport_rect = context.logical_rect_to_viewport(&borrowed.drawn_bounds);
                 target.clear(
@@ -159,6 +169,9 @@ impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
     fn layout(&self, mut available_space: LogicalRect) {
         let mut borrowed = self.data.borrow_mut();
         borrowed.default_layout(available_space);
+        if !borrowed.visible {
+            return;
+        }
         available_space = borrowed.drawn_bounds;
 
         borrowed.start_children.clear();
@@ -171,6 +184,9 @@ impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
 
         let children_clone = borrowed.children.clone();
         for child in children_clone.iter() {
+            if !child.visible() {
+                continue;
+            }
             let placement: WidgetPlacement = child.placement();
             if placement.ignore_layout {
                 child.layout(available_space);
@@ -237,7 +253,14 @@ impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
     }
 
     fn handle_event(&self, event: &Event) {
-        let children = self.data.borrow().children.clone();
+        let children; 
+        {
+            let borrowed = self.data.borrow();
+            if !borrowed.visible {
+                return;
+            }
+            children = borrowed.children.clone();
+        }
         for child in children.iter() {
             child.handle_event(event);
         }
@@ -252,6 +275,10 @@ impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
 
     fn placement(&self) -> WidgetPlacement {
         self.data.borrow().placement
+    }
+
+    fn visible(&self) -> bool {
+        self.data.borrow().visible
     }
 }
 

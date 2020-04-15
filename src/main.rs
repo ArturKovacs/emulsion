@@ -47,7 +47,7 @@ fn main() {
     std::panic::set_hook(Box::new(handle_panic::handle_panic));
 
     let mut application = Application::new();
-    let window = gelatin::window::Window::new(&mut application);
+    let window = Rc::new(gelatin::window::Window::new(&mut application));
     let vertical_container = Rc::new(VerticalLayoutContainer::new());
     vertical_container.set_margin_all(0.0);
     vertical_container.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
@@ -91,7 +91,14 @@ fn main() {
     slider.set_horizontal_align(Alignment::Center);
     slider.set_steps(6, 1);
     
-    let picture_widget = Rc::new(PictureWidget::new(&window.display_mut(), slider.clone()));
+    let picture_widget = Rc::new(
+        PictureWidget::new(
+            &window.display_mut(),
+            &window,
+            slider.clone(),
+            bottom_container.clone()
+        )
+    );
     picture_widget.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
     picture_widget.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
     

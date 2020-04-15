@@ -61,6 +61,8 @@ pub trait WidgetData {
     /// window in logical pixels. This area does not include the widget's margins.
     fn drawn_bounds(&mut self) -> &mut LogicalRect;
 
+    fn visible(&mut self) -> &mut bool;
+
     fn apply_horizontal_alignement(&mut self, available_space: LogicalRect, width: f32) {
         self.drawn_bounds().pos.vec.x = available_space.pos.vec.x;
         match self.placement().horizontal_align {
@@ -100,6 +102,13 @@ pub trait WidgetData {
         }
     }
     fn default_layout(&mut self, available_space: LogicalRect) {
+        if !*self.visible() {
+            *self.drawn_bounds() = LogicalRect {
+                pos: LogicalVector::new(0.0, 0.0),
+                size: LogicalVector::new(0.0, 0.0),
+            };
+            return;
+        }
         *self.drawn_bounds() = available_space;
         match self.placement().width {
             Length::Fixed(width) => {
@@ -169,6 +178,8 @@ pub trait Widget: Any {
     fn children(&self, children: &mut Vec<Rc<dyn Widget>>);
 
     fn placement(&self) -> WidgetPlacement;
+
+    fn visible(&self) -> bool;
 }
 
 #[macro_export]
@@ -232,6 +243,11 @@ macro_rules! add_common_widget_functions {
         pub fn set_ignore_layout(&self, ignore: bool) {
             let mut borrowed = self.$data_field.borrow_mut();
             borrowed.placement.ignore_layout = ignore;
+            borrowed.rendered_valid = false;
+        }
+        pub fn set_visible(&self, visible: bool) {
+            let mut borrowed = self.$data_field.borrow_mut();
+            borrowed.visible = visible;
             borrowed.rendered_valid = false;
         }
     };

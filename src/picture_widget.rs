@@ -1,6 +1,6 @@
 
 use std::cell::RefCell;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 use crate::shaders;
 use crate::util;
@@ -16,16 +16,18 @@ use gelatin::add_common_widget_functions;
 use gelatin::window::Window;
 use gelatin::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
 use gelatin::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
+use gelatin::line_layout_container::HorizontalLayoutContainer;
 
 use std::time::{Duration, Instant};
 
 struct PictureWidgetData {
-    pub placement: WidgetPlacement,
-    pub drawn_bounds: LogicalRect,
-    pub prev_draw_size: LogicalVector,
+    placement: WidgetPlacement,
+    drawn_bounds: LogicalRect,
+    prev_draw_size: LogicalVector,
+    visible: bool,
 
-    pub click: bool,
-    pub hover: bool,
+    click: bool,
+    hover: bool,
 
     playback_manager: PlaybackManager,
 
@@ -41,7 +43,9 @@ struct PictureWidgetData {
     moving_window: bool,
 
     slider: Rc<gelatin::slider::Slider>,
-    pub rendered_valid: bool,
+    bottom_panel: Rc<HorizontalLayoutContainer>,
+    window: Weak<Window>,
+    rendered_valid: bool,
 }
 impl WidgetData for PictureWidgetData {
     fn placement(&mut self) -> &mut WidgetPlacement {
@@ -49,6 +53,9 @@ impl WidgetData for PictureWidgetData {
     }
     fn drawn_bounds(&mut self) -> &mut LogicalRect {
         &mut self.drawn_bounds
+    }
+    fn visible(&mut self) -> &mut bool {
+        &mut self.visible
     }
 }
 impl PictureWidgetData {
@@ -128,7 +135,7 @@ pub struct PictureWidget {
     data: RefCell<PictureWidgetData>,
 }
 impl PictureWidget {
-    pub fn new(display: &Display, slider: Rc<gelatin::slider::Slider>) -> PictureWidget {
+    pub fn new(display: &Display, window: &Rc<Window>, slider: Rc<gelatin::slider::Slider>, bottom_panel: Rc<HorizontalLayoutContainer>) -> PictureWidget {
         let program = program!(display,
             140 => {
                 vertex: shaders::VERTEX_140,
@@ -144,12 +151,13 @@ impl PictureWidget {
         PictureWidget {
             data: RefCell::new(PictureWidgetData {
                 placement: Default::default(),
+                drawn_bounds: Default::default(),
+                visible: true,
                 prev_draw_size: Default::default(),
                 click: false,
                 hover: false,
                 //image_texture: None,
                 playback_manager: PlaybackManager::new(),
-                drawn_bounds: Default::default(),
                 rendered_valid: false,
 
                 program,
@@ -161,6 +169,8 @@ impl PictureWidget {
                 last_mouse_pos: Default::default(),
                 panning: false,
                 slider,
+                bottom_panel,
+                window: Rc::downgrade(window),
                 moving_window: false,
             }),
         }
@@ -187,6 +197,9 @@ impl Widget for PictureWidget {
 
     fn before_draw(&self, window: &Window) {
         let mut data = self.data.borrow_mut();
+        if !data.visible {
+            return;
+        }
         data.playback_manager.update_image(window);
         let curr_file_index = data.playback_manager.current_file_index() as u32;
         let curr_dir_len = data.playback_manager.current_dir_len() as u32;
@@ -206,6 +219,9 @@ impl Widget for PictureWidget {
         let texture;
         {
             let mut data = self.data.borrow_mut();
+            if !data.visible {
+                return Ok(());
+            }
             data.update_image_transform(context.display, context.dpi_scale_factor);
             texture = data.get_texture();
         }
@@ -277,6 +293,9 @@ impl Widget for PictureWidget {
     }
 
     fn handle_event(&self, event: &Event) {
+        if !self.data.borrow().visible {
+            return;
+        }
         match event.kind {
             EventKind::MouseMove => {
                 let mut borrowed = self.data.borrow_mut();
@@ -302,6 +321,14 @@ impl Widget for PictureWidget {
                             if duration_since_last_click < Duration::from_millis(250) {
                                 // TODO
                                 //borrowed.toggle_fullscreen(window, bottom_panel);
+                                match borrowed.window.upgrade() {
+                                    Some(window) => {
+                                        let fullscreen = !window.fullscreen();
+                                        window.set_fullscreen(fullscreen);
+                                        borrowed.bottom_panel.set_visible(!fullscreen);
+                                    }
+                                    None => unreachable!()
+                                }
                             } else {
                                 borrowed.moving_window = true;
                             }
@@ -374,5 +401,9 @@ impl Widget for PictureWidget {
 
     fn placement(&self) -> WidgetPlacement {
         self.data.borrow().placement
+    }
+
+    fn visible(&self) -> bool {
+        self.data.borrow().visible
     }
 }

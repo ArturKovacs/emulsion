@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use std::collections::hash_map::HashMap;
 
 use glium::glutin::{
@@ -11,7 +12,7 @@ use crate::window::Window;
 
 pub struct Application {
     pub event_loop: glutin::event_loop::EventLoop<()>,
-    windows: HashMap<WindowId, Window>,
+    windows: HashMap<WindowId, Rc<Window>>,
 }
 
 impl Application {
@@ -22,8 +23,8 @@ impl Application {
         }
     }
 
-    pub fn register_window(&mut self, window: &Window) {
-        self.windows.insert(window.get_id(), window.clone());
+    pub fn register_window(&mut self, window: Rc<Window>) {
+        self.windows.insert(window.get_id(), window);
     }
 
     pub fn start_event_loop(self) -> ! {

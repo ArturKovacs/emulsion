@@ -10,17 +10,18 @@ use crate::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement
 use crate::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
 
 struct SliderData {
-    pub placement: WidgetPlacement,
-    pub drawn_bounds: LogicalRect,
+    placement: WidgetPlacement,
+    drawn_bounds: LogicalRect,
+    visible: bool,
 
-    pub steps: u32,
-    pub value: u32,
-    pub click: bool,
-    pub hover: bool,
-    pub on_value_change: Option<Rc<dyn Fn()>>,
-    pub shadow_color: [f32; 3],
+    steps: u32,
+    value: u32,
+    click: bool,
+    hover: bool,
+    on_value_change: Option<Rc<dyn Fn()>>,
+    shadow_color: [f32; 3],
 
-    pub rendered_valid: bool,
+    rendered_valid: bool,
 }
 impl WidgetData for SliderData {
     fn placement(&mut self) -> &mut WidgetPlacement {
@@ -28,6 +29,9 @@ impl WidgetData for SliderData {
     }
     fn drawn_bounds(&mut self) -> &mut LogicalRect {
         &mut self.drawn_bounds
+    }
+    fn visible(&mut self) -> &mut bool {
+        &mut self.visible
     }
 }
 
@@ -40,13 +44,14 @@ impl Slider {
         Slider {
             data: RefCell::new(SliderData {
                 placement: Default::default(),
+                drawn_bounds: Default::default(),
+                visible: true,
                 steps: 1,
                 value: 0,
                 click: false,
                 hover: false,
                 on_value_change: None,
                 shadow_color: [0.0, 0.0, 0.0],
-                drawn_bounds: Default::default(),
                 rendered_valid: false,
             }),
         }
@@ -98,6 +103,9 @@ impl Widget for Slider {
         use glium::{Blend, BlendingFunction, LinearBlendingFactor};
         {
             let borrowed = self.data.borrow();
+            if !borrowed.visible {
+                return Ok(());
+            }
 
             let position = borrowed.drawn_bounds.pos.vec;
             let size = borrowed.drawn_bounds.size.vec;
@@ -182,6 +190,9 @@ impl Widget for Slider {
     }
 
     fn handle_event(&self, event: &Event) {
+        if !self.data.borrow().visible {
+            return;
+        }
         let check_value_change = || {
             // We jugle around the `on_value_change` callback so that when it gets called,
             // `self.data` is not borrowed.
@@ -229,5 +240,9 @@ impl Widget for Slider {
 
     fn placement(&self) -> WidgetPlacement {
         self.data.borrow().placement
+    }
+
+    fn visible(&self) -> bool {
+        self.data.borrow().visible
     }
 }
