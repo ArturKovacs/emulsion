@@ -3,6 +3,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::path::PathBuf;
+use std::time::Instant;
 
 use crate::shaders;
 use crate::util;
@@ -15,6 +16,7 @@ use gelatin::glium::{Display, Program, program, uniform, Frame, Surface, texture
 use gelatin::image::{self, ImageError, RgbaImage};
 
 use gelatin::add_common_widget_functions;
+use gelatin::NextUpdate;
 use gelatin::window::Window;
 use gelatin::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
 use gelatin::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
@@ -85,13 +87,13 @@ impl Widget for HelpScreen {
 
     fn before_draw(&self, _window: &Window) {}
 
-    fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<(), WidgetError> {
+    fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<NextUpdate, WidgetError> {
         use gelatin::glium::{Blend, BlendingFunction, LinearBlendingFactor};
         self.data.borrow_mut().rendered_valid = true;
         {
             let borrowed = self.data.borrow();
             if !borrowed.visible {
-                return Ok(())
+                return Ok(NextUpdate::Latest);
             }
 
             let w = borrowed.parent_space.size.vec.x;
@@ -174,7 +176,7 @@ impl Widget for HelpScreen {
 
             //let uniforms
         }
-        Ok(())
+        Ok(NextUpdate::Latest)
     }
 
     fn layout(&self, available_space: LogicalRect) {

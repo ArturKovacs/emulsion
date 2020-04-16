@@ -1,6 +1,7 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::time::Instant;
 
 use glium::glutin::{
     self,
@@ -11,6 +12,7 @@ use glium::{uniform, Frame, Surface};
 use crate::window::Window;
 use crate::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement, PickDimension, HorDim, VerDim};
 use crate::{add_common_widget_functions, DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
+use crate::NextUpdate;
 
 pub type HorizontalLayoutContainer = LineLayoutContainer<HorDim>;
 pub type VerticalLayoutContainer = LineLayoutContainer<VerDim>;
@@ -142,11 +144,12 @@ impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
         }
     }
 
-    fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<(), WidgetError> {
+    fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<NextUpdate, WidgetError> {
+        let mut next_update = NextUpdate::Latest;
         {
             let borrowed = self.data.borrow();
             if !borrowed.visible {
-                return Ok(());
+                return Ok(NextUpdate::Latest);
             }
             if borrowed.bg_color[3] > 0.0 {
                 let viewport_rect = context.logical_rect_to_viewport(&borrowed.drawn_bounds);
@@ -159,11 +162,11 @@ impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
                 );
             }
             for child in borrowed.children.iter() {
-                child.draw(target, context)?;
+                next_update = next_update.aggregate(child.draw(target, context)?);
             }
         }
         self.data.borrow_mut().rendered_valid = true;
-        Ok(())
+        Ok(next_update)
     }
 
     fn layout(&self, mut available_space: LogicalRect) {

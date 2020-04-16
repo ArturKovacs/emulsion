@@ -7,6 +7,7 @@ pub use cgmath;
 use cgmath::Matrix4;
 use glium::glutin;
 use glium::{implement_vertex, Frame, IndexBuffer, Display, Program, Rect, VertexBuffer};
+use glutin::event_loop::ControlFlow;
 use std::any::Any;
 use std::rc::Rc;
 use std::vec::Vec;
@@ -14,6 +15,7 @@ use std::path::PathBuf;
 use std::fmt;
 use std::error::Error;
 use std::ops::Deref;
+use std::time::Instant;
 
 use misc::*;
 
@@ -146,6 +148,50 @@ pub trait WidgetData {
     }
 }
 
+#[derive(Copy, Clone)]
+pub enum NextUpdate {
+    /// Analogous to glutin::ControlFlow::Poll
+    Soonest,
+
+    /// Analogous to glutin::ControlFlow::WaitUntil
+    WaitUntil(Instant),
+
+    /// Analogous to glutin::ControlFlow::Wait
+    Latest,
+}
+
+impl NextUpdate {
+    pub fn aggregate(self, other: NextUpdate) -> NextUpdate {
+        match other {
+            NextUpdate::Soonest => other,
+            NextUpdate::WaitUntil(others_time) => {
+                match self {
+                    NextUpdate::Soonest => self,
+                    NextUpdate::WaitUntil(self_time) => {
+                        if others_time < self_time {
+                            other
+                        } else { self }
+                    }
+                    NextUpdate::Latest => other,
+                }
+            }
+            NextUpdate::Latest => self,
+        }
+    }
+}
+
+impl Into<ControlFlow> for NextUpdate {
+    fn into(self) -> ControlFlow {
+        match self {
+            NextUpdate::Soonest => ControlFlow::Poll,
+            NextUpdate::WaitUntil(time) => {
+                ControlFlow::WaitUntil(time)
+            }
+            NextUpdate::Latest => ControlFlow::Wait,
+        }
+    }
+}
+
 pub trait Widget: Any {
     /// When this is false, the window containing the widget
     /// will be re-rendered entirely and will run a new event loop
@@ -166,9 +212,13 @@ pub trait Widget: Any {
     /// to do that.
     ///
     /// The widget is responsible for setting the correct transformation.
-    /// A widget can get information for finding a proper
-    /// transformation from [insert name of the appropriate layout function here]
-    fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<(), WidgetError>;
+    /// A widget should get information for finding a proper
+    /// transformation from its own `drawn_bounds` field.
+    /// 
+    /// On success this furnction may return an instant indicating the time when it would like to
+    /// be redrawn. Otherwise it can return Ok(None) to indicate that it should only be redrawn when
+    /// a window event causes a change.
+    fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<NextUpdate, WidgetError>;
 
     fn layout(&self, available_space: LogicalRect);
 
@@ -257,6 +307,7 @@ pub struct Event {
     /// The position of the cursor in virtual pixels
     /// relative to the top left corner of the window.
     pub cursor_pos: LogicalVector,
+    pub modifiers: glutin::event::ModifiersState,
     pub kind: EventKind,
 }
 pub enum EventKind {

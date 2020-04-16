@@ -1,11 +1,13 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::time::Instant;
 
 use cgmath::{Matrix4, Vector3};
 use glium::glutin::event::{ElementState, MouseButton};
 use glium::{uniform, Frame, Surface};
 
 use crate::add_common_widget_functions;
+use crate::NextUpdate;
 use crate::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
 use crate::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
 
@@ -99,12 +101,12 @@ impl Widget for Slider {
         self.data.borrow().rendered_valid
     }
 
-    fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<(), WidgetError> {
+    fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<NextUpdate, WidgetError> {
         use glium::{Blend, BlendingFunction, LinearBlendingFactor};
         {
             let borrowed = self.data.borrow();
             if !borrowed.visible {
-                return Ok(());
+                return Ok(NextUpdate::Latest);
             }
 
             let position = borrowed.drawn_bounds.pos.vec;
@@ -181,7 +183,7 @@ impl Widget for Slider {
                 .unwrap();
         }
         self.data.borrow_mut().rendered_valid = true;
-        Ok(())
+        Ok(NextUpdate::Latest)
     }
 
     fn layout(&self, available_space: LogicalRect) {

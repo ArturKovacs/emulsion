@@ -13,6 +13,7 @@ use gelatin::glium::{Display, Program, program, uniform, Frame, Surface, texture
 use gelatin::image::{self, ImageError, RgbaImage};
 
 use gelatin::add_common_widget_functions;
+use gelatin::NextUpdate;
 use gelatin::window::Window;
 use gelatin::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
 use gelatin::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
@@ -42,6 +43,7 @@ struct PictureWidgetData {
     panning: bool,
     moving_window: bool,
 
+    next_update: NextUpdate,
     slider: Rc<gelatin::slider::Slider>,
     bottom_panel: Rc<HorizontalLayoutContainer>,
     window: Weak<Window>,
@@ -168,6 +170,7 @@ impl PictureWidget {
                 last_click_time: Instant::now() - Duration::from_secs(10),
                 last_mouse_pos: Default::default(),
                 panning: false,
+                next_update: NextUpdate::Latest,
                 slider,
                 bottom_panel,
                 window: Rc::downgrade(window),
@@ -192,7 +195,8 @@ impl PictureWidget {
 
 impl Widget for PictureWidget {
     fn is_valid(&self) -> bool {
-        self.data.borrow().rendered_valid
+        let borrowed = self.data.borrow();
+        borrowed.rendered_valid && borrowed.playback_manager.should_sleep()
     }
 
     fn before_draw(&self, window: &Window) {
@@ -200,7 +204,7 @@ impl Widget for PictureWidget {
         if !data.visible {
             return;
         }
-        data.playback_manager.update_image(window);
+        data.next_update = data.playback_manager.update_image(window);
         let curr_file_index = data.playback_manager.current_file_index() as u32;
         let curr_dir_len = data.playback_manager.current_dir_len() as u32;
         data.slider.set_steps(curr_dir_len, curr_file_index);
@@ -215,12 +219,12 @@ impl Widget for PictureWidget {
         }
     }
 
-    fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<(), WidgetError> {
+    fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<NextUpdate, WidgetError> {
         let texture;
         {
             let mut data = self.data.borrow_mut();
             if !data.visible {
-                return Ok(());
+                return Ok(data.next_update);
             }
             data.update_image_transform(context.display, context.dpi_scale_factor);
             texture = data.get_texture();
@@ -283,8 +287,9 @@ impl Widget for PictureWidget {
                     .unwrap();
             }
         }
-        self.data.borrow_mut().rendered_valid = true;
-        Ok(())
+        let mut borrowed = self.data.borrow_mut();
+        borrowed.rendered_valid = true;
+        Ok(borrowed.next_update)
     }
 
     fn layout(&self, available_space: LogicalRect) {
@@ -370,19 +375,37 @@ impl Widget for PictureWidget {
                 if input.state == ElementState::Pressed {
                     if let Some(key) = input.virtual_keycode {
                         let mut borrowed = self.data.borrow_mut();
-                        match key {
-                            VirtualKeyCode::Left | VirtualKeyCode::A => {
-                                borrowed.playback_manager.request_load(LoadRequest::LoadPrevious);
+                        if event.modifiers.alt() {
+                            match key {
+                                VirtualKeyCode::V | VirtualKeyCode::A => {
+                                    match borrowed.playback_manager.playback_state() {
+                                        PlaybackState::Forward => borrowed.playback_manager.pause_playback(),
+                                        _ => borrowed.playback_manager.start_playback_forward(),
+                                    }
+                                }
+                                VirtualKeyCode::P => {
+                                    borrowed.playback_manager.start_random_presentation();
+                                }
+                                _ => ()
                             }
-                            VirtualKeyCode::Right | VirtualKeyCode::D => {
-                                borrowed.playback_manager.request_load(LoadRequest::LoadNext);
+                        } else {
+                            match key {
+                                VirtualKeyCode::Left | VirtualKeyCode::A => {
+                                    borrowed.playback_manager.request_load(LoadRequest::LoadPrevious);
+                                }
+                                VirtualKeyCode::Right | VirtualKeyCode::D => {
+                                    borrowed.playback_manager.request_load(LoadRequest::LoadNext);
+                                }
+                                VirtualKeyCode::F => borrowed.image_fit = true,
+                                VirtualKeyCode::Q => {
+                                    borrowed.image_fit = false;
+                                    borrowed.img_texel_size = 1.0;
+                                }
+                                VirtualKeyCode::P => {
+                                    borrowed.playback_manager.start_presentation();
+                                }
+                                _ => ()
                             }
-                            VirtualKeyCode::F => borrowed.image_fit = true,
-                            VirtualKeyCode::Q => {
-                                borrowed.image_fit = false;
-                                borrowed.img_texel_size = 1.0;
-                            }
-                            _ => ()
                         }
                     }
                 }

@@ -37,6 +37,7 @@ struct WindowData {
     fullscreen: bool,
     redraw_needed: bool,
     cursor_pos: LogicalVector,
+    modifiers: glutin::event::ModifiersState,
     root_widget: Rc<dyn Widget>,
     bg_color: [f32; 4],
 
@@ -146,6 +147,7 @@ impl Window {
                 size_before_fullscreen: window_size,
                 fullscreen: false,
                 cursor_pos: Default::default(),
+                modifiers: glutin::event::ModifiersState::empty(),
                 redraw_needed: false,
                 //widgets: HashSet::new(),
                 root_widget: Rc::new(crate::line_layout_container::VerticalLayoutContainer::new()),
@@ -184,6 +186,7 @@ impl Window {
                 WindowEvent::KeyboardInput { input, .. } => {
                     event = Some(Event {
                         cursor_pos: borrowed.cursor_pos,
+                        modifiers: borrowed.modifiers,
                         kind: EventKind::KeyInput { input },
                     });
                 }
@@ -200,7 +203,11 @@ impl Window {
                     }
                     borrowed.cursor_pos = logical_pos;
                     event =
-                        Some(Event { cursor_pos: borrowed.cursor_pos, kind: EventKind::MouseMove });
+                        Some(Event { 
+                            cursor_pos: borrowed.cursor_pos,
+                            modifiers: borrowed.modifiers,
+                            kind: EventKind::MouseMove
+                        });
                 }
                 WindowEvent::MouseWheel { delta: native_delta, .. } => {
                     let delta;
@@ -216,33 +223,42 @@ impl Window {
                     }
                     event = Some(Event {
                         cursor_pos: borrowed.cursor_pos,
+                        modifiers: borrowed.modifiers,
                         kind: EventKind::MouseScroll { delta },
                     });
                 }
                 WindowEvent::MouseInput { state, button, .. } => {
                     event = Some(Event {
                         cursor_pos: borrowed.cursor_pos,
+                        modifiers: borrowed.modifiers,
                         kind: EventKind::MouseButton { state, button },
                     });
                 }
                 WindowEvent::DroppedFile(path) => {
                     event = Some(Event {
                         cursor_pos: borrowed.cursor_pos,
+                        modifiers: borrowed.modifiers,
                         kind: EventKind::DroppedFile(path),
                     });
                 }
                 WindowEvent::HoveredFile(path) => {
                     event = Some(Event {
                         cursor_pos: borrowed.cursor_pos,
+                        modifiers: borrowed.modifiers,
                         kind: EventKind::HoveredFile(path),
                     });
                 },
                 WindowEvent::HoveredFileCancelled => {
                     event = Some(Event {
                         cursor_pos: borrowed.cursor_pos,
+                        modifiers: borrowed.modifiers,
                         kind: EventKind::HoveredFileCancelled,
                     });
                 },
+                WindowEvent::ModifiersChanged(modifiers) => {
+                    borrowed.modifiers = modifiers;
+                    event = None;
+                }
                 _ => event = None,
             }
         }
@@ -275,7 +291,7 @@ impl Window {
     /// WARNING The window may not be changed during the drawing phase.
     /// This means that trying to borrow the window *mutably* in a widget's
     /// draw function will fail.
-    pub fn redraw(&self) {
+    pub fn redraw(&self) -> crate::NextUpdate {
         let root_widget = self.data.borrow().root_widget.clone();
         // this way self.data is not borrowed while before draw is running.
         root_widget.before_draw(self);
@@ -329,10 +345,10 @@ impl Window {
 
         // Using the cloned root instead of self.root_widget doesn't make much difference
         // because self is being borrowed by through the draw_context anyways but it's fine.
-        root_widget.draw(&mut target, &draw_context).unwrap();
+        let retval = root_widget.draw(&mut target, &draw_context).unwrap();
 
-        //target.clear();
         target.finish().unwrap();
+        retval
     }
 
     pub fn fullscreen(&self) -> bool {

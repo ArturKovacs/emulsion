@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::time::Instant;
 
 use cgmath::{Matrix4, Vector3};
 use glium::glutin::event::{ElementState, MouseButton};
@@ -9,6 +10,7 @@ use crate::add_common_widget_functions;
 use crate::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
 use crate::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
 use crate::picture::Picture;
+use crate::NextUpdate;
 
 struct ButtonData {
     placement: WidgetPlacement,
@@ -75,7 +77,7 @@ impl Widget for Button {
         self.data.borrow().rendered_valid
     }
 
-    fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<(), WidgetError> {
+    fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<NextUpdate, WidgetError> {
         use glium::{Blend, BlendingFunction, LinearBlendingFactor};
         {
             let borrowed = self.data.borrow();
@@ -159,7 +161,7 @@ impl Widget for Button {
             }
         }
         self.data.borrow_mut().rendered_valid = true;
-        Ok(())
+        Ok(NextUpdate::Latest)
     }
 
     fn layout(&self, available_space: LogicalRect) {

@@ -30,6 +30,7 @@ impl Application {
     pub fn start_event_loop(self) -> ! {
         let windows = self.windows;
         let mut close_requested = false;
+        let mut control_flow_source = *windows.keys().next().unwrap();
         self.event_loop.run(move |event, _event_loop, control_flow| match event {
             Event::WindowEvent { event, window_id } => match event {
                 WindowEvent::CloseRequested => {
@@ -58,6 +59,7 @@ impl Application {
                     for (_, window) in windows.iter() {
                         if window.redraw_needed() {
                             window.request_redraw();
+                            //event_loop
                         }
                     }
                 }
@@ -66,13 +68,38 @@ impl Application {
                 }
             }
             Event::RedrawRequested(window_id) => {
-                windows.get(&window_id).unwrap().redraw();
+                let new_control_flow = windows.get(&window_id).unwrap().redraw().into();
+                if control_flow_source == window_id {
+                    *control_flow = new_control_flow;
+                } else if *control_flow != ControlFlow::Exit {
+                    match new_control_flow {
+                        ControlFlow::Exit => *control_flow = new_control_flow,
+                        ControlFlow::Poll => {
+                            *control_flow = new_control_flow;
+                            control_flow_source = window_id;
+                        }
+                        ControlFlow::WaitUntil(new_time) => {
+                            match *control_flow {
+                                ControlFlow::WaitUntil(orig_time) => {
+                                    if new_time < orig_time {
+                                        *control_flow = new_control_flow;
+                                        control_flow_source = window_id;
+                                    }
+                                }
+                                ControlFlow::Wait => {
+                                    *control_flow = new_control_flow;
+                                    control_flow_source = window_id;
+                                }
+                                _ => ()
+                            }
+                        }
+                        _ => ()
+                    }
+                }
             }
             Event::RedrawEventsCleared => {
                 if close_requested {
                     *control_flow = ControlFlow::Exit;
-                } else {
-                    *control_flow = ControlFlow::Wait;
                 }
             }
             _ => (),
