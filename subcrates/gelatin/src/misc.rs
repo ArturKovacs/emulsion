@@ -1,7 +1,7 @@
 use cgmath::Vector2;
 use glium::glutin::dpi;
 
-use std::ops::{Add, Mul, Sub, AddAssign};
+use std::ops::{Add, Mul, Div, Sub, AddAssign};
 
 /// Used to represent logical pixel coordinates and dimensions.
 ///
@@ -49,6 +49,12 @@ impl Mul<LogicalVector> for f32 {
     type Output = LogicalVector;
     fn mul(self, other: LogicalVector) -> Self::Output {
         (self * other.vec).into()
+    }
+}
+impl<T: Into<f32>> Div<T> for LogicalVector {
+    type Output = Self;
+    fn div(self, other: T) -> Self::Output {
+        (self.vec / other.into()).into()
     }
 }
 impl<T: Into<f32>> From<Vector2<T>> for LogicalVector {
@@ -127,6 +133,22 @@ impl LogicalRect {
             && point.vec.x < self.pos.vec.x + self.size.vec.x
             && point.vec.y > self.pos.vec.y
             && point.vec.y < self.pos.vec.y + self.size.vec.y
+    }
+    /// Set the position and the size so that they will line up
+    /// with pyhsical display pixels.
+    pub fn align_to_pixels(mut self, dpi_scale: f32) -> LogicalRect {
+        // Note that this `phys_pos` is not in OpenGl coordinates
+        // because in `phys_pos` the top left corner is (0, 0)
+        // but in OpenGL the bottom left is.
+        let mut phys_pos = self.pos * dpi_scale;
+        let mut phys_size = self.size * dpi_scale;
+        phys_pos.vec.x = phys_pos.vec.x.round();
+        phys_pos.vec.y = phys_pos.vec.y.round();
+        phys_size.vec.x = phys_size.vec.x.round();
+        phys_size.vec.y = phys_size.vec.y.round();
+        self.pos = phys_pos / dpi_scale;
+        self.size = phys_size / dpi_scale;
+        self
     }
 }
 

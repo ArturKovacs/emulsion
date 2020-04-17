@@ -82,13 +82,15 @@ impl Widget for Button {
         {
             let borrowed = self.data.borrow();
 
-            let img_w = borrowed.drawn_bounds.size.vec.x;
-            let img_h = borrowed.drawn_bounds.size.vec.y;
+            let aligned_bounds = borrowed.drawn_bounds.align_to_pixels(context.dpi_scale_factor);
+
+            let img_w = aligned_bounds.size.vec.x;
+            let img_h = aligned_bounds.size.vec.y;
 
             // Model tranform
             let transform = Matrix4::from_nonuniform_scale(img_w, img_h, 1.0);
             let transform =
-                Matrix4::from_translation(borrowed.drawn_bounds.pos.vec.extend(0.0)) * transform;
+                Matrix4::from_translation(aligned_bounds.pos.vec.extend(0.0)) * transform;
             // Projection
             let transform = context.projection_transform * transform;
 

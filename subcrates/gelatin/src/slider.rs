@@ -108,9 +108,9 @@ impl Widget for Slider {
             if !borrowed.visible {
                 return Ok(NextUpdate::Latest);
             }
-
-            let position = borrowed.drawn_bounds.pos.vec;
-            let size = borrowed.drawn_bounds.size.vec;
+            let aligned_bounds = borrowed.drawn_bounds.align_to_pixels(context.dpi_scale_factor);
+            let position = aligned_bounds.pos.vec;
+            let size = aligned_bounds.size.vec;
             //let width = borrowed.drawn_bounds.size.vec.x;
             //let height = borrowed.drawn_bounds.size.vec.y;
 
@@ -159,7 +159,7 @@ impl Widget for Slider {
             // Model tranform
             let transform = Matrix4::from_nonuniform_scale(size.x, size.y, 1.0);
             let transform =
-                Matrix4::from_translation(borrowed.drawn_bounds.pos.vec.extend(0.0)) * transform;
+                Matrix4::from_translation(position.extend(0.0)) * transform;
             // Projection
             let transform = context.projection_transform * transform;
             
