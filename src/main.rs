@@ -1,20 +1,27 @@
-#![windows_subsystem = "windows"]
+//#![windows_subsystem = "windows"]
 
 #[macro_use]
 extern crate error_chain;
-extern crate backtrace;
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-extern crate rmp_serde;
-extern crate rand;
-extern crate alphanumeric_sort;
-extern crate trash;
+//extern crate backtrace;
+//extern crate serde;
+// #[macro_use]
+// extern crate serde_derive;
+//extern crate rmp_serde;
+
+use gelatin::image;
 
 use std::env;
 use std::rc::Rc;
+use std::cell::RefCell;
 
-use gelatin::glium::{glutin, Surface};
+use gelatin::glium::{
+    glutin::{self,
+        window::Icon, 
+        dpi::{PhysicalSize, PhysicalPosition},
+        event::WindowEvent,
+    },
+    Surface
+};
 
 mod handle_panic;
 mod image_cache;
@@ -37,7 +44,7 @@ mod util;
 use std::cell::Cell;
 use std::f32;
 use gelatin::{
-    application::*, button::*, line_layout_container::*, misc::*, picture::*, slider::*, window::Window
+    application::*, button::*, line_layout_container::*, misc::*, picture::*, slider::*, window::{Window, WindowDescriptorBuilder}
 };
 
 // ========================================================
@@ -46,8 +53,56 @@ use gelatin::{
 fn main() {
     std::panic::set_hook(Box::new(handle_panic::handle_panic));
 
+    let img = image::open("resource/emulsion48.png").unwrap();
+    let rgba = img.into_rgba();
+    let (w, h) = rgba.dimensions();
+    let icon = Icon::from_rgba(rgba.into_raw(), w, h).unwrap();
+
+    let cfg_path = "cfg.toml";
+    let first_lanuch;
+    let config: Rc<RefCell<Configuration>>;
+    if let Ok(cfg) = Configuration::load(cfg_path) {
+        first_lanuch = false;
+        config = Rc::new(RefCell::new(cfg));
+    } else {
+        first_lanuch = true;
+        config = Rc::new(RefCell::new(Configuration::default()));
+    }
     let mut application = Application::new();
-    let window = Rc::new(gelatin::window::Window::new(&mut application));
+    {
+        let config_clone = config.clone();
+        application.set_at_exit(Some(move || {
+            config_clone.borrow().save(cfg_path).unwrap();
+        }));
+    }
+    let window: Rc<Window>;
+    {
+        let config = config.borrow();
+        let window_desc = WindowDescriptorBuilder::default()
+            .icon(Some(icon))
+            .size(PhysicalSize::new(config.win_w, config.win_h))
+            .position(Some(PhysicalPosition::new(config.win_x, config.win_y)))
+            .build().unwrap();
+        window = Window::new(&mut application, window_desc);
+    }
+    {
+        let config_clone = config.clone();
+        window.add_global_event_handler(move |event| {
+            match event {
+                WindowEvent::Resized(new_size) => {
+                    let mut config = config_clone.borrow_mut();
+                    config.win_w = new_size.width;
+                    config.win_h = new_size.height;
+                }
+                WindowEvent::Moved(new_pos) => {
+                    let mut config = config_clone.borrow_mut();
+                    config.win_x = new_pos.x;
+                    config.win_y = new_pos.y;
+                }
+                _ => ()
+            }
+        });
+    }
     let vertical_container = Rc::new(VerticalLayoutContainer::new());
     vertical_container.set_margin_all(0.0);
     vertical_container.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
@@ -101,6 +156,9 @@ fn main() {
     );
     picture_widget.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
     picture_widget.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
+    if let Some(file_path) = std::env::args().skip(1).next() {
+        picture_widget.jump_to_path(file_path)
+    }
     
     bottom_container.add_child(theme_button.clone());
     bottom_container.add_child(slider.clone());
@@ -127,7 +185,7 @@ fn main() {
     let bottom_container_clone = bottom_container.clone();
     let slider_clone = slider.clone();
     let window_clone = window.clone();
-    let light_theme = Cell::new(true);
+    let light_theme = Cell::new(!config.borrow().dark);
     set_theme(
         light_theme.get(),
         &picture_widget_clone,
@@ -143,6 +201,7 @@ fn main() {
     );
     theme_button.set_on_click(move || {
         light_theme.set(!light_theme.get());
+        config.borrow_mut().dark = !light_theme.get();
         set_theme(
             light_theme.get(),
             &picture_widget_clone,
@@ -162,7 +221,7 @@ fn main() {
     slider.set_on_value_change(move || {
         image_widget_clone.jump_to_index(slider_clone2.value());
     });
-    let help_visible = Cell::new(false);
+    let help_visible = Cell::new(first_lanuch);
     help_screen.set_visible(help_visible.get());
     help_button.set_on_click(move || {
         help_visible.set(!help_visible.get());

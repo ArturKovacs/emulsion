@@ -1,5 +1,6 @@
-use glium::glutin::{self, dpi::PhysicalSize, event::WindowEvent, window::WindowId};
+use glium::glutin::{self, dpi::{PhysicalSize, PhysicalPosition}, event::WindowEvent, window::WindowId};
 use glium::{program, IndexBuffer, Program, Rect, Surface, VertexBuffer, Display};
+use glium::glutin::window::Icon;
 
 use std::cell::{RefCell, RefMut};
 use std::cmp::Eq;
@@ -8,6 +9,7 @@ use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 use cgmath::ortho;
+use derive_builder::Builder;
 
 use crate::application::Application;
 use crate::shaders;
@@ -31,6 +33,19 @@ impl<'a> DerefMut for WindowDisplayRefMut<'a> {
     }
 }
 
+#[derive(Builder, Clone)]
+#[builder(setter(into))]
+pub struct WindowDescriptor {
+    #[builder(default)]
+    icon: Option<Icon>,
+
+    #[builder(default="PhysicalSize::<u32>::new(800, 600)")]
+    size: PhysicalSize<u32>,
+
+    #[builder(default)]
+    position: Option<PhysicalPosition<i32>>,
+}
+
 struct WindowData {
     display: glium::Display,
     size_before_fullscreen: PhysicalSize<u32>,
@@ -40,6 +55,8 @@ struct WindowData {
     modifiers: glutin::event::ModifiersState,
     root_widget: Rc<dyn Widget>,
     bg_color: [f32; 4],
+
+    global_event_handlers: Vec<Box<dyn FnMut(&WindowEvent)>>,
 
     // Draw data
     unit_quad_vertices: VertexBuffer<Vertex>,
@@ -65,27 +82,24 @@ impl PartialEq for Window {
 impl Eq for Window {}
 
 impl Window {
-    pub fn new(application: &mut Application) -> Rc<Self> {
+    pub fn new(application: &mut Application, desc: WindowDescriptor) -> Rc<Self> {
         //use glium::glutin::window::Icon;
         //let exe_parent = std::env::current_exe().unwrap().parent().unwrap().to_owned();
-
-        let window_size = PhysicalSize::<u32>::new(800, 600);
 
         let window = glutin::window::WindowBuilder::new()
             .with_title("Loading")
             .with_fullscreen(None)
-            .with_inner_size(window_size)
-            //.with_window_icon(Some(icon))
-            .with_visible(true);
+            .with_inner_size(desc.size)
+            .with_window_icon(desc.icon)
+            .with_visible(desc.position.is_none());
 
         let context = glutin::ContextBuilder::new().with_gl_profile(glutin::GlProfile::Core);
         let display = glium::Display::new(window, context, &application.event_loop).unwrap();
 
-        // display.gl_window().window().set_ime_position(LogicalPosition::new(
-        //     config.window_x as f64,
-        //     config.window_y as f64,
-        // ));
-        //display.gl_window().window().set_visible(true);
+        if let Some(pos) = desc.position {
+            display.gl_window().window().set_outer_position(pos);
+            display.gl_window().window().set_visible(true);
+        }
 
         // All the draw stuff
         use glium::index::PrimitiveType;
@@ -144,14 +158,15 @@ impl Window {
         let resulting_window = Rc::new(Window {
             data: RefCell::new(WindowData {
                 display,
-                size_before_fullscreen: window_size,
+                size_before_fullscreen: desc.size,
                 fullscreen: false,
                 cursor_pos: Default::default(),
                 modifiers: glutin::event::ModifiersState::empty(),
                 redraw_needed: false,
-                //widgets: HashSet::new(),
                 root_widget: Rc::new(crate::line_layout_container::VerticalLayoutContainer::new()),
                 bg_color: [0.85, 0.85, 0.85, 1.0],
+
+                global_event_handlers: Vec::new(),
 
                 unit_quad_vertices: vertex_buffer,
                 unit_quad_indices: index_buffer,
@@ -163,6 +178,11 @@ impl Window {
 
         application.register_window(resulting_window.clone());
         resulting_window
+    }
+
+    pub fn add_global_event_handler<F: FnMut(&WindowEvent) + 'static>(&self, fun: F) {
+        let mut borrowed = self.data.borrow_mut();
+        borrowed.global_event_handlers.push(Box::new(fun));
     }
 
     pub fn set_root<T: Widget>(&self, widget: Rc<T>) {
@@ -182,6 +202,9 @@ impl Window {
         let event;
         {
             let mut borrowed = self.data.borrow_mut();
+            for handler in borrowed.global_event_handlers.iter_mut() {
+                handler(&native_event);
+            }
             match native_event {
                 WindowEvent::KeyboardInput { input, .. } => {
                     event = Some(Event {

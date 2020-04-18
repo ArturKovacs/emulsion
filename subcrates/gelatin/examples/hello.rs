@@ -9,7 +9,7 @@ use std::rc::Rc;
 fn main() {
     let mut application = Application::new();
     // A window
-    let window = Window::new(&mut application);
+    let window = Window::new(&mut application, WindowDescriptorBuilder::default().build().unwrap());
     let container = Rc::new(HorizontalLayoutContainer::new());
     container.set_margin_top(5.0);
     container.set_margin_bottom(5.0);

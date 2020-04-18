@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 cgmath = "0.17"
 image = "0.23"
+derive_builder = "0.9"
 
 [dependencies.glium]
 version = "0.27"

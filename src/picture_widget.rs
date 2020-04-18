@@ -1,9 +1,9 @@
 
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
+use std::path::PathBuf;
 
 use crate::shaders;
-use crate::util;
 
 use crate::playback_manager::*;
 
@@ -26,6 +26,7 @@ struct PictureWidgetData {
     drawn_bounds: LogicalRect,
     prev_draw_size: LogicalVector,
     visible: bool,
+    rendered_valid: bool,
 
     click: bool,
     hover: bool,
@@ -43,11 +44,11 @@ struct PictureWidgetData {
     panning: bool,
     moving_window: bool,
 
+    first_draw: bool,
     next_update: NextUpdate,
     slider: Rc<gelatin::slider::Slider>,
     bottom_panel: Rc<HorizontalLayoutContainer>,
     window: Weak<Window>,
-    rendered_valid: bool,
 }
 impl WidgetData for PictureWidgetData {
     fn placement(&mut self) -> &mut WidgetPlacement {
@@ -161,7 +162,7 @@ impl PictureWidget {
                 //image_texture: None,
                 playback_manager: PlaybackManager::new(),
                 rendered_valid: false,
-
+            
                 program,
                 bright_shade: 0.95,
                 img_texel_size: 0.0,
@@ -170,6 +171,7 @@ impl PictureWidget {
                 last_click_time: Instant::now() - Duration::from_secs(10),
                 last_mouse_pos: Default::default(),
                 panning: false,
+                first_draw: true,
                 next_update: NextUpdate::Latest,
                 slider,
                 bottom_panel,
@@ -190,6 +192,13 @@ impl PictureWidget {
     pub fn jump_to_index(&self, index: u32) {
         let mut borrowed = self.data.borrow_mut();
         borrowed.playback_manager.request_load(LoadRequest::LoadAtIndex(index as usize));
+        borrowed.rendered_valid = false;
+    }
+
+    pub fn jump_to_path<P: Into<PathBuf>>(&self, path: P) {
+        let mut borrowed = self.data.borrow_mut();
+        borrowed.playback_manager.request_load(LoadRequest::FilePath(path.into()));
+        borrowed.rendered_valid = false;
     }
 }
 
@@ -202,6 +211,14 @@ impl Widget for PictureWidget {
     fn before_draw(&self, window: &Window) {
         let mut data = self.data.borrow_mut();
         if !data.visible {
+            return;
+        }
+        if data.first_draw {
+            // Don't block on the main thread and
+            // wait on the image to be loaded on the first draw
+            // let the ui draw itself first and then we can wait.
+            data.first_draw = false;
+            data.next_update = NextUpdate::Soonest;
             return;
         }
         data.next_update = data.playback_manager.update_image(window);
