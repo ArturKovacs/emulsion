@@ -1,13 +1,14 @@
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use glium::{Frame, Surface};
 
+use crate::misc::{
+    Alignment, HorDim, Length, LogicalRect, LogicalVector, PickDimension, VerDim, WidgetPlacement,
+};
 use crate::window::Window;
-use crate::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement, PickDimension, HorDim, VerDim};
-use crate::{add_common_widget_functions, DrawContext, Event, Widget, WidgetData, WidgetError};
 use crate::NextUpdate;
+use crate::{add_common_widget_functions, DrawContext, Event, Widget, WidgetData, WidgetError};
 
 pub type HorizontalLayoutContainer = LineLayoutContainer<HorDim>;
 pub type VerticalLayoutContainer = LineLayoutContainer<VerDim>;
@@ -116,7 +117,8 @@ impl<Dim: PickDimension + 'static> LineLayoutContainer<Dim> {
                 Length::Stretch { max, .. } => {
                     if stretch_space_per_widget > 0.0 {
                         let max_space = max + margins;
-                        *Dim::rect_size_mut(widget_available_space) = stretch_space_per_widget.min(max_space);
+                        *Dim::rect_size_mut(widget_available_space) =
+                            stretch_space_per_widget.min(max_space);
                     }
                 }
             }
@@ -150,10 +152,15 @@ impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
                 let viewport_rect = context.logical_rect_to_viewport(&borrowed.drawn_bounds);
                 target.clear(
                     Some(&viewport_rect),
-                    Some((borrowed.bg_color[0], borrowed.bg_color[1], borrowed.bg_color[2], borrowed.bg_color[3])),
+                    Some((
+                        borrowed.bg_color[0],
+                        borrowed.bg_color[1],
+                        borrowed.bg_color[2],
+                        borrowed.bg_color[3],
+                    )),
                     false,
                     None,
-                    None
+                    None,
                 );
             }
             for child in borrowed.children.iter() {
@@ -251,7 +258,7 @@ impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
     }
 
     fn handle_event(&self, event: &Event) {
-        let children; 
+        let children;
         {
             let borrowed = self.data.borrow();
             if !borrowed.visible {
@@ -279,4 +286,3 @@ impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
         self.data.borrow().visible
     }
 }
-

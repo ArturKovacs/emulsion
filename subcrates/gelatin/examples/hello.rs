@@ -1,5 +1,5 @@
 use gelatin::{
-    application::*, button::*, line_layout_container::*, misc::*, window::*, picture::*, slider::*
+    application::*, button::*, line_layout_container::*, misc::*, picture::*, slider::*, window::*,
 };
 
 use std::cell::Cell;

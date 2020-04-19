@@ -6,8 +6,8 @@ use glium::glutin::event::{ElementState, MouseButton};
 use glium::{uniform, Frame, Surface};
 
 use crate::add_common_widget_functions;
-use crate::NextUpdate;
 use crate::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
+use crate::NextUpdate;
 use crate::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
 
 struct SliderData {
@@ -129,11 +129,7 @@ impl Widget for Slider {
             // Draw vertical line at slider value
             // Do this before the shadow so the shadow we draw later will cover this line as well
             let value_ratio = (borrowed.value as f32 + 0.5) / (borrowed.steps as f32);
-            let slider_pos = Vector3::new(
-                position.x + value_ratio * size.x,
-                position.y,
-                0.0,
-            );
+            let slider_pos = Vector3::new(position.x + value_ratio * size.x, position.y, 0.0);
             let color = [0.25, 0.25, 0.25, 1.0f32];
 
             let mut transform = Matrix4::from_nonuniform_scale(1.0, size.y, 1.0);
@@ -152,16 +148,15 @@ impl Widget for Slider {
                     &image_draw_params,
                 )
                 .unwrap();
-            
+
             // -----------------------
             // Draw slider background (shadow)
             // Model tranform
             let transform = Matrix4::from_nonuniform_scale(size.x, size.y, 1.0);
-            let transform =
-                Matrix4::from_translation(position.extend(0.0)) * transform;
+            let transform = Matrix4::from_translation(position.extend(0.0)) * transform;
             // Projection
             let transform = context.projection_transform * transform;
-            
+
             // building the uniforms
             let uniforms = uniform! {
                 matrix: Into::<[[f32; 4]; 4]>::into(transform),
@@ -203,17 +198,25 @@ impl Widget for Slider {
                 borrowed.hover = borrowed.drawn_bounds.contains(event.cursor_pos);
                 if borrowed.click {
                     let prev_value = borrowed.value;
-                    let relative_cursor_x = event.cursor_pos.vec.x - borrowed.drawn_bounds.pos.vec.x;
-                    let proportion = (relative_cursor_x / borrowed.drawn_bounds.size.vec.x).max(0.0).min(1.0);
+                    let relative_cursor_x =
+                        event.cursor_pos.vec.x - borrowed.drawn_bounds.pos.vec.x;
+                    let proportion =
+                        (relative_cursor_x / borrowed.drawn_bounds.size.vec.x).max(0.0).min(1.0);
                     let stepsf = borrowed.steps as f32;
-                    borrowed.value = 
+                    borrowed.value =
                         (proportion * (1.0 + 1.0 / stepsf) * (stepsf - 1.0)).floor() as u32;
                     if borrowed.value != prev_value {
                         on_value_change = borrowed.on_value_change.clone();
-                    } else { on_value_change = None; }
-                } else { on_value_change = None; }
+                    } else {
+                        on_value_change = None;
+                    }
+                } else {
+                    on_value_change = None;
+                }
             }
-            if let Some(callback) = on_value_change { callback(); }
+            if let Some(callback) = on_value_change {
+                callback();
+            }
         };
         match event.kind {
             EventKind::MouseMove => {

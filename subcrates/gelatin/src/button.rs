@@ -7,9 +7,9 @@ use glium::{uniform, Frame, Surface};
 
 use crate::add_common_widget_functions;
 use crate::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
-use crate::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
 use crate::picture::Picture;
 use crate::NextUpdate;
+use crate::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
 
 struct ButtonData {
     placement: WidgetPlacement,
@@ -187,7 +187,9 @@ impl Widget for Button {
                         let mut borrowed = self.data.borrow_mut();
                         if borrowed.click && borrowed.hover {
                             on_click = borrowed.on_click.clone();
-                        } else { on_click = None; }
+                        } else {
+                            on_click = None;
+                        }
                         borrowed.click = false;
                     }
                     if let Some(callback) = on_click {

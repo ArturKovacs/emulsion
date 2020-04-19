@@ -1,5 +1,5 @@
-use std::rc::Rc;
 use std::collections::hash_map::HashMap;
+use std::rc::Rc;
 
 use glium::glutin::{
     self,
@@ -58,7 +58,7 @@ impl Application {
                     } => {
                         close_requested = true;
                     }
-                    event @ _ => {
+                    event => {
                         if let WindowEvent::Resized { .. } = event {
                             windows.get(&window_id).unwrap().request_redraw();
                         }
@@ -89,22 +89,20 @@ impl Application {
                                 *control_flow = new_control_flow;
                                 control_flow_source = window_id;
                             }
-                            ControlFlow::WaitUntil(new_time) => {
-                                match *control_flow {
-                                    ControlFlow::WaitUntil(orig_time) => {
-                                        if new_time < orig_time {
-                                            *control_flow = new_control_flow;
-                                            control_flow_source = window_id;
-                                        }
-                                    }
-                                    ControlFlow::Wait => {
+                            ControlFlow::WaitUntil(new_time) => match *control_flow {
+                                ControlFlow::WaitUntil(orig_time) => {
+                                    if new_time < orig_time {
                                         *control_flow = new_control_flow;
                                         control_flow_source = window_id;
                                     }
-                                    _ => ()
                                 }
-                            }
-                            _ => ()
+                                ControlFlow::Wait => {
+                                    *control_flow = new_control_flow;
+                                    control_flow_source = window_id;
+                                }
+                                _ => (),
+                            },
+                            _ => (),
                         }
                     }
                 }

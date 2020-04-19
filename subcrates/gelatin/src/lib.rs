@@ -1,32 +1,32 @@
 //! Idk man
 
+pub use cgmath;
 pub use glium;
 pub use image;
-pub use cgmath;
 
 use cgmath::Matrix4;
 use glium::glutin;
-use glium::{implement_vertex, Frame, IndexBuffer, Display, Program, Rect, VertexBuffer};
+use glium::{implement_vertex, Display, Frame, IndexBuffer, Program, Rect, VertexBuffer};
 use glutin::event_loop::ControlFlow;
 use std::any::Any;
-use std::rc::Rc;
-use std::vec::Vec;
-use std::path::PathBuf;
-use std::fmt;
 use std::error::Error;
+use std::fmt;
 use std::ops::Deref;
+use std::path::PathBuf;
+use std::rc::Rc;
 use std::time::Instant;
+use std::vec::Vec;
 
 use misc::*;
 
 pub mod application;
 pub mod button;
 pub mod line_layout_container;
-pub mod slider;
 pub mod misc;
-pub mod shaders;
-pub mod window;
 pub mod picture;
+pub mod shaders;
+pub mod slider;
+pub mod window;
 
 #[derive(Debug)]
 pub enum WidgetError {
@@ -164,17 +164,17 @@ impl NextUpdate {
     pub fn aggregate(self, other: NextUpdate) -> NextUpdate {
         match other {
             NextUpdate::Soonest => other,
-            NextUpdate::WaitUntil(others_time) => {
-                match self {
-                    NextUpdate::Soonest => self,
-                    NextUpdate::WaitUntil(self_time) => {
-                        if others_time < self_time {
-                            other
-                        } else { self }
+            NextUpdate::WaitUntil(others_time) => match self {
+                NextUpdate::Soonest => self,
+                NextUpdate::WaitUntil(self_time) => {
+                    if others_time < self_time {
+                        other
+                    } else {
+                        self
                     }
-                    NextUpdate::Latest => other,
                 }
-            }
+                NextUpdate::Latest => other,
+            },
             NextUpdate::Latest => self,
         }
     }
@@ -184,9 +184,7 @@ impl Into<ControlFlow> for NextUpdate {
     fn into(self) -> ControlFlow {
         match self {
             NextUpdate::Soonest => ControlFlow::Poll,
-            NextUpdate::WaitUntil(time) => {
-                ControlFlow::WaitUntil(time)
-            }
+            NextUpdate::WaitUntil(time) => ControlFlow::WaitUntil(time),
             NextUpdate::Latest => ControlFlow::Wait,
         }
     }
@@ -214,7 +212,7 @@ pub trait Widget: Any {
     /// The widget is responsible for setting the correct transformation.
     /// A widget should get information for finding a proper
     /// transformation from its own `drawn_bounds` field.
-    /// 
+    ///
     /// On success this furnction may return an instant indicating the time when it would like to
     /// be redrawn. Otherwise it can return Ok(None) to indicate that it should only be redrawn when
     /// a window event causes a change.

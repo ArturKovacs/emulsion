@@ -1,7 +1,7 @@
 use cgmath::Vector2;
 use glium::glutin::dpi;
 
-use std::ops::{Add, Mul, Div, Sub, AddAssign};
+use std::ops::{Add, AddAssign, Div, Mul, Sub};
 
 /// Used to represent logical pixel coordinates and dimensions.
 ///
@@ -196,7 +196,6 @@ pub struct PhysicalVector {
 }
 
 // TODO implement stuff for physical vector
-
 
 pub trait PickDimension {
     fn vec_mut(v: &mut LogicalVector) -> &mut f32;

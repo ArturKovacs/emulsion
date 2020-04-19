@@ -1,6 +1,11 @@
-use glium::glutin::{self, dpi::{PhysicalSize, PhysicalPosition}, event::WindowEvent, window::WindowId};
-use glium::{program, IndexBuffer, Program, Rect, Surface, VertexBuffer, Display};
 use glium::glutin::window::Icon;
+use glium::glutin::{
+    self,
+    dpi::{PhysicalPosition, PhysicalSize},
+    event::WindowEvent,
+    window::WindowId,
+};
+use glium::{program, Display, IndexBuffer, Program, Rect, Surface, VertexBuffer};
 
 use std::cell::{RefCell, RefMut};
 use std::cmp::Eq;
@@ -39,7 +44,7 @@ pub struct WindowDescriptor {
     #[builder(default)]
     icon: Option<Icon>,
 
-    #[builder(default="PhysicalSize::<u32>::new(800, 600)")]
+    #[builder(default = "PhysicalSize::<u32>::new(800, 600)")]
     size: PhysicalSize<u32>,
 
     #[builder(default)]
@@ -225,12 +230,11 @@ impl Window {
                         //logical_pos.vec.y = logical_dimensions.vec.y - logical_pos.vec.y;
                     }
                     borrowed.cursor_pos = logical_pos;
-                    event =
-                        Some(Event { 
-                            cursor_pos: borrowed.cursor_pos,
-                            modifiers: borrowed.modifiers,
-                            kind: EventKind::MouseMove
-                        });
+                    event = Some(Event {
+                        cursor_pos: borrowed.cursor_pos,
+                        modifiers: borrowed.modifiers,
+                        kind: EventKind::MouseMove,
+                    });
                 }
                 WindowEvent::MouseWheel { delta: native_delta, .. } => {
                     let delta;
@@ -240,7 +244,8 @@ impl Window {
                         }
                         MouseScrollDelta::PixelDelta(native_pos) => {
                             delta = LogicalVector::new(
-                                native_pos.x as f32 / 13.0, native_pos.y as f32 / 8.0
+                                native_pos.x as f32 / 13.0,
+                                native_pos.y as f32 / 8.0,
                             );
                         }
                     }
@@ -270,14 +275,14 @@ impl Window {
                         modifiers: borrowed.modifiers,
                         kind: EventKind::HoveredFile(path),
                     });
-                },
+                }
                 WindowEvent::HoveredFileCancelled => {
                     event = Some(Event {
                         cursor_pos: borrowed.cursor_pos,
                         modifiers: borrowed.modifiers,
                         kind: EventKind::HoveredFileCancelled,
                     });
-                },
+                }
                 WindowEvent::ModifiersChanged(modifiers) => {
                     borrowed.modifiers = modifiers;
                     event = None;
@@ -352,7 +357,7 @@ impl Window {
             borrowed.bg_color[0],
             borrowed.bg_color[1],
             borrowed.bg_color[2],
-            borrowed.bg_color[3]
+            borrowed.bg_color[3],
         );
         let draw_context = DrawContext {
             display: &borrowed.display,
