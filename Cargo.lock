@@ -414,7 +414,7 @@ checksum = "bb1f6b1ce1c140482ea30ddd3335fc0024ac7ee112895426e0a629a6c20adfe3"
 
 [[package]]
 name = "emulsion"
-version = "1.3.0"
+version = "1.6.0"
 dependencies = [
  "alphanumeric-sort",
  "backtrace",

@@ -3,4 +3,4 @@
 **/*.rs.bk
 /.idea
 /.vscode
-
+.~lock.*

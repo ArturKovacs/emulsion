@@ -39,12 +39,11 @@ pub struct HelpScreen {
 }
 
 impl HelpScreen {
-	pub fn new() -> HelpScreen {
-		let usage_img = Picture::new("resource/usage.png");
+	pub fn new(usage_img: Picture) -> HelpScreen {
 		let img_data = usage_img.get_metadata().unwrap();
 		let placement = WidgetPlacement {
-			width: Length::Fixed(img_data.width as f32),
-			height: Length::Fixed(img_data.height as f32),
+			width: Length::Fixed(img_data.width as f32 * 0.5),
+			height: Length::Fixed(img_data.height as f32 * 0.5),
 			horizontal_align: Alignment::Center,
 			vertical_align: Alignment::Center,
 			ignore_layout: true,
@@ -119,11 +118,10 @@ impl Widget for HelpScreen {
 			///////////////////////////////////////////////////////////////////////////
 			// Draw Help Image
 			//////////////////////////////////////////////////////////////////////////
-			let img_w = borrowed.drawn_bounds.size.vec.x;
-			let img_h = borrowed.drawn_bounds.size.vec.y;
-			let mut pos = borrowed.drawn_bounds.pos.vec;
-			pos.x = pos.x.trunc();
-			pos.y = pos.y.trunc();
+			let aligned_bounds = borrowed.drawn_bounds.align_to_pixels(context.dpi_scale_factor);
+			let img_w = aligned_bounds.size.vec.x;
+			let img_h = aligned_bounds.size.vec.y;
+			let pos = aligned_bounds.pos.vec;
 			// Model tranform
 			let transform = Matrix4::from_nonuniform_scale(img_w, img_h, 1.0);
 			let transform = Matrix4::from_translation(pos.extend(0.0)) * transform;

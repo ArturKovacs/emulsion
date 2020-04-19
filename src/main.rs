@@ -1,4 +1,4 @@
-//#![windows_subsystem = "windows"]
+#![windows_subsystem = "windows"]
 
 #[macro_use]
 extern crate error_chain;
@@ -50,15 +50,17 @@ mod shaders;
 fn main() {
 	std::panic::set_hook(Box::new(handle_panic::handle_panic));
 
-	let img = image::open("resource/emulsion48.png").unwrap();
+	let exe_path = std::env::current_exe().unwrap();
+	let exe_folder = exe_path.parent().unwrap();
+	let img = image::open(exe_folder.join("resource/emulsion48.png")).unwrap();
 	let rgba = img.into_rgba();
 	let (w, h) = rgba.dimensions();
 	let icon = Icon::from_rgba(rgba.into_raw(), w, h).unwrap();
 
-	let cfg_path = "cfg.toml";
+	let cfg_path = exe_folder.join("cfg.toml").to_owned();
 	let first_lanuch;
 	let config: Rc<RefCell<Configuration>>;
-	if let Ok(cfg) = Configuration::load(cfg_path) {
+	if let Ok(cfg) = Configuration::load(cfg_path.as_path()) {
 		first_lanuch = false;
 		config = Rc::new(RefCell::new(cfg));
 	} else {
@@ -105,9 +107,9 @@ fn main() {
 
 	let update_notification = Rc::new(HorizontalLayoutContainer::new());
 	let update_label = Rc::new(Label::new());
-	let update_label_image = Rc::new(Picture::new("resource/new-version-available.png"));
+	let update_label_image = Rc::new(Picture::new(exe_folder.join("resource/new-version-available.png")));
 	let update_label_image_light =
-		Rc::new(Picture::new("resource/new-version-available-light.png"));
+		Rc::new(Picture::new(exe_folder.join("resource/new-version-available-light.png")));
 	{
 		update_notification.set_vertical_align(Alignment::End);
 		update_notification.set_horizontal_align(Alignment::Start);
@@ -119,7 +121,7 @@ fn main() {
 		update_label.set_fixed_size(LogicalVector::new(200.0, 24.0));
 		update_label.set_horizontal_align(Alignment::Center);
 		let update_button = Rc::new(Button::new());
-		let button_image = Rc::new(Picture::new("resource/visit-site.png"));
+		let button_image = Rc::new(Picture::new(exe_folder.join("resource/visit-site.png")));
 		update_button.set_icon(Some(button_image));
 		update_button.set_margin_top(4.0);
 		update_button.set_margin_bottom(4.0);
@@ -132,7 +134,8 @@ fn main() {
 		update_notification.add_child(update_button);
 	}
 
-	let help_screen = Rc::new(HelpScreen::new());
+	let usage_img = Picture::new(exe_folder.join("resource/usage.png"));
+	let help_screen = Rc::new(HelpScreen::new(usage_img));
 
 	let bottom_container = Rc::new(HorizontalLayoutContainer::new());
 	//bottom_container.set_margin_top(4.0);
@@ -142,8 +145,8 @@ fn main() {
 	bottom_container.set_height(Length::Fixed(32.0));
 	bottom_container.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
 
-	let moon_img = Rc::new(Picture::new("resource/moon.png"));
-	let light_img = Rc::new(Picture::new("resource/light.png"));
+	let moon_img = Rc::new(Picture::new(exe_folder.join("resource/moon.png")));
+	let light_img = Rc::new(Picture::new(exe_folder.join("resource/light.png")));
 	let theme_button = Rc::new(Button::new());
 	theme_button.set_margin_top(5.0);
 	theme_button.set_margin_left(28.0);
@@ -153,10 +156,10 @@ fn main() {
 	theme_button.set_horizontal_align(Alignment::Center);
 	theme_button.set_icon(Some(moon_img.clone()));
 
-	let question = Rc::new(Picture::new("resource/question_button.png"));
-	let question_light = Rc::new(Picture::new("resource/question_button_light.png"));
-	let question_noti = Rc::new(Picture::new("resource/question-noti.png"));
-	let question_light_noti = Rc::new(Picture::new("resource/question-light-noti.png"));
+	let question = Rc::new(Picture::new(exe_folder.join("resource/question_button.png")));
+	let question_light = Rc::new(Picture::new(exe_folder.join("resource/question_button_light.png")));
+	let question_noti = Rc::new(Picture::new(exe_folder.join("resource/question-noti.png")));
+	let question_light_noti = Rc::new(Picture::new(exe_folder.join("resource/question-light-noti.png")));
 	let help_button = Rc::new(Button::new());
 	help_button.set_margin_top(5.0);
 	help_button.set_margin_left(4.0);
