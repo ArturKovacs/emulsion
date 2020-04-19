@@ -27,6 +27,7 @@ pub mod picture;
 pub mod shaders;
 pub mod slider;
 pub mod window;
+pub mod label;
 
 #[derive(Debug)]
 pub enum WidgetError {
