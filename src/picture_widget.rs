@@ -192,8 +192,8 @@ impl Widget for PictureWidget {
 		}
 		if data.first_draw {
 			// Don't block on the main thread and
-			// wait on the image to be loaded on the first draw
-			// let the ui draw itself first and then we can wait.
+			// wait on the image to be loaded on the first draw,
+			// instead let the ui draw itself first and then we can wait.
 			data.first_draw = false;
 			data.next_update = NextUpdate::Soonest;
 			return;
@@ -398,6 +398,16 @@ impl Widget for PictureWidget {
 								}
 								VirtualKeyCode::P => {
 									borrowed.playback_manager.start_presentation();
+								}
+								VirtualKeyCode::Delete => {
+									let path = borrowed.playback_manager.current_file_path();
+									if let Err(e) = trash::remove(&path) {
+										eprintln!("Error while moving file '{:?}' to trash {:?}", path, e);
+									}
+									if let Err(e) = borrowed.playback_manager.update_directory() {
+										eprintln!("Error while updating directory {:?}", e);
+									}
+									borrowed.rendered_valid = false;
 								}
 								_ => (),
 							}
