@@ -19,6 +19,27 @@ use gelatin::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
 
 use std::time::{Duration, Instant};
 
+#[derive(Debug, Clone)]
+enum HoverState {
+	None,
+	ItemHovered{prev_path: PathBuf}
+}
+
+impl HoverState {
+	fn is_none(&self) -> bool {
+		match self {
+			HoverState::None => true,
+			_ => false,
+		}
+	}
+	fn is_hovered(&self) -> bool {
+		match self {
+			HoverState::ItemHovered {..} => true,
+			_ => false,
+		}
+	}
+}
+
 struct PictureWidgetData {
 	placement: WidgetPlacement,
 	drawn_bounds: LogicalRect,
@@ -41,7 +62,7 @@ struct PictureWidgetData {
 	last_click_time: Instant,
 	last_mouse_pos: LogicalVector,
 	panning: bool,
-	moving_window: bool,
+	hover_state: HoverState,
 
 	first_draw: bool,
 	next_update: NextUpdate,
@@ -148,12 +169,12 @@ impl PictureWidget {
 				last_click_time: Instant::now() - Duration::from_secs(10),
 				last_mouse_pos: Default::default(),
 				panning: false,
+				hover_state: HoverState::None,
 				first_draw: true,
 				next_update: NextUpdate::Latest,
 				slider,
 				bottom_panel,
 				window: Rc::downgrade(window),
-				moving_window: false,
 			}),
 		}
 	}
@@ -329,12 +350,8 @@ impl Widget for PictureWidget {
 									}
 									None => unreachable!(),
 								}
-							} else {
-								borrowed.moving_window = true;
 							}
 						}
-					} else {
-						borrowed.moving_window = false;
 					}
 					borrowed.rendered_valid = false;
 				}
@@ -418,6 +435,31 @@ impl Widget for PictureWidget {
 			EventKind::DroppedFile(ref path) => {
 				let mut borrowed = self.data.borrow_mut();
 				borrowed.playback_manager.request_load(LoadRequest::FilePath(path.clone()));
+				borrowed.hover_state = HoverState::None;
+				borrowed.rendered_valid = false;
+			}
+			EventKind::HoveredFile(ref path) => {
+				let mut borrowed = self.data.borrow_mut();
+				match borrowed.hover_state {
+					HoverState::None => {
+						borrowed.hover_state = HoverState::ItemHovered{
+							prev_path: borrowed.playback_manager.current_file_path()
+						};
+					}
+					HoverState::ItemHovered {..} => {}
+				}
+				borrowed.playback_manager.request_load(LoadRequest::FilePath(path.clone()));
+				borrowed.rendered_valid = false;
+			}
+			EventKind::HoveredFileCancelled => {
+				let mut borrowed = self.data.borrow_mut();
+				match borrowed.hover_state.clone() {
+					HoverState::None => unreachable!(),
+					HoverState::ItemHovered {prev_path} => {
+						borrowed.playback_manager.request_load(LoadRequest::FilePath(prev_path));
+						borrowed.hover_state = HoverState::None;
+					}
+				}
 				borrowed.rendered_valid = false;
 			}
 			_ => (),
