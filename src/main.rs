@@ -118,6 +118,8 @@ fn main() {
     let bottom_container = Rc::new(HorizontalLayoutContainer::new());
     //bottom_container.set_margin_top(4.0);
     //bottom_container.set_margin_bottom(4.0);
+    bottom_container.set_margin_left(0.0);
+    bottom_container.set_margin_right(0.0);
     bottom_container.set_height(Length::Fixed(32.0));
     bottom_container.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
 
@@ -125,6 +127,8 @@ fn main() {
     let light = Rc::new(Picture::new("resource/light.png"));
     let theme_button = Rc::new(Button::new());
     theme_button.set_margin_top(5.0);
+    theme_button.set_margin_left(28.0);
+    theme_button.set_margin_right(4.0);
     theme_button.set_height(Length::Fixed(24.0));
     theme_button.set_width(Length::Fixed(24.0));
     theme_button.set_horizontal_align(Alignment::Center);
@@ -134,6 +138,8 @@ fn main() {
     let question_light = Rc::new(Picture::new("resource/question_button_light.png"));
     let help_button = Rc::new(Button::new());
     help_button.set_margin_top(5.0);
+    help_button.set_margin_left(4.0);
+    help_button.set_margin_right(28.0);
     help_button.set_height(Length::Fixed(24.0));
     help_button.set_width(Length::Fixed(24.0));
     help_button.set_horizontal_align(Alignment::Center);
@@ -141,6 +147,8 @@ fn main() {
     
     let slider = Rc::new(Slider::new());
     slider.set_margin_top(5.0);
+    slider.set_margin_left(4.0);
+    slider.set_margin_right(4.0);
     slider.set_height(Length::Fixed(24.0));
     slider.set_width(Length::Stretch { min: 0.0, max: 600.0 });
     slider.set_horizontal_align(Alignment::Center);
@@ -159,7 +167,7 @@ fn main() {
     if let Some(file_path) = std::env::args().skip(1).next() {
         picture_widget.jump_to_path(file_path)
     }
-    
+
     bottom_container.add_child(theme_button.clone());
     bottom_container.add_child(slider.clone());
     bottom_container.add_child(help_button.clone());
@@ -169,15 +177,6 @@ fn main() {
 
     vertical_container.add_child(picture_area_container);
     vertical_container.add_child(bottom_container.clone());
-    
-    bottom_container.set_margin_left(0.0);
-    bottom_container.set_margin_right(0.0);
-    theme_button.set_margin_left(4.0);
-    theme_button.set_margin_right(4.0);
-    help_button.set_margin_left(4.0);
-    help_button.set_margin_right(4.0);
-    slider.set_margin_left(4.0);
-    slider.set_margin_right(4.0);
 
     let theme_button_clone = theme_button.clone();
     let help_button_clone = help_button.clone();
