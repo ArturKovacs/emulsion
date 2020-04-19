@@ -165,7 +165,7 @@ impl PlaybackManager {
     pub fn update_image(&mut self, window: &Window) -> gelatin::NextUpdate {
         //self.should_sleep = true;
         let now = Instant::now();
-        let mut next_update = gelatin::NextUpdate::Latest;// = Some(now.checked_add(Duration::from_millis(1)).unwrap());
+        let mut next_update;
         // The reason why I reset the load request in such a convoluted way is that
         // it has to guaranteprefetch_neighborsequest will be reset even if I return from this
         // function early

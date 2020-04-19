@@ -9,8 +9,7 @@ use crate::playback_manager::*;
 
 use gelatin::cgmath::{Matrix4, Vector3};
 use gelatin::glium::glutin::event::{ElementState, MouseButton};
-use gelatin::glium::{Display, Program, program, uniform, Frame, Surface, texture::SrgbTexture2d, texture::RawImage2d};
-use gelatin::image::{self, ImageError, RgbaImage};
+use gelatin::glium::{Display, Program, program, uniform, Frame, Surface, texture::SrgbTexture2d};
 
 use gelatin::add_common_widget_functions;
 use gelatin::NextUpdate;
@@ -62,7 +61,7 @@ impl WidgetData for PictureWidgetData {
     }
 }
 impl PictureWidgetData {
-    fn fit_image_to_panel(&mut self, display: &Display, dpi_scale: f32) {
+    fn fit_image_to_panel(&mut self, _display: &Display, dpi_scale: f32) {
         let size = self.drawn_bounds.size.vec;
         if let Some(texture) = self.get_texture() {
             let panel_aspect = size.x / size.y;
@@ -81,27 +80,6 @@ impl PictureWidgetData {
             );
             self.img_texel_size = img_texel_size * dpi_scale;
             self.image_fit = true;
-        }
-    }
-
-    fn pause_playback(window: &Window, playback_manager: &mut PlaybackManager) {
-        playback_manager.pause_playback();
-        let filename = playback_manager
-            .current_filename()
-            .to_str()
-            .unwrap()
-            .to_owned();
-        Self::set_window_title_filename(window, filename);
-    }
-
-    fn toggle_playback(&mut self, window: &Window, playback_manager: &mut PlaybackManager) {
-        match playback_manager.playback_state() {
-            PlaybackState::Forward => Self::pause_playback(window, playback_manager),
-            PlaybackState::Paused => {
-                playback_manager.start_playback_forward();
-                Self::set_window_title_filename(window, "Playing");
-            }
-            _ => (),
         }
     }
 

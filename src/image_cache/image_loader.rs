@@ -106,9 +106,9 @@ impl ImageLoader {
 
         let mut join_handles = Vec::new();
         for _ in 0..threads {
-            let mut running = running.clone();
-            let mut load_request_rx = load_request_rx.clone();
-            let mut loaded_img_tx = loaded_img_tx.clone();
+            let running = running.clone();
+            let load_request_rx = load_request_rx.clone();
+            let loaded_img_tx = loaded_img_tx.clone();
 
             join_handles.push(thread::spawn(move || {
                 Self::thread_loop(running, load_request_rx, loaded_img_tx);
@@ -185,7 +185,7 @@ impl Drop for ImageLoader {
                     self.path_tx.send(PathBuf::from("")).unwrap();
                 }
 
-                for mut handle in join_handles.into_iter() {
+                for handle in join_handles.into_iter() {
                     match handle.join() {
                         Err(err) => eprintln!("Error occured while joining handle {:?}", err),
                         _ => (),

@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::time::Instant;
 
 use cgmath::{Matrix4, Vector3};
 use glium::glutin::event::{ElementState, MouseButton};

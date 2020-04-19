@@ -2,24 +2,16 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::path::PathBuf;
-use std::time::Instant;
-
-use crate::shaders;
-use crate::util;
-
-use crate::playback_manager::*;
 
 use gelatin::cgmath::{Matrix4, Vector3};
-use gelatin::glium::glutin::event::{ElementState, MouseButton};
-use gelatin::glium::{Display, Program, program, uniform, Frame, Surface, texture::SrgbTexture2d, texture::RawImage2d};
-use gelatin::image::{self, ImageError, RgbaImage};
+
+use gelatin::glium::{uniform, Frame, Surface};
 
 use gelatin::add_common_widget_functions;
 use gelatin::NextUpdate;
 use gelatin::window::Window;
 use gelatin::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
-use gelatin::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
+use gelatin::{DrawContext, Event, Widget, WidgetData, WidgetError};
 use gelatin::picture::Picture;
 
 struct HelpScreenData {
@@ -73,11 +65,7 @@ impl HelpScreen {
         }
     }
 
-    pub fn set_visible(&self, visible: bool) {
-        let mut borrowed = self.data.borrow_mut();
-        borrowed.visible = visible;
-        borrowed.rendered_valid = false;
-    }
+    add_common_widget_functions!(data);
 }
 
 impl Widget for HelpScreen {

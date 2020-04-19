@@ -204,7 +204,7 @@ pub trait Widget: Any {
     ///
     /// Note that the `Window` uses inner mutability so all window related functions take a
     /// reference to a seemingly immutable window.
-    fn before_draw(&self, window: &window::Window) {}
+    fn before_draw(&self, _window: &window::Window) {}
 
     /// This function is called when the window is being re-rendered.
     ///

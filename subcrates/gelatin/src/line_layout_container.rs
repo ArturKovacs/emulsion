@@ -1,17 +1,12 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::time::Instant;
 
-use glium::glutin::{
-    self,
-    event::{ElementState, MouseButton},
-};
-use glium::{uniform, Frame, Surface};
+use glium::{Frame, Surface};
 
 use crate::window::Window;
 use crate::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement, PickDimension, HorDim, VerDim};
-use crate::{add_common_widget_functions, DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
+use crate::{add_common_widget_functions, DrawContext, Event, Widget, WidgetData, WidgetError};
 use crate::NextUpdate;
 
 pub type HorizontalLayoutContainer = LineLayoutContainer<HorDim>;

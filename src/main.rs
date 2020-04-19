@@ -2,25 +2,18 @@
 
 #[macro_use]
 extern crate error_chain;
-//extern crate backtrace;
-//extern crate serde;
-// #[macro_use]
-// extern crate serde_derive;
-//extern crate rmp_serde;
 
 use gelatin::image;
 
-use std::env;
 use std::rc::Rc;
 use std::cell::RefCell;
 
 use gelatin::glium::{
-    glutin::{self,
+    glutin::{
         window::Icon, 
         dpi::{PhysicalSize, PhysicalPosition},
         event::WindowEvent,
     },
-    Surface
 };
 
 mod handle_panic;
@@ -34,12 +27,9 @@ mod help_screen;
 use crate::help_screen::*;
 
 mod playback_manager;
-use crate::playback_manager::{LoadRequest, PlaybackManager};
 
 mod configuration;
 use crate::configuration::Configuration;
-
-mod util;
 
 use std::cell::Cell;
 use std::f32;
