@@ -3,47 +3,49 @@
 #[macro_use]
 extern crate error_chain;
 
-use gelatin::image;
-
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+use std::f32;
 use std::rc::Rc;
+use std::sync::{
+	atomic::{AtomicBool, Ordering},
+	Arc,
+};
+use std::time::{Duration, Instant};
+
+use serde_derive::Deserialize;
 
 use gelatin::glium::glutin::{
 	dpi::{PhysicalPosition, PhysicalSize},
 	event::WindowEvent,
 	window::Icon,
 };
-
-mod handle_panic;
-mod image_cache;
-mod shaders;
-
-mod picture_widget;
-use crate::picture_widget::*;
-
-mod help_screen;
-use crate::help_screen::*;
-
-mod playback_manager;
-
-mod configuration;
-use crate::configuration::Configuration;
-
 use gelatin::{
 	application::*,
-    button::*,
-    label::*,
+	button::*,
+	image,
+	label::*,
 	line_layout_container::*,
 	misc::*,
 	picture::*,
 	slider::*,
 	window::{Window, WindowDescriptorBuilder},
+	NextUpdate, Widget,
 };
-use std::cell::Cell;
-use std::f32;
+
+use crate::configuration::Configuration;
+use crate::help_screen::*;
+use crate::picture_widget::*;
+
+mod configuration;
+mod handle_panic;
+mod help_screen;
+mod image_cache;
+mod picture_widget;
+mod playback_manager;
+mod shaders;
 
 // ========================================================
-// Glorious main function
+// Not-so glorious main function
 // ========================================================
 fn main() {
 	std::panic::set_hook(Box::new(handle_panic::handle_panic));
@@ -64,12 +66,6 @@ fn main() {
 		config = Rc::new(RefCell::new(Configuration::default()));
 	}
 	let mut application = Application::new();
-	{
-		let config_clone = config.clone();
-		application.set_at_exit(Some(move || {
-			config_clone.borrow().save(cfg_path).unwrap();
-		}));
-	}
 	let window: Rc<Window>;
 	{
 		let config = config.borrow();
@@ -107,31 +103,35 @@ fn main() {
 	picture_area_container.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
 	picture_area_container.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
 
-    let update_notification = Rc::new(HorizontalLayoutContainer::new());
-    let update_label = Rc::new(Label::new());
-    let update_label_image = Rc::new(Picture::new("resource/new-version-available.png"));
-    let update_label_image_light = Rc::new(Picture::new("resource/new-version-available-light.png"));
-    {
-        update_notification.set_vertical_align(Alignment::End);
-        update_notification.set_horizontal_align(Alignment::Start);
-        update_notification.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
-        update_notification.set_height(Length::Fixed(32.0));
-        update_label.set_icon(Some(update_label_image.clone()));
-        update_label.set_margin_top(4.0);
-        update_label.set_margin_bottom(4.0);
-        update_label.set_fixed_size(LogicalVector::new(200.0, 24.0));
-        update_label.set_horizontal_align(Alignment::Center);
-        let update_button = Rc::new(Button::new());
-        let button_image = Rc::new(Picture::new("resource/visit-site.png"));
-        update_button.set_icon(Some(button_image));
-        update_button.set_margin_top(4.0);
-        update_button.set_margin_bottom(4.0);
-        update_button.set_fixed_size(LogicalVector::new(100.0, 24.0));
-        update_button.set_horizontal_align(Alignment::Center);
-        update_notification.add_child(update_label.clone());
-        update_notification.add_child(update_button);
-    }
-    
+	let update_notification = Rc::new(HorizontalLayoutContainer::new());
+	let update_label = Rc::new(Label::new());
+	let update_label_image = Rc::new(Picture::new("resource/new-version-available.png"));
+	let update_label_image_light =
+		Rc::new(Picture::new("resource/new-version-available-light.png"));
+	{
+		update_notification.set_vertical_align(Alignment::End);
+		update_notification.set_horizontal_align(Alignment::Start);
+		update_notification.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
+		update_notification.set_height(Length::Fixed(32.0));
+		update_label.set_icon(Some(update_label_image.clone()));
+		update_label.set_margin_top(4.0);
+		update_label.set_margin_bottom(4.0);
+		update_label.set_fixed_size(LogicalVector::new(200.0, 24.0));
+		update_label.set_horizontal_align(Alignment::Center);
+		let update_button = Rc::new(Button::new());
+		let button_image = Rc::new(Picture::new("resource/visit-site.png"));
+		update_button.set_icon(Some(button_image));
+		update_button.set_margin_top(4.0);
+		update_button.set_margin_bottom(4.0);
+		update_button.set_fixed_size(LogicalVector::new(100.0, 24.0));
+		update_button.set_horizontal_align(Alignment::Center);
+		update_button.set_on_click(|| {
+			open::that("https://arturkovacs.github.io/emulsion-website/").unwrap();
+		});
+		update_notification.add_child(update_label.clone());
+		update_notification.add_child(update_button);
+	}
+
 	let help_screen = Rc::new(HelpScreen::new());
 
 	let bottom_container = Rc::new(HorizontalLayoutContainer::new());
@@ -154,9 +154,9 @@ fn main() {
 	theme_button.set_icon(Some(moon_img.clone()));
 
 	let question = Rc::new(Picture::new("resource/question_button.png"));
-    let question_light = Rc::new(Picture::new("resource/question_button_light.png"));
-    let question_noti = Rc::new(Picture::new("resource/question-noti.png"));
-    let question_light_noti = Rc::new(Picture::new("resource/question-light-noti.png"));
+	let question_light = Rc::new(Picture::new("resource/question_button_light.png"));
+	let question_noti = Rc::new(Picture::new("resource/question-noti.png"));
+	let question_light_noti = Rc::new(Picture::new("resource/question-light-noti.png"));
 	let help_button = Rc::new(Button::new());
 	help_button.set_margin_top(5.0);
 	help_button.set_margin_left(4.0);
@@ -192,76 +192,173 @@ fn main() {
 	bottom_container.add_child(help_button.clone());
 
 	picture_area_container.add_child(picture_widget.clone());
-    picture_area_container.add_child(help_screen.clone());
-    picture_area_container.add_child(update_notification.clone());
+	picture_area_container.add_child(help_screen.clone());
+	picture_area_container.add_child(update_notification.clone());
 
 	vertical_container.add_child(picture_area_container);
 	vertical_container.add_child(bottom_container.clone());
 
+	let update_available = Arc::new(AtomicBool::new(false));
+	let update_check_done = Arc::new(AtomicBool::new(false));
+	let light_theme = Rc::new(Cell::new(!config.borrow().dark));
 	let theme_button_clone = theme_button.clone();
-    let help_button_clone = help_button.clone();
-    let update_label_clone = update_label.clone();
+	let help_button_clone = help_button.clone();
+	let update_label_clone = update_label;
 	let picture_widget_clone = picture_widget.clone();
-    let bottom_container_clone = bottom_container;
-    let update_notification_clone = update_notification.clone();
+	let bottom_container_clone = bottom_container;
+	let update_notification_clone = update_notification.clone();
 	let slider_clone = slider.clone();
 	let window_clone = window.clone();
-    let light_theme = Cell::new(!config.borrow().dark);
-    let update_available = Rc::new(Cell::new(true));
-    let set_theme = move |light: bool, update: bool| {
-        if light {
-            picture_widget_clone.set_bright_shade(0.96);
-            bottom_container_clone.set_bg_color([1.0, 1.0, 1.0, 1.0]);
-            slider_clone.set_shadow_color([0.0, 0.0, 0.0]);
-            window_clone.set_bg_color([0.85, 0.85, 0.85, 1.0]);
-            theme_button_clone.set_icon(Some(moon_img.clone()));
-            update_notification_clone.set_bg_color([0.06, 0.06, 0.06, 1.0]);
-            update_label_clone.set_icon(Some(update_label_image_light.clone()));
-            if update {
-                help_button_clone.set_icon(Some(question_noti.clone()));
-            } else {
-                help_button_clone.set_icon(Some(question.clone()));
-            }
-        } else {
-            picture_widget_clone.set_bright_shade(0.3);
-            bottom_container_clone.set_bg_color([0.1, 0.1, 0.1, 1.0]);
-            slider_clone.set_shadow_color([0.0, 0.0, 0.0]);
-            window_clone.set_bg_color([0.05, 0.05, 0.05, 1.0]);
-            theme_button_clone.set_icon(Some(light_img.clone()));
-            update_notification_clone.set_bg_color([0.85, 0.85, 0.85, 1.0]);
-            update_label_clone.set_icon(Some(update_label_image.clone()));
-            if update {
-                help_button_clone.set_icon(Some(question_light_noti.clone()));
-            } else {
-                help_button_clone.set_icon(Some(question_light.clone()));
-            }
-        }
-    };
-    set_theme(light_theme.get(), update_available.get());
-    let update_available_clone = update_available.clone();
-	theme_button.set_on_click(move || {
-		light_theme.set(!light_theme.get());
-		config.borrow_mut().dark = !light_theme.get();
-		set_theme(light_theme.get(), update_available_clone.get());
+	let light_theme_clone = light_theme.clone();
+	let update_available_clone = update_available.clone();
+	let set_theme = Rc::new(move || {
+		if light_theme_clone.get() {
+			picture_widget_clone.set_bright_shade(0.96);
+			bottom_container_clone.set_bg_color([1.0, 1.0, 1.0, 1.0]);
+			slider_clone.set_shadow_color([0.0, 0.0, 0.0]);
+			window_clone.set_bg_color([0.85, 0.85, 0.85, 1.0]);
+			theme_button_clone.set_icon(Some(moon_img.clone()));
+			update_notification_clone.set_bg_color([0.06, 0.06, 0.06, 1.0]);
+			update_label_clone.set_icon(Some(update_label_image_light.clone()));
+			if update_available_clone.load(Ordering::SeqCst) {
+				help_button_clone.set_icon(Some(question_noti.clone()));
+			} else {
+				help_button_clone.set_icon(Some(question.clone()));
+			}
+		} else {
+			picture_widget_clone.set_bright_shade(0.3);
+			bottom_container_clone.set_bg_color([0.1, 0.1, 0.1, 1.0]);
+			slider_clone.set_shadow_color([0.0, 0.0, 0.0]);
+			window_clone.set_bg_color([0.05, 0.05, 0.05, 1.0]);
+			theme_button_clone.set_icon(Some(light_img.clone()));
+			update_notification_clone.set_bg_color([0.85, 0.85, 0.85, 1.0]);
+			update_label_clone.set_icon(Some(update_label_image.clone()));
+			if update_available_clone.load(Ordering::SeqCst) {
+				help_button_clone.set_icon(Some(question_light_noti.clone()));
+			} else {
+				help_button_clone.set_icon(Some(question_light.clone()));
+			}
+		}
 	});
+	set_theme();
+	{
+		let config = config.clone();
+		let set_theme = set_theme.clone();
+		theme_button.set_on_click(move || {
+			light_theme.set(!light_theme.get());
+			config.borrow_mut().dark = !light_theme.get();
+			set_theme();
+		});
+	}
 	let slider_clone2 = slider.clone();
 	let image_widget_clone = picture_widget;
 	slider.set_on_value_change(move || {
 		image_widget_clone.jump_to_index(slider_clone2.value());
 	});
-    let help_visible = Cell::new(first_lanuch);
-    help_screen.set_visible(help_visible.get());
-    update_notification.set_visible(help_visible.get() && update_available.get());
+	let help_visible = Cell::new(first_lanuch);
+	help_screen.set_visible(help_visible.get());
+	let update_available_clone = update_available.clone();
+	let help_screen_clone = help_screen.clone();
+	let update_notification_clone = update_notification.clone();
+	update_notification
+		.set_visible(help_visible.get() && update_available_clone.load(Ordering::SeqCst));
 	help_button.set_on_click(move || {
-        help_visible.set(!help_visible.get());
-		help_screen.set_visible(help_visible.get());
-        update_notification.set_visible(help_visible.get() && update_available.get());
+		help_visible.set(!help_visible.get());
+		help_screen_clone.set_visible(help_visible.get());
+		update_notification_clone
+			.set_visible(help_visible.get() && update_available_clone.load(Ordering::SeqCst));
 	});
+
 	window.set_root(vertical_container);
+	// kick off a thread that will check for an update in the background
+	let update_available_clone = update_available;
+	let update_check_done_clone = update_check_done.clone();
+	let update_checker = std::thread::spawn(move || {
+		update_available_clone.store(check_for_updates(), Ordering::SeqCst);
+		update_check_done_clone.store(true, Ordering::SeqCst);
+	});
+	let update_check_done_clone = update_check_done;
+	let help_screen_clone = help_screen;
+	let mut nothing_to_do = false;
+	application.add_global_event_handler(move |_| {
+		if nothing_to_do {
+			return NextUpdate::Latest;
+		}
+		if update_check_done_clone.load(Ordering::SeqCst) {
+			nothing_to_do = true;
+			set_theme();
+			if help_screen_clone.visible() {
+				update_notification.set_visible(true);
+			}
+		}
+		NextUpdate::WaitUntil(Instant::now() + Duration::from_secs(1))
+	});
+	application.set_at_exit(Some(move || {
+		config.borrow().save(cfg_path).unwrap();
+		update_checker.join().unwrap();
+	}));
 	application.start_event_loop();
 }
 // ========================================================
 
-fn check_for_updates(update_notification: Rc<HorizontalLayoutContainer>, ) {
-    
+#[derive(Deserialize)]
+struct ReleaseInfoJson {
+	tag_name: String,
+}
+
+/// Returns true if updates are available.
+fn check_for_updates() -> bool {
+	let client;
+	match reqwest::blocking::Client::builder().user_agent("emulsion").build() {
+		Ok(c) => client = c,
+		Err(e) => {
+			println!("Could not build client for version request: {}", e);
+			return false;
+		}
+	}
+	let response =
+		client.get("https://api.github.com/repos/ArturKovacs/emulsion/releases/latest").send();
+	match response {
+		Ok(response) => match response.json::<ReleaseInfoJson>() {
+			Ok(info) => {
+				println!("Found latest version tag {}", info.tag_name);
+				let curr_major = env!("CARGO_PKG_VERSION_MAJOR");
+				let curr_minor = env!("CARGO_PKG_VERSION_MINOR");
+				let curr_patch = env!("CARGO_PKG_VERSION_PATCH");
+				println!("Current version is '{}.{}.{}'", curr_major, curr_minor, curr_patch);
+
+				let latest_full = info.tag_name.chars().skip(1).collect::<String>();
+				let mut latest_parts = latest_full.split('.');
+				let mut extract_part = || {
+					let result;
+					if let Some(part) = latest_parts.next() {
+						if part.is_empty() {
+							result = "0";
+						} else {
+							result = part;
+						}
+					} else {
+						result = "0";
+					}
+					result
+				};
+				let latest_major = extract_part();
+				let latest_minor = extract_part();
+				let latest_patch = extract_part();
+				println!(
+					"Parsed latest version is '{}.{}.{}'",
+					latest_major, latest_minor, latest_patch
+				);
+				if curr_major != latest_major
+					|| curr_minor != latest_minor
+					|| curr_patch != latest_patch
+				{
+					return true;
+				}
+			}
+			Err(e) => println!("Failed to create json from response: {}", e),
+		},
+		Err(e) => println!("Failed to get latest version info: {}", e),
+	}
+	false
 }

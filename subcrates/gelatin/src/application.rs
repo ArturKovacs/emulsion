@@ -9,10 +9,40 @@ use glium::glutin::{
 };
 
 use crate::window::Window;
+use crate::NextUpdate;
+
+/// Returns true of original was replaced by new
+fn update_control_flow(original: &mut ControlFlow, new: ControlFlow) -> bool {
+    if *original == ControlFlow::Exit {
+        return false;
+    }
+    match new {
+        ControlFlow::Exit | ControlFlow::Poll => {
+            *original = new;
+            return true;
+        }
+        ControlFlow::WaitUntil(new_time) => match *original {
+            ControlFlow::WaitUntil(orig_time) => {
+                if new_time < orig_time {
+                    *original = new;
+                    return true;
+                }
+            }
+            ControlFlow::Wait => {
+                *original = new;
+                return true;
+            }
+            _ => (),
+        },
+        _ => (),
+    }
+    false
+}
 
 pub struct Application {
     pub event_loop: glutin::event_loop::EventLoop<()>,
     windows: HashMap<WindowId, Rc<Window>>,
+    global_handlers: Vec<Box<dyn FnMut(&Event<()>) -> NextUpdate>>,
     at_exit: Option<Box<dyn FnOnce()>>,
 }
 
@@ -21,6 +51,7 @@ impl Application {
         Application {
             event_loop: glutin::event_loop::EventLoop::<()>::new(),
             windows: HashMap::new(),
+            global_handlers: Vec::new(),
             at_exit: None,
         }
     }
@@ -36,12 +67,23 @@ impl Application {
         self.windows.insert(window.get_id(), window);
     }
 
+    pub fn add_global_event_handler<F: FnMut(&Event<()>) -> NextUpdate + 'static>(
+        &mut self,
+        fun: F,
+    ) {
+        self.global_handlers.push(Box::new(fun));
+    }
+
     pub fn start_event_loop(self) -> ! {
         let windows = self.windows;
         let mut at_exit = self.at_exit;
+        let mut global_handlers = self.global_handlers;
         let mut close_requested = false;
         let mut control_flow_source = *windows.keys().next().unwrap();
         self.event_loop.run(move |event, _event_loop, control_flow| {
+            for handler in global_handlers.iter_mut() {
+                update_control_flow(control_flow, handler(&event).into());
+            }
             match event {
                 Event::WindowEvent { event, window_id } => match event {
                     WindowEvent::CloseRequested => {
@@ -82,28 +124,10 @@ impl Application {
                     let new_control_flow = windows.get(&window_id).unwrap().redraw().into();
                     if control_flow_source == window_id {
                         *control_flow = new_control_flow;
-                    } else if *control_flow != ControlFlow::Exit {
-                        match new_control_flow {
-                            ControlFlow::Exit => *control_flow = new_control_flow,
-                            ControlFlow::Poll => {
-                                *control_flow = new_control_flow;
-                                control_flow_source = window_id;
-                            }
-                            ControlFlow::WaitUntil(new_time) => match *control_flow {
-                                ControlFlow::WaitUntil(orig_time) => {
-                                    if new_time < orig_time {
-                                        *control_flow = new_control_flow;
-                                        control_flow_source = window_id;
-                                    }
-                                }
-                                ControlFlow::Wait => {
-                                    *control_flow = new_control_flow;
-                                    control_flow_source = window_id;
-                                }
-                                _ => (),
-                            },
-                            _ => (),
-                        }
+                    } else if *control_flow != ControlFlow::Exit
+                        && update_control_flow(control_flow, new_control_flow)
+                    {
+                        control_flow_source = window_id;
                     }
                 }
                 Event::RedrawEventsCleared => {

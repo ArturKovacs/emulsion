@@ -172,15 +172,15 @@ impl Drop for ImageLoader {
 		self.running.store(false, Ordering::Release);
 
 		if let Some(join_handles) = self.join_handles.take() {
-            for _ in join_handles.iter() {
-                self.path_tx.send(PathBuf::from("")).unwrap();
-            }
+			for _ in join_handles.iter() {
+				self.path_tx.send(PathBuf::from("")).unwrap();
+			}
 
-            for handle in join_handles.into_iter() {
-                if let Err(err) = handle.join() {
-                    eprintln!("Error occured while joining handle {:?}", err);
-                }
-            }
+			for handle in join_handles.into_iter() {
+				if let Err(err) = handle.join() {
+					eprintln!("Error occured while joining handle {:?}", err);
+				}
+			}
 		}
 	}
 }

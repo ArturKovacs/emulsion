@@ -122,9 +122,7 @@ impl Widget for Button {
                     shadow_color: Into::<[f32; 3]>::into(Vector3::<f32>::new(0.0, 0.0, 0.0)),
                     shadow_offset: if borrowed.click {
                         0.5f32
-                    } else {
-                        if borrowed.hover { 0.7 } else { 1.0f32 }
-                    }
+                    } else if borrowed.hover { 0.7 } else { 1.0f32 }
                 };
                 target
                     .draw(
@@ -146,9 +144,7 @@ impl Widget for Button {
                     shadow_color: Into::<[f32; 3]>::into(Vector3::<f32>::new(0.0, 0.0, 0.0)),
                     shadow_offset: if borrowed.click {
                         0.5f32
-                    } else {
-                        if borrowed.hover { 0.7 } else { 1.0f32 }
-                    }
+                    } else if borrowed.hover { 0.7 } else { 1.0f32 }
                 };
                 target
                     .draw(

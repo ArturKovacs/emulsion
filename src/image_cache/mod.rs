@@ -38,7 +38,7 @@ struct ImageDescriptor {
 
 impl ImageDescriptor {
 	fn from_entry(dir_entry: fs::DirEntry) -> ImageDescriptor {
-		ImageDescriptor { dir_entry, /* frame_count: None */ }
+		ImageDescriptor { dir_entry /* frame_count: None */ }
 	}
 }
 

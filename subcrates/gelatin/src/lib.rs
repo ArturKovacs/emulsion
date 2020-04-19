@@ -21,13 +21,13 @@ use misc::*;
 
 pub mod application;
 pub mod button;
+pub mod label;
 pub mod line_layout_container;
 pub mod misc;
 pub mod picture;
 pub mod shaders;
 pub mod slider;
 pub mod window;
-pub mod label;
 
 #[derive(Debug)]
 pub enum WidgetError {
@@ -325,6 +325,7 @@ pub struct Vertex {
     pub tex_coords: [f32; 2],
 }
 
+#[allow(clippy::unneeded_field_pattern)]
 implement_vertex!(Vertex, position, tex_coords);
 
 pub struct DrawContext<'a> {

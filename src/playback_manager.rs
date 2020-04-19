@@ -180,68 +180,63 @@ impl PlaybackManager {
 			self.image_cache.prefetch_neighbors();
 			next_update = gelatin::NextUpdate::Latest;
 		} else if load_request == LoadRequest::None {
-            let elapsed = self.playback_start_time.elapsed();
-            let elapsed_nanos =
-                elapsed.as_secs() * NANOS_PER_SEC + elapsed.subsec_nanos() as u64;
+			let elapsed = self.playback_start_time.elapsed();
+			let elapsed_nanos = elapsed.as_secs() * NANOS_PER_SEC + elapsed.subsec_nanos() as u64;
 
-            let nanos_til_next =
-                frame_delta_time_nanos - (elapsed_nanos % frame_delta_time_nanos);
-            let millis_til_next = nanos_til_next / 1_000_000;
-            next_update = gelatin::NextUpdate::WaitUntil(
-                now.checked_add(Duration::from_millis((millis_til_next / 2).max(1))).unwrap(),
-            );
-            let frame_step = (elapsed_nanos / frame_delta_time_nanos)
-                - self.frame_count_since_playback_start;
-            if frame_step > 0 {
-                load_request = match self.playback_state {
-                    PlaybackState::Forward | PlaybackState::Present => {
-                        LoadRequest::Jump(frame_step as i32)
-                    }
-                    //PlaybackState::Backward => LoadRequest::Jump(-(frame_step as i32)),
-                    PlaybackState::RandomPresent => {
-                        let mut target = None;
-                        for _ in 0..frame_step {
-                            target = self.present_remaining.pop();
-                            if target == None {
-                                // Restart
-                                self.fill_present_remainig_with_random();
-                                target = self.present_remaining.pop();
-                            }
-                        }
-                        match target {
-                            Some(index) => LoadRequest::LoadAtIndex(index),
-                            None => LoadRequest::None,
-                        }
-                    }
-                    PlaybackState::Paused => unreachable!(),
-                };
-                self.frame_count_since_playback_start += frame_step;
-            } else {
-                self.image_cache.process_prefetched(&window.display_mut()).unwrap();
+			let nanos_til_next = frame_delta_time_nanos - (elapsed_nanos % frame_delta_time_nanos);
+			let millis_til_next = nanos_til_next / 1_000_000;
+			next_update = gelatin::NextUpdate::WaitUntil(
+				now.checked_add(Duration::from_millis((millis_til_next / 2).max(1))).unwrap(),
+			);
+			let frame_step =
+				(elapsed_nanos / frame_delta_time_nanos) - self.frame_count_since_playback_start;
+			if frame_step > 0 {
+				load_request = match self.playback_state {
+					PlaybackState::Forward | PlaybackState::Present => {
+						LoadRequest::Jump(frame_step as i32)
+					}
+					//PlaybackState::Backward => LoadRequest::Jump(-(frame_step as i32)),
+					PlaybackState::RandomPresent => {
+						let mut target = None;
+						for _ in 0..frame_step {
+							target = self.present_remaining.pop();
+							if target == None {
+								// Restart
+								self.fill_present_remainig_with_random();
+								target = self.present_remaining.pop();
+							}
+						}
+						match target {
+							Some(index) => LoadRequest::LoadAtIndex(index),
+							None => LoadRequest::None,
+						}
+					}
+					PlaybackState::Paused => unreachable!(),
+				};
+				self.frame_count_since_playback_start += frame_step;
+			} else {
+				self.image_cache.process_prefetched(&window.display_mut()).unwrap();
 
-                let nanos_since_last = elapsed_nanos % frame_delta_time_nanos;
-                const BUISY_WAIT_TRESHOLD: f32 = 0.8;
-                if nanos_since_last
-                    > (frame_delta_time_nanos as f32 * BUISY_WAIT_TRESHOLD) as u64
-                {
-                    // Just buisy wait if we are getting very close to the next frame swap
-                    next_update = gelatin::NextUpdate::Soonest;
-                } else {
-                    match self.playback_state {
-                        PlaybackState::RandomPresent => {
-                            if let Some(&last) = self.present_remaining.iter().last() {
-                                self.image_cache.prefetch_at_index(last);
-                            }
-                        }
-                        _ => self.image_cache.prefetch_neighbors(),
-                    }
-                }
-            }
-        } else {
-            next_update = gelatin::NextUpdate::WaitUntil(
-                now.checked_add(Duration::from_millis(1)).unwrap(),
-            );
-        }
+				let nanos_since_last = elapsed_nanos % frame_delta_time_nanos;
+				const BUISY_WAIT_TRESHOLD: f32 = 0.8;
+				if nanos_since_last > (frame_delta_time_nanos as f32 * BUISY_WAIT_TRESHOLD) as u64 {
+					// Just buisy wait if we are getting very close to the next frame swap
+					next_update = gelatin::NextUpdate::Soonest;
+				} else {
+					match self.playback_state {
+						PlaybackState::RandomPresent => {
+							if let Some(&last) = self.present_remaining.iter().last() {
+								self.image_cache.prefetch_at_index(last);
+							}
+						}
+						_ => self.image_cache.prefetch_neighbors(),
+					}
+				}
+			}
+		} else {
+			next_update =
+				gelatin::NextUpdate::WaitUntil(now.checked_add(Duration::from_millis(1)).unwrap());
+		}
 
 		//let should_sleep = load_request == LoadRequest::None && running && !update_screen;
 		// Process long operations here
