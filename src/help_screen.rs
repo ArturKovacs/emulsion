@@ -17,7 +17,7 @@ struct HelpScreenData {
 	drawn_bounds: LogicalRect,
 	visible: bool,
 	rendered_valid: bool,
-
+	initiaizlied: bool,
 	parent_space: LogicalRect,
 	usage_image: Picture,
 }
@@ -40,22 +40,13 @@ pub struct HelpScreen {
 
 impl HelpScreen {
 	pub fn new(usage_img: Picture) -> HelpScreen {
-		let img_data = usage_img.get_metadata().unwrap();
-		let placement = WidgetPlacement {
-			width: Length::Fixed(img_data.width as f32 * 0.5),
-			height: Length::Fixed(img_data.height as f32 * 0.5),
-			horizontal_align: Alignment::Center,
-			vertical_align: Alignment::Center,
-			ignore_layout: true,
-			..Default::default()
-		};
 		HelpScreen {
 			data: RefCell::new(HelpScreenData {
-				placement,
+				placement: WidgetPlacement::default(),
 				drawn_bounds: Default::default(),
-				rendered_valid: false,
-
 				visible: false,
+				rendered_valid: false,
+				initiaizlied: false,
 				parent_space: LogicalRect::default(),
 				usage_image: usage_img,
 			}),
@@ -163,6 +154,21 @@ impl Widget for HelpScreen {
 
 	fn layout(&self, available_space: LogicalRect) {
 		let mut borrowed = self.data.borrow_mut();
+		if !borrowed.visible {
+			return;
+		}
+		if !borrowed.initiaizlied {
+			borrowed.initiaizlied = true;
+			let img_data = borrowed.usage_image.get_metadata().unwrap();
+			borrowed.placement = WidgetPlacement {
+				width: Length::Fixed(img_data.width as f32 * 0.5),
+				height: Length::Fixed(img_data.height as f32 * 0.5),
+				horizontal_align: Alignment::Center,
+				vertical_align: Alignment::Center,
+				ignore_layout: true,
+				..Default::default()
+			};
+		}
 		borrowed.default_layout(available_space);
 		borrowed.parent_space = available_space;
 	}

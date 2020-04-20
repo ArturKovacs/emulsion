@@ -274,7 +274,7 @@ fn main() {
 
 	window.set_root(vertical_container);
 	// kick off a thread that will check for an update in the background
-	let update_available_clone = update_available;
+	let update_available_clone = update_available.clone();
 	let update_check_done_clone = update_check_done.clone();
 	let update_checker = std::thread::spawn(move || {
 		update_available_clone.store(check_for_updates(), Ordering::SeqCst);
@@ -290,7 +290,7 @@ fn main() {
 		if update_check_done_clone.load(Ordering::SeqCst) {
 			nothing_to_do = true;
 			set_theme();
-			if help_screen_clone.visible() {
+			if help_screen_clone.visible() && update_available.load(Ordering::SeqCst) {
 				update_notification.set_visible(true);
 			}
 		}

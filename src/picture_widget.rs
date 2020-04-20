@@ -380,9 +380,9 @@ impl Widget for PictureWidget {
 			}
 			EventKind::KeyInput { input } => {
 				use gelatin::glium::glutin::event::VirtualKeyCode;
-				if input.state == ElementState::Pressed {
-					if let Some(key) = input.virtual_keycode {
-						let mut borrowed = self.data.borrow_mut();
+				if let Some(key) = input.virtual_keycode {
+					let mut borrowed = self.data.borrow_mut();
+					if input.state == ElementState::Pressed {
 						if event.modifiers.alt() {
 							match key {
 								VirtualKeyCode::V | VirtualKeyCode::A => {
@@ -416,6 +416,9 @@ impl Widget for PictureWidget {
 								VirtualKeyCode::P => {
 									borrowed.playback_manager.start_presentation();
 								}
+								VirtualKeyCode::Space => {
+									borrowed.panning = borrowed.hover;
+								}
 								VirtualKeyCode::Delete => {
 									let path = borrowed.playback_manager.current_file_path();
 									if let Err(e) = trash::remove(&path) {
@@ -429,6 +432,8 @@ impl Widget for PictureWidget {
 								_ => (),
 							}
 						}
+					} else if key == VirtualKeyCode::Space {
+						borrowed.panning = false;
 					}
 				}
 			}

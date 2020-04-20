@@ -43,6 +43,7 @@ impl Picture {
         Picture { data: RefCell::new(PictureData::Cpu(img)) }
     }
 
+    /// This function loads the entire image from file it it hasn't been loaded yet
     pub fn get_metadata(&self) -> Result<PictureMetadata, ImageError> {
         let mut borrowed = self.data.borrow_mut();
         let mut tmp_picture = PictureData::Path("".into());
