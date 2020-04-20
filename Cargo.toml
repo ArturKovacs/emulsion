@@ -1,6 +1,6 @@
 [package]
 name = "emulsion"
-version = "1.6.0"
+version = "1.8.0"
 authors = ["Artur Barnabas <kovacs.artur.barnabas@gmail.com>"]
 edition = "2018"
 build = "build.rs"

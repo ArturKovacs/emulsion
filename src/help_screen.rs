@@ -40,9 +40,17 @@ pub struct HelpScreen {
 
 impl HelpScreen {
 	pub fn new(usage_img: Picture) -> HelpScreen {
+		let placement = WidgetPlacement {
+			width: Length::Fixed(0.0 as f32),
+			height: Length::Fixed(0.0 as f32),
+			horizontal_align: Alignment::Center,
+			vertical_align: Alignment::Center,
+			ignore_layout: true,
+			..Default::default()
+		};
 		HelpScreen {
 			data: RefCell::new(HelpScreenData {
-				placement: WidgetPlacement::default(),
+				placement,
 				drawn_bounds: Default::default(),
 				visible: false,
 				rendered_valid: false,
