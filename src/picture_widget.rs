@@ -22,7 +22,7 @@ use std::time::{Duration, Instant};
 #[derive(Debug, Clone)]
 enum HoverState {
 	None,
-	ItemHovered{prev_path: PathBuf}
+	ItemHovered { prev_path: PathBuf },
 }
 
 impl HoverState {
@@ -34,7 +34,7 @@ impl HoverState {
 	}
 	fn is_hovered(&self) -> bool {
 		match self {
-			HoverState::ItemHovered {..} => true,
+			HoverState::ItemHovered { .. } => true,
 			_ => false,
 		}
 	}
@@ -422,7 +422,10 @@ impl Widget for PictureWidget {
 								VirtualKeyCode::Delete => {
 									let path = borrowed.playback_manager.current_file_path();
 									if let Err(e) = trash::remove(&path) {
-										eprintln!("Error while moving file '{:?}' to trash {:?}", path, e);
+										eprintln!(
+											"Error while moving file '{:?}' to trash {:?}",
+											path, e
+										);
 									}
 									if let Err(e) = borrowed.playback_manager.update_directory() {
 										eprintln!("Error while updating directory {:?}", e);
@@ -447,11 +450,11 @@ impl Widget for PictureWidget {
 				let mut borrowed = self.data.borrow_mut();
 				match borrowed.hover_state {
 					HoverState::None => {
-						borrowed.hover_state = HoverState::ItemHovered{
-							prev_path: borrowed.playback_manager.current_file_path()
+						borrowed.hover_state = HoverState::ItemHovered {
+							prev_path: borrowed.playback_manager.current_file_path(),
 						};
 					}
-					HoverState::ItemHovered {..} => {}
+					HoverState::ItemHovered { .. } => {}
 				}
 				borrowed.playback_manager.request_load(LoadRequest::FilePath(path.clone()));
 				borrowed.rendered_valid = false;
@@ -460,7 +463,7 @@ impl Widget for PictureWidget {
 				let mut borrowed = self.data.borrow_mut();
 				match borrowed.hover_state.clone() {
 					HoverState::None => unreachable!(),
-					HoverState::ItemHovered {prev_path} => {
+					HoverState::ItemHovered { prev_path } => {
 						borrowed.playback_manager.request_load(LoadRequest::FilePath(prev_path));
 						borrowed.hover_state = HoverState::None;
 					}

@@ -107,7 +107,8 @@ fn main() {
 
 	let update_notification = Rc::new(HorizontalLayoutContainer::new());
 	let update_label = Rc::new(Label::new());
-	let update_label_image = Rc::new(Picture::new(exe_folder.join("resource/new-version-available.png")));
+	let update_label_image =
+		Rc::new(Picture::new(exe_folder.join("resource/new-version-available.png")));
 	let update_label_image_light =
 		Rc::new(Picture::new(exe_folder.join("resource/new-version-available-light.png")));
 	{
@@ -157,9 +158,11 @@ fn main() {
 	theme_button.set_icon(Some(moon_img.clone()));
 
 	let question = Rc::new(Picture::new(exe_folder.join("resource/question_button.png")));
-	let question_light = Rc::new(Picture::new(exe_folder.join("resource/question_button_light.png")));
+	let question_light =
+		Rc::new(Picture::new(exe_folder.join("resource/question_button_light.png")));
 	let question_noti = Rc::new(Picture::new(exe_folder.join("resource/question-noti.png")));
-	let question_light_noti = Rc::new(Picture::new(exe_folder.join("resource/question-light-noti.png")));
+	let question_light_noti =
+		Rc::new(Picture::new(exe_folder.join("resource/question-light-noti.png")));
 	let help_button = Rc::new(Button::new());
 	help_button.set_margin_top(5.0);
 	help_button.set_margin_left(4.0);

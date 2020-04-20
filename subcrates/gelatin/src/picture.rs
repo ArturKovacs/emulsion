@@ -6,109 +6,109 @@ use std::ops::Deref;
 use std::path;
 
 pub struct PictureTextureRef<'a> {
-    pic_data: Ref<'a, PictureData>,
+	pic_data: Ref<'a, PictureData>,
 }
 impl<'a> Deref for PictureTextureRef<'a> {
-    type Target = SrgbTexture2d;
-    fn deref(&self) -> &SrgbTexture2d {
-        if let PictureData::Gpu(texture) = &*self.pic_data {
-            texture
-        } else {
-            unreachable!()
-        }
-    }
+	type Target = SrgbTexture2d;
+	fn deref(&self) -> &SrgbTexture2d {
+		if let PictureData::Gpu(texture) = &*self.pic_data {
+			texture
+		} else {
+			unreachable!()
+		}
+	}
 }
 
 pub enum PictureData {
-    Path(path::PathBuf),
-    Cpu(RgbaImage),
-    Gpu(SrgbTexture2d),
+	Path(path::PathBuf),
+	Cpu(RgbaImage),
+	Gpu(SrgbTexture2d),
 }
 
 pub struct PictureMetadata {
-    pub width: u32,
-    pub height: u32,
+	pub width: u32,
+	pub height: u32,
 }
 
 pub struct Picture {
-    data: RefCell<PictureData>,
+	data: RefCell<PictureData>,
 }
 
 impl Picture {
-    pub fn new<T: Into<path::PathBuf>>(path: T) -> Picture {
-        Picture { data: RefCell::new(PictureData::Path(path.into())) }
-    }
+	pub fn new<T: Into<path::PathBuf>>(path: T) -> Picture {
+		Picture { data: RefCell::new(PictureData::Path(path.into())) }
+	}
 
-    pub fn from_image(img: RgbaImage) -> Picture {
-        Picture { data: RefCell::new(PictureData::Cpu(img)) }
-    }
+	pub fn from_image(img: RgbaImage) -> Picture {
+		Picture { data: RefCell::new(PictureData::Cpu(img)) }
+	}
 
-    /// This function loads the entire image from file it it hasn't been loaded yet
-    pub fn get_metadata(&self) -> Result<PictureMetadata, ImageError> {
-        let mut borrowed = self.data.borrow_mut();
-        let mut tmp_picture = PictureData::Path("".into());
-        std::mem::swap(&mut *borrowed, &mut tmp_picture);
-        let dimensions;
-        match tmp_picture {
-            PictureData::Path(path) => {
-                let img = image::open(path)?;
-                let rgba = img.into_rgba();
-                dimensions = rgba.dimensions();
-                *borrowed = PictureData::Cpu(rgba);
-            }
-            PictureData::Cpu(img) => {
-                dimensions = img.dimensions();
-                *borrowed = PictureData::Cpu(img);
-            }
-            PictureData::Gpu(img) => {
-                // This must be done because `img` was taken from `borrowed` when
-                // `borrowed` was swapped with `tmp_picture`.
-                dimensions = img.dimensions();
-                *borrowed = PictureData::Gpu(img);
-            }
-        }
-        Ok(PictureMetadata { width: dimensions.0, height: dimensions.1 })
-    }
+	/// This function loads the entire image from file it it hasn't been loaded yet
+	pub fn get_metadata(&self) -> Result<PictureMetadata, ImageError> {
+		let mut borrowed = self.data.borrow_mut();
+		let mut tmp_picture = PictureData::Path("".into());
+		std::mem::swap(&mut *borrowed, &mut tmp_picture);
+		let dimensions;
+		match tmp_picture {
+			PictureData::Path(path) => {
+				let img = image::open(path)?;
+				let rgba = img.into_rgba();
+				dimensions = rgba.dimensions();
+				*borrowed = PictureData::Cpu(rgba);
+			}
+			PictureData::Cpu(img) => {
+				dimensions = img.dimensions();
+				*borrowed = PictureData::Cpu(img);
+			}
+			PictureData::Gpu(img) => {
+				// This must be done because `img` was taken from `borrowed` when
+				// `borrowed` was swapped with `tmp_picture`.
+				dimensions = img.dimensions();
+				*borrowed = PictureData::Gpu(img);
+			}
+		}
+		Ok(PictureMetadata { width: dimensions.0, height: dimensions.1 })
+	}
 
-    pub fn texture(&self, display: &glium::Display) -> Result<PictureTextureRef, ImageError> {
-        self.upload_to_texture(display)?;
-        if let PictureData::Gpu(_) = &*self.data.borrow() {
-            Ok(PictureTextureRef { pic_data: self.data.borrow() })
-        } else {
-            unreachable!()
-        }
-    }
+	pub fn texture(&self, display: &glium::Display) -> Result<PictureTextureRef, ImageError> {
+		self.upload_to_texture(display)?;
+		if let PictureData::Gpu(_) = &*self.data.borrow() {
+			Ok(PictureTextureRef { pic_data: self.data.borrow() })
+		} else {
+			unreachable!()
+		}
+	}
 
-    fn upload_to_texture(&self, display: &glium::Display) -> Result<(), ImageError> {
-        let mut borrowed = self.data.borrow_mut();
-        let mut tmp_picture = PictureData::Path("".into());
-        std::mem::swap(&mut *borrowed, &mut tmp_picture);
-        match tmp_picture {
-            PictureData::Path(path) => {
-                let img = image::open(path)?;
-                let rgba = img.into_rgba();
-                *borrowed = PictureData::Gpu(Self::cpu_to_texture(rgba, display));
-            }
-            PictureData::Cpu(img) => {
-                *borrowed = PictureData::Gpu(Self::cpu_to_texture(img, display));
-            }
-            PictureData::Gpu(img) => {
-                // This must be done because `img` was taken from `borrowed` when
-                // `borrowed` was swapped with `tmp_picture`.
-                *borrowed = PictureData::Gpu(img);
-            }
-        };
-        Ok(())
-    }
+	fn upload_to_texture(&self, display: &glium::Display) -> Result<(), ImageError> {
+		let mut borrowed = self.data.borrow_mut();
+		let mut tmp_picture = PictureData::Path("".into());
+		std::mem::swap(&mut *borrowed, &mut tmp_picture);
+		match tmp_picture {
+			PictureData::Path(path) => {
+				let img = image::open(path)?;
+				let rgba = img.into_rgba();
+				*borrowed = PictureData::Gpu(Self::cpu_to_texture(rgba, display));
+			}
+			PictureData::Cpu(img) => {
+				*borrowed = PictureData::Gpu(Self::cpu_to_texture(img, display));
+			}
+			PictureData::Gpu(img) => {
+				// This must be done because `img` was taken from `borrowed` when
+				// `borrowed` was swapped with `tmp_picture`.
+				*borrowed = PictureData::Gpu(img);
+			}
+		};
+		Ok(())
+	}
 
-    fn cpu_to_texture(img: RgbaImage, display: &glium::Display) -> SrgbTexture2d {
-        let image_dimensions = img.dimensions();
-        let image = RawImage2d::from_raw_rgba(img.into_raw(), image_dimensions);
-        SrgbTexture2d::with_mipmaps(
-            display,
-            image,
-            glium::texture::MipmapsOption::AutoGeneratedMipmaps,
-        )
-        .unwrap()
-    }
+	fn cpu_to_texture(img: RgbaImage, display: &glium::Display) -> SrgbTexture2d {
+		let image_dimensions = img.dimensions();
+		let image = RawImage2d::from_raw_rgba(img.into_raw(), image_dimensions);
+		SrgbTexture2d::with_mipmaps(
+			display,
+			image,
+			glium::texture::MipmapsOption::AutoGeneratedMipmaps,
+		)
+		.unwrap()
+	}
 }
