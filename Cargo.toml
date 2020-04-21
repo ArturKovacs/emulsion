@@ -1,7 +1,10 @@
 [package]
 name = "emulsion"
 version = "1.8.0"
+repository = "https://github.com/ArturKovacs/emulsion"
 authors = ["Artur Barnabas <kovacs.artur.barnabas@gmail.com>"]
+license = "MIT"
+readme = "README.md"
 edition = "2018"
 build = "build.rs"
 
