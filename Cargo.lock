@@ -419,7 +419,7 @@ dependencies = [
  "alphanumeric-sort",
  "backtrace",
  "error-chain",
- "gelatin",
+ "gelatin 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "open",
  "rand 0.5.6",
  "reqwest",
@@ -543,6 +543,18 @@ dependencies = [
 [[package]]
 name = "gelatin"
 version = "0.1.0"
+dependencies = [
+ "cgmath",
+ "derive_builder",
+ "glium",
+ "image",
+]
+
+[[package]]
+name = "gelatin"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4374acb09d097436d01c9cc93529e6b86a360d0e02ab3bfa41a21d29f68240b8"
 dependencies = [
  "cgmath",
  "derive_builder",
