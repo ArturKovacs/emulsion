@@ -21,6 +21,7 @@ impl<'a> Deref for PictureTextureRef<'a> {
 
 pub enum PictureData {
 	Path(path::PathBuf),
+	EncodedBytes(&'static [u8]),
 	Cpu(RgbaImage),
 	Gpu(SrgbTexture2d),
 }
@@ -39,6 +40,10 @@ impl Picture {
 		Picture { data: RefCell::new(PictureData::Path(path.into())) }
 	}
 
+	pub fn from_encoded_bytes(data: &'static [u8]) -> Picture {
+		Picture { data: RefCell::new(PictureData::EncodedBytes(data)) }
+	}
+
 	pub fn from_image(img: RgbaImage) -> Picture {
 		Picture { data: RefCell::new(PictureData::Cpu(img)) }
 	}
@@ -52,6 +57,12 @@ impl Picture {
 		match tmp_picture {
 			PictureData::Path(path) => {
 				let img = image::open(path)?;
+				let rgba = img.into_rgba();
+				dimensions = rgba.dimensions();
+				*borrowed = PictureData::Cpu(rgba);
+			}
+			PictureData::EncodedBytes(bytes) => {
+				let img = image::load_from_memory(bytes)?;
 				let rgba = img.into_rgba();
 				dimensions = rgba.dimensions();
 				*borrowed = PictureData::Cpu(rgba);
@@ -86,6 +97,11 @@ impl Picture {
 		match tmp_picture {
 			PictureData::Path(path) => {
 				let img = image::open(path)?;
+				let rgba = img.into_rgba();
+				*borrowed = PictureData::Gpu(Self::cpu_to_texture(rgba, display));
+			}
+			PictureData::EncodedBytes(bytes) => {
+				let img = image::load_from_memory(bytes)?;
 				let rgba = img.into_rgba();
 				*borrowed = PictureData::Gpu(Self::cpu_to_texture(rgba, display));
 			}

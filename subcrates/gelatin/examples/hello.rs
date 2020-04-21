@@ -16,7 +16,7 @@ fn main() {
 	container.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
 	container.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
 
-	let image = Rc::new(Picture::new("examples/resource/cogs.png"));
+	let image = Rc::new(Picture::from_encoded_bytes(include_bytes!("resource/cogs.png")));
 	let button = Rc::new(Button::new());
 	button.set_margin_top(5.0);
 	button.set_height(Length::Fixed(24.0));
