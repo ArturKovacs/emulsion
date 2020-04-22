@@ -14,6 +14,7 @@ use std::time::{Duration, Instant};
 
 use serde_derive::Deserialize;
 use directories::ProjectDirs;
+use lazy_static::lazy_static;
 
 use gelatin::glium::glutin::{
 	dpi::{PhysicalPosition, PhysicalSize},
@@ -45,6 +46,10 @@ mod picture_widget;
 mod playback_manager;
 mod shaders;
 
+lazy_static! {
+	pub static ref PROJECT_DIRS: Option<ProjectDirs> = ProjectDirs::from("", "", "emulsion");
+}
+
 // ========================================================
 // Not-so glorious main function
 // ========================================================
@@ -57,7 +62,7 @@ fn main() {
 	let icon = Icon::from_rgba(rgba.into_raw(), w, h).unwrap();
 
 	let cfg_folder;
-	if let Some(project_dirs) = ProjectDirs::from("", "", "emulsion") {
+	if let Some(ref project_dirs) = *PROJECT_DIRS {
 		cfg_folder = project_dirs.config_dir().to_owned();
 	} else {
 		let exe_path = std::env::current_exe().unwrap();

@@ -24,6 +24,7 @@ winres = "0.1"
 [dependencies]
 gelatin = { path = "./subcrates/gelatin" }
 reqwest = { version = "0.10", features = ["json", "blocking"], optional = true }
+lazy_static = "1.4.0"
 directories = "2.0.2"
 open = "1.4.0"
 sys-info = "=0.5.8"

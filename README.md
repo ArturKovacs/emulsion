@@ -10,10 +10,10 @@ Contribution is welcome. Feel free to post feature requests, bug reports, and ma
 
 ## Reporting bugs
 
-If Emulsion closed unexpectedly please locate a "panic.txt" file which should be in the same folder as the "emulsion" executable. When posting a bug report please paste the contents of this file into GitHub. If its too long just paste the last panic entry which begins with
-```
---
-error message here
---
-```
-If there's no "panic.txt" file describe the scenario in which emulsion closed, and steps to reproduce if you deem that useful.
+If Emulsion closed unexpectedly please locate the "panic.txt" file. This file has a different location depending on the target platform.
+
+- Windows: `%localappdata%\emulsion\data`
+- MacOS: `$HOME/Library/Application Support/emulsion`
+- Linux: `$XDG_DATA_HOME/emulsion` or `$HOME/.local/share/emulsion`
+
+When posting a bug report please upload the contents of this file to GitHub. If you deem it too large just paste the last panic entry between the rows of equal signs. If there's no "panic.txt" file describe the scenario in which emulsion closed, and steps to reproduce if you believe that could help.

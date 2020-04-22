@@ -466,6 +466,7 @@ dependencies = [
  "directories",
  "error-chain",
  "gelatin",
+ "lazy_static",
  "open",
  "rand 0.7.3",
  "reqwest",
