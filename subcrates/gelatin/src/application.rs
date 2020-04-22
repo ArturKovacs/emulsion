@@ -135,7 +135,9 @@ impl Application {
 						*control_flow = ControlFlow::Exit;
 					}
 				}
-				_ => (),
+				_ => {
+					*control_flow = ControlFlow::Wait;
+				}
 			}
 			if *control_flow == ControlFlow::Exit {
 				if let Some(at_exit) = at_exit.take() {
