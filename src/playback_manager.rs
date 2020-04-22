@@ -5,7 +5,8 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use rand::{thread_rng, Rng};
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 
 use sys_info;
 
@@ -295,6 +296,7 @@ impl PlaybackManager {
 		for i in 0..self.image_cache.current_dir_len() {
 			self.present_remaining.push(i);
 		}
-		thread_rng().shuffle(self.present_remaining.as_mut_slice());
+		let mut rng = thread_rng();
+		self.present_remaining.as_mut_slice().shuffle(&mut rng);
 	}
 }
