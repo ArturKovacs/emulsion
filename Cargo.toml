@@ -1,6 +1,6 @@
 [package]
 name = "emulsion"
-version = "1.9.0"
+version = "1.10.0"
 description = "A fast and minimalistic image viewer"
 repository = "https://github.com/ArturKovacs/emulsion"
 authors = ["Artur Barnabas <kovacs.artur.barnabas@gmail.com>"]
@@ -14,12 +14,16 @@ members = [
     "subcrates/gelatin",
 ]
 
+[features]
+default = ["networking"]
+networking = ["reqwest"]
+
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1"
 
 [dependencies]
-gelatin = "0.2"
-reqwest = {version = "0.10", features = ["json", "blocking"]}
+gelatin = { path = "./subcrates/gelatin" }
+reqwest = { version = "0.10", features = ["json", "blocking"], optional = true }
 open = "1.4.0"
 sys-info = "=0.5.8"
 error-chain = "0.12"

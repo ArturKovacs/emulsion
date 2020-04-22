@@ -318,6 +318,11 @@ struct ReleaseInfoJson {
 	tag_name: String,
 }
 
+#[cfg(not(feature = "networking"))]
+/// Always returns false without the `networking` feature.
+fn check_for_updates() -> bool { false }
+
+#[cfg(feature = "networking")]
 /// Returns true if updates are available.
 fn check_for_updates() -> bool {
 	let client;

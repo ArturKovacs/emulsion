@@ -414,12 +414,12 @@ checksum = "bb1f6b1ce1c140482ea30ddd3335fc0024ac7ee112895426e0a629a6c20adfe3"
 
 [[package]]
 name = "emulsion"
-version = "1.9.0"
+version = "1.10.0"
 dependencies = [
  "alphanumeric-sort",
  "backtrace",
  "error-chain",
- "gelatin 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "gelatin",
  "open",
  "rand 0.5.6",
  "reqwest",
@@ -543,18 +543,6 @@ dependencies = [
 [[package]]
 name = "gelatin"
 version = "0.2.0"
-dependencies = [
- "cgmath",
- "derive_builder",
- "glium",
- "image",
-]
-
-[[package]]
-name = "gelatin"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3095725f7ae2af2e6521189025d1c78101109ff9d67e4c314a89b4cb1e0a5ba"
 dependencies = [
  "cgmath",
  "derive_builder",
