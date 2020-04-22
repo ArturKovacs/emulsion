@@ -13,6 +13,7 @@ use std::sync::{
 use std::time::{Duration, Instant};
 
 use serde_derive::Deserialize;
+use directories::ProjectDirs;
 
 use gelatin::glium::glutin::{
 	dpi::{PhysicalPosition, PhysicalSize},
@@ -50,14 +51,24 @@ mod shaders;
 fn main() {
 	std::panic::set_hook(Box::new(handle_panic::handle_panic));
 
-	let exe_path = std::env::current_exe().unwrap();
-	let exe_folder = exe_path.parent().unwrap();
 	let img = image::load_from_memory(include_bytes!("../resource/emulsion48.png")).unwrap();
 	let rgba = img.into_rgba();
 	let (w, h) = rgba.dimensions();
 	let icon = Icon::from_rgba(rgba.into_raw(), w, h).unwrap();
 
-	let cfg_path = exe_folder.join("cfg.toml").to_owned();
+	let cfg_folder;
+	if let Some(project_dirs) = ProjectDirs::from("", "", "emulsion") {
+		cfg_folder = project_dirs.config_dir().to_owned();
+	} else {
+		let exe_path = std::env::current_exe().unwrap();
+		let exe_folder = exe_path.parent().unwrap();
+		cfg_folder = exe_folder.to_owned();
+	}
+	println!("Config folder is {:?}", cfg_folder);
+	if !cfg_folder.exists() {
+		std::fs::create_dir_all(&cfg_folder).unwrap();
+	}
+	let cfg_path = cfg_folder.join("cfg.toml").to_owned();
 	let first_lanuch;
 	let config: Rc<RefCell<Configuration>>;
 	if let Ok(cfg) = Configuration::load(cfg_path.as_path()) {
