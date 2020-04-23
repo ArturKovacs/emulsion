@@ -25,21 +25,6 @@ enum HoverState {
 	ItemHovered { prev_path: PathBuf },
 }
 
-impl HoverState {
-	fn is_none(&self) -> bool {
-		match self {
-			HoverState::None => true,
-			_ => false,
-		}
-	}
-	fn is_hovered(&self) -> bool {
-		match self {
-			HoverState::ItemHovered { .. } => true,
-			_ => false,
-		}
-	}
-}
-
 struct PictureWidgetData {
 	placement: WidgetPlacement,
 	drawn_bounds: LogicalRect,
@@ -470,7 +455,6 @@ impl Widget for PictureWidget {
 				}
 				borrowed.rendered_valid = false;
 			}
-			_ => (),
 		}
 	}
 

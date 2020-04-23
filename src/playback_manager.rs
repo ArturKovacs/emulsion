@@ -150,10 +150,6 @@ impl PlaybackManager {
 		self.load_request = request;
 	}
 
-	pub fn curr_load_request(&self) -> &LoadRequest {
-		&self.load_request
-	}
-
 	pub fn image_texture<'a>(&'a self) -> &'a Option<Rc<glium::texture::SrgbTexture2d>> {
 		&self.image_texture
 	}
