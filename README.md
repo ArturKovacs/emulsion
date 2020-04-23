@@ -8,9 +8,9 @@ To build the software, obtain the latest stable release of [Rust](https://www.ru
 
 Contribution is welcome. Feel free to post feature requests, bug reports, and make pull requests.
 
-## Custom keybindings
+## Custom key-bindings
 
-To change the default keybindings, locate the `cfg.toml` file first. For this file to be created run and then close emulsion at least once with the current user. Depending on your OS you can find it under
+To change the default key-bindings, locate the `cfg.toml` file first. For this file to be created run and then close emulsion at least once with the current user. Depending on your OS you can find it under
 
 - Windows: `%appdata%\emulsion\config`
 - MacOS: `$HOME/Library/Preferences/emulsion`
@@ -42,7 +42,7 @@ Note that all items in this section are optional so it's fully valid to only spe
 ```toml
 [bindings]
 img_next = ["space", "right"]
-pan = [""]
+pan = []
 ```
 
 For more information and available inputs please refer to the [Bindings.md](Bindings.md) file.
