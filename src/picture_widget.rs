@@ -29,9 +29,9 @@ static IMG_ORIG_NAME: &'static str = "img_orig";
 static IMG_FIT_NAME: &'static str = "img_fit";
 static IMG_DEL_NAME: &'static str = "img_del";
 static PAN_NAME: &'static str = "pan";
-static ANIM_PLAY_NAME: &'static str = "anim_play";
-static PRESENT_PLAY_NAME: &'static str = "present_play";
-static PRESENT_PLAY_RND_NAME: &'static str = "present_play_rnd";
+static PLAY_ANIM_NAME: &'static str = "play_anim";
+static PLAY_PRESENT_NAME: &'static str = "play_present";
+static PLAY_PRESENT_RND_NAME: &'static str = "play_present_rnd";
 
 lazy_static! {
 	static ref DEFAULT_BINDINGS: HashMap<&'static str, Vec<&'static str>> = {
@@ -42,9 +42,9 @@ lazy_static! {
 		m.insert(IMG_FIT_NAME, vec!["F"]);
 		m.insert(IMG_DEL_NAME, vec!["Delete"]);
 		m.insert(PAN_NAME, vec!["Space"]);
-		m.insert(ANIM_PLAY_NAME, vec!["Alt+A", "Alt+V"]);
-		m.insert(PRESENT_PLAY_NAME, vec!["P"]);
-		m.insert(PRESENT_PLAY_RND_NAME, vec!["Alt+P"]);
+		m.insert(PLAY_ANIM_NAME, vec!["Alt+A", "Alt+V"]);
+		m.insert(PLAY_PRESENT_NAME, vec!["P"]);
+		m.insert(PLAY_PRESENT_RND_NAME, vec!["Alt+P"]);
 		m
 	};
 }
@@ -259,7 +259,7 @@ impl PictureWidget {
 				Self::triggered(&borrowed.configuration, $action_name, input_key, modifiers)
 			}
 		}
-		if triggered!(ANIM_PLAY_NAME) {
+		if triggered!(PLAY_ANIM_NAME) {
 			match borrowed.playback_manager.playback_state() {
 				PlaybackState::Forward => {
 					borrowed.playback_manager.pause_playback()
@@ -284,11 +284,11 @@ impl PictureWidget {
 			borrowed.img_texel_size = 1.0;
 			borrowed.rendered_valid = false;
 		}
-		if triggered!(PRESENT_PLAY_NAME) {
+		if triggered!(PLAY_PRESENT_NAME) {
 			borrowed.playback_manager.start_presentation();
 			borrowed.rendered_valid = false;
 		}
-		if triggered!(PRESENT_PLAY_RND_NAME) {
+		if triggered!(PLAY_PRESENT_RND_NAME) {
 			borrowed.playback_manager.start_presentation();
 			borrowed.rendered_valid = false;
 		}

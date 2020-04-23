@@ -15,15 +15,15 @@ win_x = 109
 win_y = 70
 
 [bindings]
-anim_play = ["alt+a", "alt+v"]
-img_del = ["delete"]
-img_fit = ["f"]
 img_next = ["d", "right"]
-img_orig = ["q"]
 img_prev = ["a", "left"]
+img_orig = ["q"]
+img_fit = ["f"]
+img_del = ["delete"]
 pan = ["space"]
-present_play = ["p"]
-present_play_rnd = ["alt+p"]
+play_anim = ["alt+a", "alt+v"]
+play_present = ["p"]
+play_present_rnd = ["alt+p"]
 ```
 
 ## Modifiers
