@@ -314,6 +314,7 @@ pub enum EventKind {
 	MouseButton { state: glutin::event::ElementState, button: glutin::event::MouseButton },
 	MouseScroll { delta: LogicalVector },
 	KeyInput { input: glutin::event::KeyboardInput },
+	ReceivedCharacter(char),
 	DroppedFile(PathBuf),
 	HoveredFile(PathBuf),
 	HoveredFileCancelled,

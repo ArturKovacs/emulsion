@@ -1,13 +1,17 @@
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
+use std::collections::HashMap;
+
+use lazy_static::lazy_static;
 
 use crate::shaders;
+use crate::utils::{virtual_keycode_to_string, virtual_keycode_is_char};
 
-use crate::playback_manager::*;
+use crate::{playback_manager::*, configuration::Configuration};
 
 use gelatin::cgmath::{Matrix4, Vector3};
-use gelatin::glium::glutin::event::{ElementState, MouseButton};
+use gelatin::glium::glutin::event::{ElementState, MouseButton, ModifiersState};
 use gelatin::glium::{program, texture::SrgbTexture2d, uniform, Display, Frame, Program, Surface};
 
 use gelatin::add_common_widget_functions;
@@ -18,6 +22,32 @@ use gelatin::NextUpdate;
 use gelatin::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
 
 use std::time::{Duration, Instant};
+
+static IMG_NEXT_NAME: &'static str = "img_next";
+static IMG_PREV_NAME: &'static str = "img_prev";
+static IMG_ORIG_NAME: &'static str = "img_orig";
+static IMG_FIT_NAME: &'static str = "img_fit";
+static IMG_DEL_NAME: &'static str = "img_del";
+static PAN_NAME: &'static str = "pan";
+static ANIM_PLAY_NAME: &'static str = "anim_play";
+static PRESENT_PLAY_NAME: &'static str = "present_play";
+static PRESENT_PLAY_RND_NAME: &'static str = "present_play_rnd";
+
+lazy_static! {
+	static ref DEFAULT_BINDINGS: HashMap<&'static str, Vec<&'static str>> = {
+		let mut m = HashMap::new();
+		m.insert(IMG_NEXT_NAME, vec!["D", "Right"]);
+		m.insert(IMG_PREV_NAME, vec!["A", "Left"]);
+		m.insert(IMG_ORIG_NAME, vec!["Q"]);
+		m.insert(IMG_FIT_NAME, vec!["F"]);
+		m.insert(IMG_DEL_NAME, vec!["Delete"]);
+		m.insert(PAN_NAME, vec!["Space"]);
+		m.insert(ANIM_PLAY_NAME, vec!["Alt+A", "Alt+V"]);
+		m.insert(PRESENT_PLAY_NAME, vec!["P"]);
+		m.insert(PRESENT_PLAY_RND_NAME, vec!["Alt+P"]);
+		m
+	};
+}
 
 #[derive(Debug, Clone)]
 enum HoverState {
@@ -31,10 +61,11 @@ struct PictureWidgetData {
 	prev_draw_size: LogicalVector,
 	visible: bool,
 	rendered_valid: bool,
-
+	
 	click: bool,
 	hover: bool,
-
+	
+	configuration: Rc<RefCell<Configuration>>,
 	playback_manager: PlaybackManager,
 
 	program: Program,
@@ -121,6 +152,7 @@ impl PictureWidget {
 		window: &Rc<Window>,
 		slider: Rc<gelatin::slider::Slider>,
 		bottom_panel: Rc<HorizontalLayoutContainer>,
+		configuration: Rc<RefCell<Configuration>>,
 	) -> PictureWidget {
 		let program = program!(display,
 			140 => {
@@ -142,7 +174,7 @@ impl PictureWidget {
 				prev_draw_size: Default::default(),
 				click: false,
 				hover: false,
-				//image_texture: None,
+				configuration,
 				playback_manager: PlaybackManager::new(),
 				rendered_valid: false,
 
@@ -182,6 +214,97 @@ impl PictureWidget {
 		let mut borrowed = self.data.borrow_mut();
 		borrowed.playback_manager.request_load(LoadRequest::FilePath(path.into()));
 		borrowed.rendered_valid = false;
+	}
+
+	fn keys_triggered<S: AsRef<str>>(keys: &[S], input_key: &str, modifiers: ModifiersState) -> bool {
+		for key in keys {
+			let complex_key = key.as_ref();
+			let parts = complex_key.split('+').map(|s| s.trim().to_lowercase()).collect::<Vec<_>>();
+			if parts.is_empty() { continue; }
+			let key = parts.last().unwrap();
+			if input_key != *key {
+				continue;
+			}
+			let mut all_modifiers_active = true;
+			for mod_str in parts.iter().take(parts.len()-1) {
+				match mod_str.as_ref() {
+					"alt" if !modifiers.alt() => all_modifiers_active = false,
+					"ctrl" if !modifiers.ctrl() => all_modifiers_active = false,
+					"logo" if !modifiers.logo() => all_modifiers_active = false,
+					_ => (),
+				}
+			}
+			if all_modifiers_active {
+				return true;
+			}
+		}
+		false
+	}
+
+	fn triggered(config: &Rc<RefCell<Configuration>>, action_name: &str, input_key: &str, modifiers: ModifiersState) -> bool {
+		//let borrowed = self.data.borrow();
+		let config = config.borrow();
+		if let Some(keys) = config.bindings.get(action_name) {
+			Self::keys_triggered(keys.as_slice(), input_key, modifiers)
+		} else {
+			let keys = DEFAULT_BINDINGS.get(action_name).unwrap();
+			Self::keys_triggered(keys.as_slice(), input_key, modifiers)
+		}
+	}
+
+	fn handle_key_input(&self, input_key: &str, modifiers: ModifiersState) {
+		let mut borrowed = self.data.borrow_mut();
+		macro_rules! triggered {
+			($action_name:ident) => {
+				Self::triggered(&borrowed.configuration, $action_name, input_key, modifiers)
+			}
+		}
+		if triggered!(ANIM_PLAY_NAME) {
+			match borrowed.playback_manager.playback_state() {
+				PlaybackState::Forward => {
+					borrowed.playback_manager.pause_playback()
+				}
+				_ => borrowed.playback_manager.start_playback_forward(),
+			}
+		}
+		if triggered!(IMG_PREV_NAME) {
+			borrowed.playback_manager.request_load(LoadRequest::LoadPrevious);
+			borrowed.rendered_valid = false;
+		}
+		if triggered!(IMG_NEXT_NAME) {
+			borrowed.playback_manager.request_load(LoadRequest::LoadNext);
+			borrowed.rendered_valid = false;
+		}
+		if triggered!(IMG_FIT_NAME) {
+			borrowed.image_fit = true;
+			borrowed.rendered_valid = false;
+		}
+		if triggered!(IMG_ORIG_NAME) {
+			borrowed.image_fit = false;
+			borrowed.img_texel_size = 1.0;
+			borrowed.rendered_valid = false;
+		}
+		if triggered!(PRESENT_PLAY_NAME) {
+			borrowed.playback_manager.start_presentation();
+			borrowed.rendered_valid = false;
+		}
+		if triggered!(PRESENT_PLAY_RND_NAME) {
+			borrowed.playback_manager.start_presentation();
+			borrowed.rendered_valid = false;
+		}
+		if triggered!(IMG_DEL_NAME) {
+			let path = borrowed.playback_manager.current_file_path();
+			if let Err(e) = trash::remove(&path) {
+				eprintln!(
+					"Error while moving file '{:?}' to trash: {:?}",
+					path, e
+				);
+			}
+			if let Err(e) = borrowed.playback_manager.update_directory() {
+				eprintln!("Error while updating directory {:?}", e);
+			}
+			borrowed.rendered_valid = false;
+		}
 	}
 }
 
@@ -272,7 +395,6 @@ impl Widget for PictureWidget {
 					sampler.magnify_filter(gelatin::glium::uniforms::MagnifySamplerFilter::Linear)
 				};
 				// building the uniforms
-
 				let uniforms = uniform! {
 					matrix: Into::<[[f32; 4]; 4]>::into(transform),
 					bright_shade: data.bright_shade,
@@ -363,65 +485,23 @@ impl Widget for PictureWidget {
 				borrowed.zoom_image(event.cursor_pos, new_image_texel_size);
 				borrowed.image_fit = false;
 			}
+			EventKind::ReceivedCharacter(ch) => {
+				let mut input_key = String::with_capacity(4);
+				input_key.push(ch);
+				self.handle_key_input(input_key.as_str(), event.modifiers);
+			}
 			EventKind::KeyInput { input } => {
-				use gelatin::glium::glutin::event::VirtualKeyCode;
 				if let Some(key) = input.virtual_keycode {
-					let mut borrowed = self.data.borrow_mut();
-					if input.state == ElementState::Pressed {
-						if event.modifiers.alt() {
-							match key {
-								VirtualKeyCode::V | VirtualKeyCode::A => {
-									match borrowed.playback_manager.playback_state() {
-										PlaybackState::Forward => {
-											borrowed.playback_manager.pause_playback()
-										}
-										_ => borrowed.playback_manager.start_playback_forward(),
-									}
-								}
-								VirtualKeyCode::P => {
-									borrowed.playback_manager.start_random_presentation();
-								}
-								_ => (),
-							}
-						} else {
-							match key {
-								VirtualKeyCode::Left | VirtualKeyCode::A => {
-									borrowed
-										.playback_manager
-										.request_load(LoadRequest::LoadPrevious);
-								}
-								VirtualKeyCode::Right | VirtualKeyCode::D => {
-									borrowed.playback_manager.request_load(LoadRequest::LoadNext);
-								}
-								VirtualKeyCode::F => borrowed.image_fit = true,
-								VirtualKeyCode::Q => {
-									borrowed.image_fit = false;
-									borrowed.img_texel_size = 1.0;
-								}
-								VirtualKeyCode::P => {
-									borrowed.playback_manager.start_presentation();
-								}
-								VirtualKeyCode::Space => {
-									borrowed.panning = borrowed.hover;
-								}
-								VirtualKeyCode::Delete => {
-									let path = borrowed.playback_manager.current_file_path();
-									if let Err(e) = trash::remove(&path) {
-										eprintln!(
-											"Error while moving file '{:?}' to trash {:?}",
-											path, e
-										);
-									}
-									if let Err(e) = borrowed.playback_manager.update_directory() {
-										eprintln!("Error while updating directory {:?}", e);
-									}
-									borrowed.rendered_valid = false;
-								}
-								_ => (),
-							}
+					let input_key_str = virtual_keycode_to_string(key).to_lowercase();
+					if !virtual_keycode_is_char(key) {
+						if input.state == ElementState::Pressed {
+							self.handle_key_input(input_key_str.as_str(), event.modifiers)
 						}
-					} else if key == VirtualKeyCode::Space {
-						borrowed.panning = false;
+					}
+					// Panning is a special snowflake
+					let mut borrowed = self.data.borrow_mut();
+					if Self::triggered(&borrowed.configuration, PAN_NAME, input_key_str.as_str(), event.modifiers) {
+						borrowed.panning = input.state == ElementState::Pressed;
 					}
 				}
 			}

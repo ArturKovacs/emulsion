@@ -8,6 +8,45 @@ To build the software, obtain the latest stable release of [Rust](https://www.ru
 
 Contribution is welcome. Feel free to post feature requests, bug reports, and make pull requests.
 
+## Custom keybindings
+
+To change the default keybindings, locate the `cfg.toml` file first. For this file to be created run and then close emulsion at least once with the current user. Depending on your OS you can find it under
+
+- Windows: `%appdata%\emulsion\config`
+- MacOS: `$HOME/Library/Preferences/emulsion`
+- Linux: `$XDG_CONFIG_HOME/emulsion` or `$HOME/.config/emulsion`
+
+This file may contain a `[bindings]` section. If there is no such section, the defaults are used. If we were to add all the default bindings to this file it would look somethings like the following
+
+```toml
+dark = false
+win_w = 835
+win_h = 759
+win_x = 109
+win_y = 70
+
+[bindings]
+anim_play = ["alt+a", "alt+v"]
+img_del = ["delete"]
+img_fit = ["f"]
+img_next = ["d", "right"]
+img_orig = ["q"]
+img_prev = ["a", "left"]
+pan = ["space"]
+present_play = ["p"]
+present_play_rnd = ["alt+p"]
+```
+
+Note that all items in this section are optional so it's fully valid to only specify one of the actions. In this case all the rest will use the default bindings. For example
+
+```toml
+[bindings]
+img_next = ["space", "right"]
+pan = [""]
+```
+
+For more information and available inputs please refer to the [Bindings.md](Bindings.md) file.
+
 ## Reporting bugs
 
 If Emulsion closed unexpectedly please locate the "panic.txt" file. This file has a different location depending on the target platform.

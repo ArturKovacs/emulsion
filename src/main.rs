@@ -45,6 +45,7 @@ mod image_cache;
 mod picture_widget;
 mod playback_manager;
 mod shaders;
+mod utils;
 
 lazy_static! {
 	pub static ref PROJECT_DIRS: Option<ProjectDirs> = ProjectDirs::from("", "", "emulsion");
@@ -207,6 +208,7 @@ fn main() {
 		&window,
 		slider.clone(),
 		bottom_container.clone(),
+		config.clone(),
 	));
 	picture_widget.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
 	picture_widget.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });

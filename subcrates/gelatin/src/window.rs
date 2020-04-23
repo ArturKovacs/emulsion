@@ -220,6 +220,13 @@ impl Window {
 						kind: EventKind::KeyInput { input },
 					});
 				}
+				WindowEvent::ReceivedCharacter(ch) => {
+					event = Some(Event {
+						cursor_pos: borrowed.cursor_pos,
+						modifiers: borrowed.modifiers,
+						kind: EventKind::ReceivedCharacter(ch),
+					});
+				}
 				WindowEvent::CursorMoved { position, .. } => {
 					let logical_pos;
 					{

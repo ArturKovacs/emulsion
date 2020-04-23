@@ -14,9 +14,5 @@ edition = "2018"
 cgmath = "0.17"
 image = "0.23"
 derive_builder = "0.9"
-
-[dependencies.glium]
-version = "0.27"
-features = [
-#    "icon_loading"
-]
+glium = { version = "0.27" }
+#glutin = { version = "0.24", features=["serde"] }
