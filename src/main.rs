@@ -69,7 +69,6 @@ fn main() {
 		let exe_folder = exe_path.parent().unwrap();
 		cfg_folder = exe_folder.to_owned();
 	}
-	println!("Config folder is {:?}", cfg_folder);
 	if !cfg_folder.exists() {
 		std::fs::create_dir_all(&cfg_folder).unwrap();
 	}
