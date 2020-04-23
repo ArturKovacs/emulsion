@@ -327,11 +327,13 @@ impl ImageCache {
 		use std::collections::btree_map::Entry;
 		use std::sync::mpsc::TryRecvError;
 
-		loop {
+		let mut processed = 0;
+		while processed < 2 {
 			match self.loader.try_recv_prefetched() {
 				Ok(load_result) => {
 					self.requested_images -= 1;
 					if let LoadResult::Ok { path, metadata, image } = load_result {
+						processed += 1;
 						let size_estimate =
 							get_image_size_estimate((image.width(), image.height())) as isize;
 						match self.texture_cache.entry(path.file_name().unwrap().to_owned()) {
