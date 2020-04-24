@@ -3,14 +3,20 @@ use std::path::Path;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub struct Configuration {
+pub struct WindowSection {
 	pub dark: bool,
 	pub win_w: u32,
 	pub win_h: u32,
 	pub win_x: i32,
 	pub win_y: i32,
-    pub bindings: BTreeMap<String, Vec<String>>,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct Configuration {
+	pub window: WindowSection,
+    pub bindings: Option<BTreeMap<String, Vec<String>>>,
 }
 
 impl Configuration {
@@ -40,12 +46,14 @@ impl Configuration {
 impl Default for Configuration {
 	fn default() -> Self {
 		Configuration {
-			dark: false,
-			win_w: 580,
-			win_h: 558,
-			win_x: 64,
-			win_y: 64,
-            bindings: BTreeMap::new(),
+			window: WindowSection {
+				dark: false,
+				win_w: 580,
+				win_h: 558,
+				win_x: 64,
+				win_y: 64,
+			},
+            bindings: None,
 		}
 	}
 }

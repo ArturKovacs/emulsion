@@ -89,8 +89,8 @@ fn main() {
 		let config = config.borrow();
 		let window_desc = WindowDescriptorBuilder::default()
 			.icon(Some(icon))
-			.size(PhysicalSize::new(config.win_w, config.win_h))
-			.position(Some(PhysicalPosition::new(config.win_x, config.win_y)))
+			.size(PhysicalSize::new(config.window.win_w, config.window.win_h))
+			.position(Some(PhysicalPosition::new(config.window.win_x, config.window.win_y)))
 			.build()
 			.unwrap();
 		window = Window::new(&mut application, window_desc);
@@ -100,13 +100,13 @@ fn main() {
 		window.add_global_event_handler(move |event| match event {
 			WindowEvent::Resized(new_size) => {
 				let mut config = config_clone.borrow_mut();
-				config.win_w = new_size.width;
-				config.win_h = new_size.height;
+				config.window.win_w = new_size.width;
+				config.window.win_h = new_size.height;
 			}
 			WindowEvent::Moved(new_pos) => {
 				let mut config = config_clone.borrow_mut();
-				config.win_x = new_pos.x;
-				config.win_y = new_pos.y;
+				config.window.win_x = new_pos.x;
+				config.window.win_y = new_pos.y;
 			}
 			_ => (),
 		});
@@ -229,7 +229,7 @@ fn main() {
 
 	let update_available = Arc::new(AtomicBool::new(false));
 	let update_check_done = Arc::new(AtomicBool::new(false));
-	let light_theme = Rc::new(Cell::new(!config.borrow().dark));
+	let light_theme = Rc::new(Cell::new(!config.borrow().window.dark));
 	let theme_button_clone = theme_button.clone();
 	let help_button_clone = help_button.clone();
 	let update_label_clone = update_label;
@@ -275,7 +275,7 @@ fn main() {
 		let set_theme = set_theme.clone();
 		theme_button.set_on_click(move || {
 			light_theme.set(!light_theme.get());
-			config.borrow_mut().dark = !light_theme.get();
+			config.borrow_mut().window.dark = !light_theme.get();
 			set_theme();
 		});
 	}

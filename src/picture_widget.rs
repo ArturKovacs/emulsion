@@ -242,9 +242,9 @@ impl PictureWidget {
 	}
 
 	fn triggered(config: &Rc<RefCell<Configuration>>, action_name: &str, input_key: &str, modifiers: ModifiersState) -> bool {
-		//let borrowed = self.data.borrow();
 		let config = config.borrow();
-		if let Some(keys) = config.bindings.get(action_name) {
+		let bindings = config.bindings.as_ref();
+		if let Some(Some(keys)) = bindings.map(|b| b.get(action_name)) {
 			Self::keys_triggered(keys.as_slice(), input_key, modifiers)
 		} else {
 			let keys = DEFAULT_BINDINGS.get(action_name).unwrap();
