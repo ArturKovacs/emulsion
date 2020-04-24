@@ -285,11 +285,17 @@ impl PictureWidget {
 			borrowed.rendered_valid = false;
 		}
 		if triggered!(PLAY_PRESENT_NAME) {
-			borrowed.playback_manager.start_presentation();
+			match borrowed.playback_manager.playback_state() {
+				PlaybackState::Present => borrowed.playback_manager.pause_playback(),
+				_ => borrowed.playback_manager.start_presentation(),
+			}
 			borrowed.rendered_valid = false;
 		}
 		if triggered!(PLAY_PRESENT_RND_NAME) {
-			borrowed.playback_manager.start_presentation();
+			match borrowed.playback_manager.playback_state() {
+				PlaybackState::RandomPresent => borrowed.playback_manager.pause_playback(),
+				_ => borrowed.playback_manager.start_random_presentation(),
+			}
 			borrowed.rendered_valid = false;
 		}
 		if triggered!(IMG_DEL_NAME) {
@@ -486,8 +492,12 @@ impl Widget for PictureWidget {
 				borrowed.image_fit = false;
 			}
 			EventKind::ReceivedCharacter(ch) => {
-				let mut input_key = String::with_capacity(4);
-				input_key.push(ch);
+				let mut input_key = String::with_capacity(5);
+				if ch == ' ' {
+					input_key.push_str("space");
+				} else {
+					input_key.push(ch);
+				}
 				self.handle_key_input(input_key.as_str(), event.modifiers);
 			}
 			EventKind::KeyInput { input } => {

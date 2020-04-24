@@ -25,11 +25,8 @@ impl Configuration {
 		let cfg_str = fs::read_to_string(file_path)
 			.map_err(|_| format!("Could not read configuration from {:?}", file_path))?;
 		let result = toml::from_str(cfg_str.as_ref()).map_err(|e| format!("{}", e))?;
-		println!("Read config from file:\n{:#?}", result);
+		//println!("Read config from file:\n{:#?}", result);
 		Ok(result)
-		//let file = fs::File::open(file_path).map_err(|_| ())?;
-		//let mut de = Deserializer::new(file);
-		//Ok(Deserialize::deserialize(&mut de).map_err(|_| ())?)
 	}
 
 	pub fn save<P: AsRef<Path>>(&self, file_path: P) -> Result<(), String> {
@@ -37,8 +34,6 @@ impl Configuration {
 		let string = toml::to_string(self).map_err(|e| format!("{}", e))?;
 		fs::write(file_path, string)
 			.map_err(|_| format!("Could not write to config file {:?}", file_path))?;
-		//let mut ser = Serializer::new(&mut file);
-		//self.serialize(&mut ser).map_err(|_| ())?;
 		Ok(())
 	}
 }
