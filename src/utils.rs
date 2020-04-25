@@ -52,6 +52,8 @@ pub fn virtual_keycode_is_char(vk: VirtualKeyCode) -> bool {
         VirtualKeyCode::Numpad7 => true,
         VirtualKeyCode::Numpad8 => true,
         VirtualKeyCode::Numpad9 => true,
+        VirtualKeyCode::AbntC1 => true,
+        VirtualKeyCode::AbntC2 => true,
         VirtualKeyCode::Add => true,
         VirtualKeyCode::Apostrophe => true,
         VirtualKeyCode::At => true,

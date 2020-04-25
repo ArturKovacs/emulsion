@@ -495,6 +495,8 @@ impl Widget for PictureWidget {
 				let mut input_key = String::with_capacity(5);
 				if ch == ' ' {
 					input_key.push_str("space");
+				} else if ch == '+' {
+					input_key.push_str("add");
 				} else {
 					input_key.push(ch);
 				}

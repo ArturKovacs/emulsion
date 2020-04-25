@@ -39,9 +39,13 @@ The following modifiers are valid
 
 ## Keys
 
-Everything typeable is supported including unicode characters like `ø`, `ű`, and `💜`
+Everything typeable is supported including unicode characters like `ø`, `ű`, and `💜`.
 
-The following list contains all supported non-typeable keys' names (and some of the typeable ones as well).
+There are two special cases for typeable characters:
+- `' '` must be specified as `space`
+- `'+'` must be specified as `add`.
+
+The following list contains all supported non-typeable keys' names.
 
 ```
 /// The Escape key, next to F1.
@@ -100,8 +104,6 @@ Return,
 /// The "Compose" key on Linux.
 Compose,
 
-Caret,
-
 Numlock,
 Numpad0,
 Numpad1,
@@ -114,62 +116,38 @@ Numpad7,
 Numpad8,
 Numpad9,
 
-AbntC1,
-AbntC2,
-Add,
-Apostrophe,
 Apps,
-At,
 Ax,
-Backslash,
 Calculator,
 Capital,
-Colon,
-Comma,
 Convert,
 Decimal,
-Divide,
-Equals,
-Grave,
 Kana,
 Kanji,
 LAlt,
-LBracket,
 LControl,
 LShift,
 LWin,
 Mail,
 MediaSelect,
 MediaStop,
-Minus,
-Multiply,
 Mute,
 MyComputer,
 NavigateForward,  // also called "Prior"
 NavigateBackward, // also called "Next"
 NextTrack,
 NoConvert,
-NumpadComma,
-NumpadEnter,
-NumpadEquals,
 OEM102,
-Period,
 PlayPause,
 Power,
 PrevTrack,
 RAlt,
-RBracket,
 RControl,
 RShift,
 RWin,
-Semicolon,
-Slash,
 Sleep,
 Stop,
-Subtract,
 Sysrq,
-Tab,
-Underline,
 Unlabeled,
 VolumeDown,
 VolumeUp,
