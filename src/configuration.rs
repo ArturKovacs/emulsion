@@ -1,8 +1,7 @@
-use std::fs;
-use std::path::Path;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-
+use std::fs;
+use std::path::Path;
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct WindowSection {
@@ -16,7 +15,7 @@ pub struct WindowSection {
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Configuration {
 	pub window: WindowSection,
-    pub bindings: Option<BTreeMap<String, Vec<String>>>,
+	pub bindings: Option<BTreeMap<String, Vec<String>>>,
 }
 
 impl Configuration {
@@ -41,14 +40,8 @@ impl Configuration {
 impl Default for Configuration {
 	fn default() -> Self {
 		Configuration {
-			window: WindowSection {
-				dark: false,
-				win_w: 580,
-				win_h: 558,
-				win_x: 64,
-				win_y: 64,
-			},
-            bindings: None,
+			window: WindowSection { dark: false, win_w: 580, win_h: 558, win_x: 64, win_y: 64 },
+			bindings: None,
 		}
 	}
 }

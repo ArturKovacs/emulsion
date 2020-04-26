@@ -48,9 +48,9 @@ fn write_to_file(msg: &str) -> io::Result<()> {
 		local_data_folder = project_dirs.data_local_dir().to_owned();
 	} else {
 		let curr_exe = env::current_exe()?;
-		let curr_exe_dir = curr_exe
-			.parent()
-			.ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Could not get exe parent folder!"))?;
+		let curr_exe_dir = curr_exe.parent().ok_or_else(|| {
+			io::Error::new(io::ErrorKind::Other, "Could not get exe parent folder!")
+		})?;
 		local_data_folder = curr_exe_dir.to_owned();
 	}
 	if !local_data_folder.exists() {

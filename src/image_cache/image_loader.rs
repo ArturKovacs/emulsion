@@ -10,7 +10,7 @@ use std::thread;
 use gelatin::glium;
 use gelatin::image;
 
-use glium::texture::{RawImage2d, SrgbTexture2d, MipmapsOption};
+use glium::texture::{MipmapsOption, RawImage2d, SrgbTexture2d};
 
 pub mod errors {
 	use gelatin::glium::texture;

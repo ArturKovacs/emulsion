@@ -12,9 +12,9 @@ use std::sync::{
 };
 use std::time::{Duration, Instant};
 
-use serde_derive::Deserialize;
 use directories::ProjectDirs;
 use lazy_static::lazy_static;
+use serde_derive::Deserialize;
 
 use gelatin::glium::glutin::{
 	dpi::{PhysicalPosition, PhysicalSize},
@@ -337,7 +337,9 @@ struct ReleaseInfoJson {
 
 #[cfg(not(feature = "networking"))]
 /// Always returns false without the `networking` feature.
-fn check_for_updates() -> bool { false }
+fn check_for_updates() -> bool {
+	false
+}
 
 #[cfg(feature = "networking")]
 /// Returns true if updates are available.
