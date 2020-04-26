@@ -385,14 +385,19 @@ impl Widget for PictureWidget {
 				// Model tranform
 				let image_display_height = image_display_width * img_height_over_width;
 				let img_pyhs_pos = data.img_pos.vec * context.dpi_scale_factor;
-				let img_phys_siz = LogicalVector::new(image_display_width, image_display_height)
-					* context.dpi_scale_factor;
+				let img_phys_siz;
+				{
+					let img_phys_w = image_display_width * context.dpi_scale_factor;
+					let img_phys_h = image_display_height * context.dpi_scale_factor;
+					img_phys_siz = LogicalVector::new(img_phys_w.ceil(), img_phys_h.ceil());
+				}
 				let corner_x =
 					(img_pyhs_pos.x - img_phys_siz.vec.x * 0.5).floor() / context.dpi_scale_factor;
 				let corner_y =
 					(img_pyhs_pos.y - img_phys_siz.vec.y * 0.5).floor() / context.dpi_scale_factor;
-				let transform =
-					Matrix4::from_nonuniform_scale(image_display_width, image_display_height, 1.0);
+				let adjusted_w = img_phys_siz.vec.x / context.dpi_scale_factor;
+				let adjusted_h = img_phys_siz.vec.y / context.dpi_scale_factor;
+				let transform = Matrix4::from_nonuniform_scale(adjusted_w, adjusted_h, 1.0);
 				let transform =
 					Matrix4::from_translation(Vector3::new(corner_x, corner_y, 0.0)) * transform;
 				// Projection tranform
