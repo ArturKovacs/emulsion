@@ -73,7 +73,7 @@ fn main() {
 	if !cfg_folder.exists() {
 		std::fs::create_dir_all(&cfg_folder).unwrap();
 	}
-	let cfg_path = cfg_folder.join("cfg.toml").to_owned();
+	let cfg_path = cfg_folder.join("cfg.toml");
 	let first_lanuch;
 	let config: Rc<RefCell<Configuration>>;
 	if let Ok(cfg) = Configuration::load(cfg_path.as_path()) {
