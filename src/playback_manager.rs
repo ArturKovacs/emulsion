@@ -169,7 +169,7 @@ impl PlaybackManager {
 		match &self.load_request {
 			LoadRequest::None => (),
 			lr => {
-				println!("Updating imagte with load request {:?}", lr);
+				//println!("Updating imagte with load request {:?}", lr);
 			}
 		}
 		let mut load_request = LoadRequest::None;
@@ -265,7 +265,7 @@ impl PlaybackManager {
 			LoadRequest::None => None,
 		};
 		if let Some(result) = load_result {
-			println!("load_result was some");
+			//println!("load_result was some");
 			match result {
 				Ok((frame, filename)) => {
 					println!("load_result was some ok");
@@ -273,7 +273,7 @@ impl PlaybackManager {
 					self.filename = Some(filename);
 				}
 				Err(image_cache::errors::Error(image_cache::errors::ErrorKind::WaitingOnLoader, _)) => {
-					println!("load_result was waity stuff");
+					//println!("load_result was waity stuff");
 					next_update = gelatin::NextUpdate::WaitUntil(a_millisec_from_now);
 					// Place the original load request back to self
 					// so that next time we attempt to load this again.

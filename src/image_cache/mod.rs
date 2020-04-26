@@ -154,7 +154,7 @@ impl ImageCache {
 			
 			remaining_capacity: capacity,
 			total_capacity: capacity,
-			curr_est_size: capacity,
+			curr_est_size: 1000, // 1 kb, an optimistic estimate for the image size before anything is loaded
 			requested_images: 0,
 
 			current_req_id: 0,
@@ -276,11 +276,12 @@ impl ImageCache {
 
 		let current_index;
 		if self.dir_path != parent {
+			println!("Requested dir is different from current dir. Current: {:?}", self.dir_path);
 			self.texture_cache.clear();
 			self.prefetched.clear();
 			self.remaining_capacity = self.total_capacity;
 			self.change_directory(&parent, &target_file_name)?;
-			self.force_load_at_index(self.current_index);
+			self.send_request_for_index(self.current_index);
 			return Err(errors::Error::from_kind(errors::ErrorKind::WaitingOnLoader));
 		} else {
 			let mut option_index = None;
@@ -298,6 +299,7 @@ impl ImageCache {
 				bail!("Image not found at '{:?}'", path);
 			}
 
+			//println!("Cache has a length of {} before reduction", self.texture_cache.len());
 			let mut tmp_cache = BTreeMap::new();
 			mem::swap(&mut self.texture_cache, &mut tmp_cache);
 			
@@ -329,39 +331,43 @@ impl ImageCache {
 			});
 			tmp_cache = sorted_files.into_iter().map(|(_, entry)| entry).collect();
 			mem::swap(&mut self.texture_cache, &mut tmp_cache);
+			//println!("Reduced cache to a length of {}", self.texture_cache.len());
 			self.remaining_capacity = remaining_capacity;
 		}
 
 		let metadata = fs::metadata(&path)?;
 
-		// First check if it's among the prefetched, and upload it, if it is
+		// Check if it's among the prefetched, and upload it, if it is
 		if let Some(load_result) = self.prefetched.remove(&path) {
 			if let Ok(Some(texture)) = self.upload_to_texture(display, load_result) {
 				return Ok(texture);
 			}
 		}
-
 		// Check if it is inside the texture cache first
-		{
-			if let Some(tex) = self.texture_cache.get(&path) {
-				let mut get_from_cache = false;
-				if let Some(curr_mod_time) = metadata.modified().ok() {
-					if let Some(mod_time) = tex.mod_time {
-						if mod_time == curr_mod_time {
-							get_from_cache = true;
-						}
+		if let Some(tex) = self.texture_cache.get(&path) {
+			let mut get_from_cache = false;
+			if let Some(curr_mod_time) = metadata.modified().ok() {
+				if let Some(mod_time) = tex.mod_time {
+					if mod_time == curr_mod_time {
+						get_from_cache = true;
 					}
-				} else {
-					get_from_cache = true;
 				}
-				if get_from_cache {
-					if let Some(frame) = tex.frames.get(frame_id) {
-						return Ok(frame.clone());
-					}
+			} else {
+				get_from_cache = true;
+			}
+			if get_from_cache {
+				if let Some(frame) = tex.frames.get(frame_id) {
+					return Ok(frame.clone());
 				}
 			}
+			return Err(Error::from_kind(ErrorKind::WaitingOnLoader));
 		}
-		self.force_load_at_index(current_index);
+		// Check if it's been requested
+		let req_id = self.dir_files.get(current_index).unwrap().request_id;
+		if self.ongoing_requests.contains_key(&req_id) {
+			return Err(Error::from_kind(ErrorKind::WaitingOnLoader));
+		}
+		self.send_request_for_index(current_index);
 		// If the texture is not in the cache just throw our hands in the air
 		// and tell the caller that we gotta wait for the loader to load this texture.
 		Err(Error::from_kind(ErrorKind::WaitingOnLoader))
@@ -454,10 +460,12 @@ impl ImageCache {
 				let request = self.ongoing_requests.get_mut(&req_id).unwrap();
 				//request.mod_time = curr_mod_time;
 				match self.texture_cache.entry(request.path.clone()) {
-					Entry::Vacant(mut entry) => {
+					Entry::Vacant(entry) => {
+						println!("Texture Cache entry was vacant in the start of {}", req_id);
 						entry.insert(CachedTexture {req_id, mod_time: curr_mod_time, frames: Vec::new()});
 					}
 					Entry::Occupied(mut entry) => {
+						println!("Texture Cache entry was occupied in the start of {}", req_id);
 						let mut overwrite = true;
 						if let Some(curr_mod_time) = curr_mod_time {
 							let cached = entry.get();
@@ -533,7 +541,7 @@ impl ImageCache {
 			return false;
 		}
 		if self.remaining_capacity > self.curr_est_size as isize {
-			return self.force_load_at_index(index);
+			return self.send_request_for_index(index);
 		}
 		false
 	}
@@ -545,57 +553,22 @@ impl ImageCache {
 	/// This is almost identical to `prefetch_at_index` but different in that
 	/// it does not care whether the new image will fit into the allowed
 	/// remaining capacity.
-	fn force_load_at_index(&mut self, index: usize) -> bool {
-		use std::collections::btree_map::Entry;
+	fn send_request_for_index(&mut self, index: usize) -> bool {
 		if let Some(desc) = self.dir_files.get(index) {
 			let file = &desc.dir_entry;
-			let new_mod_time = file.metadata().ok().and_then(|m| m.modified().ok());
 			let file_path = file.path();
-			
-			macro_rules! send_load_request {
-				($path:ident) => {
-					if self.requested_images >= Self::MAX_PENDING_PREFETCH_REQUESTS {
-						None
-					} else {
-						self.current_req_id += 1;
-						let req_id = self.current_req_id;
-						println!("Sending load request {} for {:?}", req_id, $path);
-						self.ongoing_requests.insert(req_id, OngoingRequest { path: $path.clone() });
-						self.loader.send_load_request(LoadRequest { req_id,  path: $path });
-						self.requested_images += 1;
-						Some(req_id)
-					}
-				}
+
+			if self.ongoing_requests.contains_key(&desc.request_id) {
+				return false;
 			}
 
-			match self.texture_cache.entry(file_path.clone()) {
-				Entry::Vacant(entry) => {
-					if is_file_supported(file_path.as_ref()) {
-						if let Some(req_id) = send_load_request!(file_path) {
-							entry.insert(CachedTexture {
-								req_id,
-								mod_time: new_mod_time,
-								frames: Vec::new(),
-							});
-						}
-						return true;
-					}
-				}
-				Entry::Occupied(entry) => {
-					let texture = entry.get();
-					let mut should_update = true;
-					if let Some(existing_mod_time) = texture.mod_time {
-						if let Some(new_mod_time) = new_mod_time {
-							if new_mod_time == existing_mod_time {
-								should_update = false;
-							}
-						}
-					}
-					if should_update {
-						send_load_request!(file_path);
-						return true;
-					}
-				}
+			if self.requested_images < Self::MAX_PENDING_PREFETCH_REQUESTS {
+				let req_id = desc.request_id;
+				println!("Sending load request {} for {:?}", req_id, file_path);
+				self.ongoing_requests.insert(req_id, OngoingRequest { path: file_path.clone() });
+				self.loader.send_load_request(LoadRequest { req_id,  path: file_path });
+				self.requested_images += 1;
+				return true;
 			}
 		}
 		false
