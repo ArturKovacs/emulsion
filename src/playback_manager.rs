@@ -260,7 +260,7 @@ impl PlaybackManager {
 				Some(self.image_cache.load_at_index(&window.display_mut(), index, 0))
 			}
 			LoadRequest::Jump(jump_count) => {
-				Some(self.image_cache.load_jump(&window.display_mut(), jump_count))
+				Some(self.image_cache.load_jump(&window.display_mut(), jump_count, 0))
 			}
 			LoadRequest::None => None,
 		};
@@ -275,9 +275,9 @@ impl PlaybackManager {
 				Err(image_cache::errors::Error(image_cache::errors::ErrorKind::WaitingOnLoader, _)) => {
 					//println!("load_result was waity stuff");
 					next_update = gelatin::NextUpdate::WaitUntil(a_millisec_from_now);
-					// Place the original load request back to self
-					// so that next time we attempt to load this again.
-					mem::swap(&mut self.load_request, &mut load_request);
+					// Set the load request to jump in place so that
+					// next time we attempt to load this again.
+					self.load_request = LoadRequest::Jump(0);
 				}
 				Err(err) => {
 					println!("load_result was err stufff");
