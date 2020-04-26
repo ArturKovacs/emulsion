@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use glium::{Frame, Surface};
+use glium::Frame;
 
 use crate::misc::{
 	Alignment, HorDim, Length, LogicalRect, LogicalVector, PickDimension, VerDim, WidgetPlacement,
@@ -149,19 +149,7 @@ impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
 				return Ok(NextUpdate::Latest);
 			}
 			if borrowed.bg_color[3] > 0.0 {
-				let viewport_rect = context.logical_rect_to_viewport(&borrowed.drawn_bounds);
-				target.clear(
-					Some(&viewport_rect),
-					Some((
-						borrowed.bg_color[0],
-						borrowed.bg_color[1],
-						borrowed.bg_color[2],
-						borrowed.bg_color[3],
-					)),
-					false,
-					None,
-					None,
-				);
+				context.clear_color(target, borrowed.bg_color, Some(borrowed.drawn_bounds));
 			}
 			for child in borrowed.children.iter() {
 				next_update = next_update.aggregate(child.draw(target, context)?);

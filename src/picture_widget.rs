@@ -1,17 +1,17 @@
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
-use std::collections::HashMap;
 
 use lazy_static::lazy_static;
 
 use crate::shaders;
-use crate::utils::{virtual_keycode_to_string, virtual_keycode_is_char};
+use crate::utils::{virtual_keycode_is_char, virtual_keycode_to_string};
 
-use crate::{playback_manager::*, configuration::Configuration};
+use crate::{configuration::Configuration, playback_manager::*};
 
 use gelatin::cgmath::{Matrix4, Vector3};
-use gelatin::glium::glutin::event::{ElementState, MouseButton, ModifiersState};
+use gelatin::glium::glutin::event::{ElementState, ModifiersState, MouseButton};
 use gelatin::glium::{program, texture::SrgbTexture2d, uniform, Display, Frame, Program, Surface};
 
 use gelatin::add_common_widget_functions;
@@ -61,10 +61,10 @@ struct PictureWidgetData {
 	prev_draw_size: LogicalVector,
 	visible: bool,
 	rendered_valid: bool,
-	
+
 	click: bool,
 	hover: bool,
-	
+
 	configuration: Rc<RefCell<Configuration>>,
 	playback_manager: PlaybackManager,
 
@@ -159,7 +159,6 @@ impl PictureWidget {
 				vertex: shaders::VERTEX_140,
 				fragment: shaders::FRAGMENT_140
 			},
-
 			110 => {
 				vertex: shaders::VERTEX_110,
 				fragment: shaders::FRAGMENT_110
@@ -216,17 +215,23 @@ impl PictureWidget {
 		borrowed.rendered_valid = false;
 	}
 
-	fn keys_triggered<S: AsRef<str>>(keys: &[S], input_key: &str, modifiers: ModifiersState) -> bool {
+	fn keys_triggered<S: AsRef<str>>(
+		keys: &[S],
+		input_key: &str,
+		modifiers: ModifiersState,
+	) -> bool {
 		for key in keys {
 			let complex_key = key.as_ref();
 			let parts = complex_key.split('+').map(|s| s.trim().to_lowercase()).collect::<Vec<_>>();
-			if parts.is_empty() { continue; }
+			if parts.is_empty() {
+				continue;
+			}
 			let key = parts.last().unwrap();
 			if input_key != *key {
 				continue;
 			}
 			let mut all_modifiers_active = true;
-			for mod_str in parts.iter().take(parts.len()-1) {
+			for mod_str in parts.iter().take(parts.len() - 1) {
 				match mod_str.as_ref() {
 					"alt" if !modifiers.alt() => all_modifiers_active = false,
 					"ctrl" if !modifiers.ctrl() => all_modifiers_active = false,
@@ -241,7 +246,12 @@ impl PictureWidget {
 		false
 	}
 
-	fn triggered(config: &Rc<RefCell<Configuration>>, action_name: &str, input_key: &str, modifiers: ModifiersState) -> bool {
+	fn triggered(
+		config: &Rc<RefCell<Configuration>>,
+		action_name: &str,
+		input_key: &str,
+		modifiers: ModifiersState,
+	) -> bool {
 		let config = config.borrow();
 		let bindings = config.bindings.as_ref();
 		if let Some(Some(keys)) = bindings.map(|b| b.get(action_name)) {
@@ -257,13 +267,11 @@ impl PictureWidget {
 		macro_rules! triggered {
 			($action_name:ident) => {
 				Self::triggered(&borrowed.configuration, $action_name, input_key, modifiers)
-			}
+			};
 		}
 		if triggered!(PLAY_ANIM_NAME) {
 			match borrowed.playback_manager.playback_state() {
-				PlaybackState::Forward => {
-					borrowed.playback_manager.pause_playback()
-				}
+				PlaybackState::Forward => borrowed.playback_manager.pause_playback(),
 				_ => borrowed.playback_manager.start_playback_forward(),
 			}
 		}
@@ -301,10 +309,7 @@ impl PictureWidget {
 		if triggered!(IMG_DEL_NAME) {
 			let path = borrowed.playback_manager.current_file_path();
 			if let Err(e) = trash::remove(&path) {
-				eprintln!(
-					"Error while moving file '{:?}' to trash: {:?}",
-					path, e
-				);
+				eprintln!("Error while moving file '{:?}' to trash: {:?}", path, e);
 			}
 			if let Err(e) = borrowed.playback_manager.update_directory() {
 				eprintln!("Error while updating directory {:?}", e);
@@ -364,8 +369,9 @@ impl Widget for PictureWidget {
 			let size = data.drawn_bounds.size.vec;
 			let projection_transform = gelatin::cgmath::ortho(0.0, size.x, size.y, 0.0, -1.0, 1.0);
 
+			let viewport_rect = context.logical_rect_to_viewport(&data.drawn_bounds);
 			let image_draw_params = gelatin::glium::DrawParameters {
-				viewport: Some(context.logical_rect_to_viewport(&data.drawn_bounds)),
+				viewport: Some(viewport_rect),
 				..Default::default()
 			};
 
@@ -453,8 +459,6 @@ impl Widget for PictureWidget {
 								now.duration_since(borrowed.last_click_time);
 							borrowed.last_click_time = now;
 							if duration_since_last_click < Duration::from_millis(250) {
-								// TODO
-								//borrowed.toggle_fullscreen(window, bottom_panel);
 								match borrowed.window.upgrade() {
 									Some(window) => {
 										let fullscreen = !window.fullscreen();
@@ -512,7 +516,12 @@ impl Widget for PictureWidget {
 					}
 					// Panning is a special snowflake
 					let mut borrowed = self.data.borrow_mut();
-					if Self::triggered(&borrowed.configuration, PAN_NAME, input_key_str.as_str(), event.modifiers) {
+					if Self::triggered(
+						&borrowed.configuration,
+						PAN_NAME,
+						input_key_str.as_str(),
+						event.modifiers,
+					) {
 						borrowed.panning = input.state == ElementState::Pressed;
 					}
 				}
