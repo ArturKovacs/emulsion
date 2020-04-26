@@ -4,10 +4,9 @@
 extern crate error_chain;
 
 use std::cell::{Cell, RefCell};
-use std::cmp;
 use std::f32;
-use std::num::ParseIntError;
 use std::rc::Rc;
+use std::str::FromStr;
 use std::sync::{
 	atomic::{AtomicBool, Ordering},
 	Arc,
@@ -39,6 +38,8 @@ use gelatin::{
 use crate::configuration::Configuration;
 use crate::help_screen::*;
 use crate::picture_widget::*;
+#[cfg(feature = "networking")]
+use crate::version::Version;
 
 mod configuration;
 mod handle_panic;
@@ -48,6 +49,8 @@ mod picture_widget;
 mod playback_manager;
 mod shaders;
 mod utils;
+#[cfg(feature = "networking")]
+mod version;
 
 lazy_static! {
 	pub static ref PROJECT_DIRS: Option<ProjectDirs> = ProjectDirs::from("", "", "emulsion");
@@ -360,31 +363,21 @@ fn check_for_updates() -> bool {
 		Ok(response) => match response.json::<ReleaseInfoJson>() {
 			Ok(info) => {
 				println!("Found latest version tag {}", info.tag_name);
-				let curr_major = env!("CARGO_PKG_VERSION_MAJOR");
-				let curr_minor = env!("CARGO_PKG_VERSION_MINOR");
-				let curr_patch = env!("CARGO_PKG_VERSION_PATCH");
-				println!("Current version is '{}.{}.{}'", curr_major, curr_minor, curr_patch);
 
-				// Trim letters from the start of the version tag, e.g. "v1.9" -> "1.9"
-				let latest_full = info.tag_name.trim_start_matches(char::is_alphabetic);
-				let mut latest_parts = latest_full.split('.');
-				let mut extract_part =
-					|| latest_parts.next().filter(|&s| !s.is_empty()).unwrap_or("0");
-				let latest_major = extract_part();
-				let latest_minor = extract_part();
-				let latest_patch = extract_part();
-				println!(
-					"Parsed latest version is '{}.{}.{}'",
-					latest_major, latest_minor, latest_patch
-				);
+				let current = Version::cargo_pkg_version();
+				println!("Current version is '{}'", current);
 
-				match compare_semver_versions(
-					(curr_major, curr_minor, curr_patch),
-					(latest_major, latest_minor, latest_patch),
-				) {
-					Ok(cmp::Ordering::Less) => return true,
-					Ok(_) => {}
-					Err(error) => println!("Error parsing version: {}", error.to_string()),
+				match Version::from_str(&info.tag_name) {
+					Ok(latest) => {
+						println!("Parsed latest version is {}", latest);
+
+						if latest > current {
+							return true;
+						}
+					}
+					Err(error) => {
+						println!("Error parsing version: {}", error.to_string());
+					}
 				}
 			}
 			Err(e) => println!("Failed to create json from response: {}", e),
@@ -392,32 +385,4 @@ fn check_for_updates() -> bool {
 		Err(e) => println!("Failed to get latest version info: {}", e),
 	}
 	false
-}
-
-#[cfg(feature = "networking")]
-/// Compare two versions using semantic versioning.
-/// Both versions are represented as a tuple `(MAJOR, MINOR, PATCH)`.
-fn compare_semver_versions(
-	current: (&str, &str, &str),
-	latest: (&str, &str, &str),
-) -> Result<cmp::Ordering, ParseIntError> {
-	use cmp::Ordering::*;
-
-	// Fast path if versions are identical
-	if current == latest {
-		return Ok(Equal);
-	}
-
-	let current: (u32, u32, u32) = (current.0.parse()?, current.1.parse()?, current.2.parse()?);
-	let latest: (u32, u32, u32) = (latest.0.parse()?, latest.1.parse()?, latest.2.parse()?);
-
-	Ok(match current.0.cmp(&latest.0) {
-		Greater => Greater,
-		Less => Less,
-		Equal => match current.1.cmp(&latest.1) {
-			Greater => Greater,
-			Less => Less,
-			Equal => current.2.cmp(&latest.2),
-		},
-	})
 }
