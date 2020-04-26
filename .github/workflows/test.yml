@@ -23,6 +23,7 @@ jobs:
         run: cargo clippy --verbose
 
   build:
+    needs: clippy
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
