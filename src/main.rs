@@ -365,21 +365,11 @@ fn check_for_updates() -> bool {
 				let curr_patch = env!("CARGO_PKG_VERSION_PATCH");
 				println!("Current version is '{}.{}.{}'", curr_major, curr_minor, curr_patch);
 
-				let latest_full = info.tag_name.chars().skip(1).collect::<String>();
+				// Trim letters from the start of the version tag, e.g. "v1.9" -> "1.9"
+				let latest_full = info.tag_name.trim_start_matches(char::is_alphabetic);
 				let mut latest_parts = latest_full.split('.');
-				let mut extract_part = || {
-					let result;
-					if let Some(part) = latest_parts.next() {
-						if part.is_empty() {
-							result = "0";
-						} else {
-							result = part;
-						}
-					} else {
-						result = "0";
-					}
-					result
-				};
+				let mut extract_part =
+					|| latest_parts.next().filter(|&s| !s.is_empty()).unwrap_or("0");
 				let latest_major = extract_part();
 				let latest_minor = extract_part();
 				let latest_patch = extract_part();
