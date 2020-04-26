@@ -54,12 +54,6 @@ pub fn texture_from_image(
 	Ok(SrgbTexture2d::with_mipmaps(display, raw_image(), mipmaps)?)
 }
 
-pub fn get_image_size_estimate(dimensions: (u32, u32)) -> u32 {
-	// counting all the mipmaps would add an additionnal multiplier of around ~1.6
-	// but only the gpu textures have mip maps so just multiply by 1.5
-	((dimensions.0 * dimensions.1 * 4) as f32 * 1.5) as u32
-}
-
 pub fn is_file_supported(filename: &Path) -> bool {
 	if let Some(ext) = filename.extension() {
 		if let Some(ext) = ext.to_str() {
@@ -77,21 +71,41 @@ pub fn is_file_supported(filename: &Path) -> bool {
 	false
 }
 
-pub enum CachedTexture {
-	Texture((fs::Metadata, Rc<SrgbTexture2d>)),
-	LoadRequested,
+pub struct LoadRequest {
+	pub req_id: u32,
+	pub path: PathBuf,
 }
 
 pub enum LoadResult {
-	Ok { path: PathBuf, metadata: fs::Metadata, image: image::RgbaImage },
-	Failed,
+	Start {req_id: u32, metadata: fs::Metadata },
+	Frame { req_id: u32, image: image::RgbaImage, delay_nano: u64 },
+	Done { req_id: u32 },
+	Failed { req_id: u32 },
+}
+
+impl LoadResult {
+	pub fn req_id(&self) -> u32 {
+		match self {
+			LoadResult::Start { req_id, .. } => *req_id,
+			LoadResult::Frame { req_id, .. } => *req_id,
+			LoadResult::Done { req_id, .. } => *req_id,
+			LoadResult::Failed { req_id, .. } => *req_id,
+		}
+	}
+	pub fn is_failed(&self) -> bool {
+		if let LoadResult::Failed {..} = *self {
+			true
+		} else {
+			false
+		}
+	}
 }
 
 pub struct ImageLoader {
 	running: Arc<AtomicBool>,
 	join_handles: Option<Vec<thread::JoinHandle<()>>>,
 	image_rx: Receiver<LoadResult>,
-	path_tx: Sender<PathBuf>,
+	path_tx: Sender<LoadRequest>,
 }
 
 impl ImageLoader {
@@ -135,32 +149,29 @@ impl ImageLoader {
 
 	fn thread_loop(
 		running: Arc<AtomicBool>,
-		load_request_rx: Arc<Mutex<Receiver<PathBuf>>>,
+		load_request_rx: Arc<Mutex<Receiver<LoadRequest>>>,
 		loaded_img_tx: Sender<LoadResult>,
 	) {
 		// walk the directory starting from the current item and cache in all the images
 		// do this by stepping in both directions so that the cached images ahead of the file
 		// should never be more than 1 + "cached images before the file"
 		while running.load(Ordering::Acquire) {
-			let img_path = {
+			let request = {
 				let load_request = load_request_rx.lock().unwrap();
 				load_request.recv().unwrap()
 			};
 			// It is very important that we release the mutex before starting to load the image
-
-			let result = {
-				if let Ok(metadata) = fs::metadata(img_path.as_path()) {
-					if let Ok(image) = load_image(img_path.as_path()) {
-						LoadResult::Ok { path: img_path, metadata, image }
-					} else {
-						LoadResult::Failed
-					}
+			if let Ok(metadata) = fs::metadata(&request.path) {
+				loaded_img_tx.send(LoadResult::Start { req_id: request.req_id, metadata }).unwrap();
+				if let Ok(image) = load_image(request.path.as_path()) {
+					loaded_img_tx.send(LoadResult::Frame { req_id: request.req_id, image, delay_nano: 0 }).unwrap();
+					loaded_img_tx.send(LoadResult::Done { req_id: request.req_id }).unwrap();
 				} else {
-					LoadResult::Failed
+					loaded_img_tx.send(LoadResult::Failed { req_id: request.req_id }).unwrap();
 				}
-			};
-
-			loaded_img_tx.send(result).unwrap();
+			} else {
+				loaded_img_tx.send(LoadResult::Failed { req_id: request.req_id }).unwrap();
+			}
 		}
 	}
 
@@ -168,18 +179,17 @@ impl ImageLoader {
 		self.image_rx.try_recv()
 	}
 
-	pub fn send_load_request(&mut self, path: PathBuf) {
-		self.path_tx.send(path).unwrap();
+	pub fn send_load_request(&mut self, request: LoadRequest) {
+		self.path_tx.send(request).unwrap();
 	}
 }
 
 impl Drop for ImageLoader {
 	fn drop(&mut self) {
 		self.running.store(false, Ordering::Release);
-
 		if let Some(join_handles) = self.join_handles.take() {
 			for _ in join_handles.iter() {
-				self.path_tx.send(PathBuf::from("")).unwrap();
+				self.path_tx.send(LoadRequest { req_id: 0, path: PathBuf::from("") }).unwrap();
 			}
 
 			for handle in join_handles.into_iter() {

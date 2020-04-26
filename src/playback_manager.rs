@@ -18,7 +18,7 @@ use gelatin::window::Window;
 use crate::image_cache;
 use crate::image_cache::ImageCache;
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum LoadRequest {
 	None,
 	LoadNext,
@@ -161,13 +161,19 @@ impl PlaybackManager {
 	pub fn update_image(&mut self, window: &Window) -> gelatin::NextUpdate {
 		//self.should_sleep = true;
 		let now = Instant::now();
+		let a_millisec_from_now = now.checked_add(Duration::from_millis(1)).unwrap();
 		let mut next_update;
 		// The reason why I reset the load request in such a convoluted way is that
 		// it has to guaranteprefetch_neighborsequest will be reset even if I return from this
 		// function early
+		match &self.load_request {
+			LoadRequest::None => (),
+			lr => {
+				println!("Updating imagte with load request {:?}", lr);
+			}
+		}
 		let mut load_request = LoadRequest::None;
 		mem::swap(&mut self.load_request, &mut load_request);
-
 		let framerate = match self.playback_state {
 			PlaybackState::Present | PlaybackState::RandomPresent => 0.1667, // six seconds per img
 			_ => 25.0,
@@ -234,10 +240,8 @@ impl PlaybackManager {
 				}
 			}
 		} else {
-			next_update =
-				gelatin::NextUpdate::WaitUntil(now.checked_add(Duration::from_millis(1)).unwrap());
+			next_update = gelatin::NextUpdate::WaitUntil(a_millisec_from_now);
 		}
-
 		//let should_sleep = load_request == LoadRequest::None && running && !update_screen;
 		// Process long operations here
 		let load_result = match load_request {
@@ -246,14 +250,14 @@ impl PlaybackManager {
 			LoadRequest::FilePath(ref file_path) => {
 				Some(if let Some(file_name) = file_path.file_name() {
 					self.image_cache
-						.load_specific(&window.display_mut(), file_path.as_ref())
+						.load_specific(&window.display_mut(), file_path.as_ref(), 0)
 						.map(|x| (x, OsString::from(file_name)))
 				} else {
 					Err(String::from("Could not extract filename").into())
 				})
 			}
 			LoadRequest::LoadAtIndex(index) => {
-				Some(self.image_cache.load_at_index(&window.display_mut(), index))
+				Some(self.image_cache.load_at_index(&window.display_mut(), index, 0))
 			}
 			LoadRequest::Jump(jump_count) => {
 				Some(self.image_cache.load_jump(&window.display_mut(), jump_count))
@@ -261,12 +265,22 @@ impl PlaybackManager {
 			LoadRequest::None => None,
 		};
 		if let Some(result) = load_result {
+			println!("load_result was some");
 			match result {
-				Ok((texture, filename)) => {
-					self.image_texture = Some(texture);
+				Ok((frame, filename)) => {
+					println!("load_result was some ok");
+					self.image_texture = Some(frame.texture);
 					self.filename = Some(filename);
 				}
+				Err(image_cache::errors::Error(image_cache::errors::ErrorKind::WaitingOnLoader, _)) => {
+					println!("load_result was waity stuff");
+					next_update = gelatin::NextUpdate::WaitUntil(a_millisec_from_now);
+					// Place the original load request back to self
+					// so that next time we attempt to load this again.
+					mem::swap(&mut self.load_request, &mut load_request);
+				}
 				Err(err) => {
+					println!("load_result was err stufff");
 					self.image_texture = None;
 					self.filename = None;
 					let stderr = &mut ::std::io::stderr();
@@ -282,7 +296,6 @@ impl PlaybackManager {
 					writeln!(stderr).expect(stderr_errmsg);
 				}
 			}
-			next_update = gelatin::NextUpdate::Soonest;
 		}
 		next_update
 	}

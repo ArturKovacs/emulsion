@@ -1,7 +1,8 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::mem;
+use std::time::SystemTime;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
@@ -22,8 +23,15 @@ pub mod errors {
 		foreign_links {
 			Io(io::Error) #[doc = "Error during IO"];
 			TextureCreationError(texture::TextureCreationError);
-			ImageLoadError(image::ImageError);
+			ImageRsError(image::ImageError);
 			TextureLoaderError(image_loader::errors::Error);
+		}
+		errors {
+			WaitingOnLoader {
+				description("ImageCache is waiting for loader to send result")
+				display("ImageCache is waiting for loader to send result")
+			}
+			FailedToLoadImage {}
 		}
 	}
 }
@@ -31,29 +39,102 @@ pub mod errors {
 pub use self::errors::Result;
 use self::errors::*;
 
-struct ImageDescriptor {
-	dir_entry: fs::DirEntry,
-	//frame_count: Option<u32>, // it is evaluated in an on-demand fashion
+pub fn get_image_size_estimate(dimensions: (u32, u32)) -> u32 {
+	// counting all the mipmaps would add an additionnal multiplier of around ~1.6
+	// but only the gpu textures have mip maps so just multiply by 1.5
+	((dimensions.0 * dimensions.1 * 4) as f32 * 1.5) as u32
 }
 
+pub fn get_anim_size_estimate(frames: &[AnimationFrameTexture]) -> u32 {
+	let mut size = 0;
+	for frame in frames {
+		let dimensions = frame.texture.dimensions();
+		size += get_image_size_estimate(dimensions);
+	}
+	size
+}
+
+struct ImageDescriptor {
+	dir_entry: fs::DirEntry,
+
+	/// Sometimes also abbreviated as `req_id` is used as a more efficient replacement 
+	/// of a PathBuf to identify a file load request.
+	request_id: u32,
+
+	// /// If an ongoing request
+	// loaded: bool,
+	//frame_count: Option<u32>, // it is evaluated in an on-demand fashion
+}
 impl ImageDescriptor {
-	fn from_entry(dir_entry: fs::DirEntry) -> ImageDescriptor {
-		ImageDescriptor { dir_entry /* frame_count: None */ }
+	fn from_entry(dir_entry: fs::DirEntry, request_id: u32) -> ImageDescriptor {
+		ImageDescriptor { dir_entry, request_id, /* loaded: false */ }
 	}
 }
 
+/// This struct is used in a map to determine the appropriate file when
+/// a load result comes in. (Load results identify the file with the request id only)
+/// See: `ImageCache::ongoing_requests`
+struct OngoingRequest {
+	path: PathBuf,
+
+	// mod_time: Option<SystemTime>,
+
+	// /// The index of this file within the sorted folder.
+	// /// indexing `ImageCache::dir_files` with this will return the corresponding
+	// /// file.
+	// index: usize,
+}
+
+#[derive(Clone)]
+pub struct AnimationFrameTexture {
+	pub texture: Rc<SrgbTexture2d>,
+	pub delay_nano: u64,
+}
+
+struct CachedTexture {
+	/// Contains the load request id
+	req_id: u32,
+	mod_time: Option<SystemTime>,
+
+	/// If the target file is an image this vector will have a single texture once the
+	/// image uploaded to the GPU. If the target file is an animated image like a gif,
+	/// these the frames
+	frames: Vec<AnimationFrameTexture>,
+}
+
+/// The process of loading an image (or animation frame) consists of the following steps.
+/// Note that even still images are handled as 1 frame long animations as there is
+/// semantically no difference between those and this keeps the code relatively simple.
+/// 
+/// - ImageCache - Load request sent
+/// 	- An entry representing the request is created in `ImageCache::ongoing_requests`
+/// - Worker thread - Decodes an image from the byte stream into a CPU-side buffer. Send this back on a channel
+/// 	- Decoded pixel data on channel (CPU)
+/// - ImageCache - Prefetched image received from worker thread
+/// 	- Decoded pixel data in `ImageCache::prefetched`
+/// - ImageCache - Prefetched image is uploaded to a GPU texture from the CPU
+/// 	- Pixel data is on the gpu referred to by `ImageCache::texture_cache`
+/// 
 pub struct ImageCache {
 	dir_path: PathBuf,
 	//current_name: OsString,
 	current_index: usize,
 	dir_files: Vec<ImageDescriptor>,
-
+	
 	remaining_capacity: isize,
 	total_capacity: isize,
 	curr_est_size: isize,
 	requested_images: i32,
-	texture_cache: BTreeMap<OsString, CachedTexture>,
 
+	/// A monotonically increasing integer used for identifying
+	/// each load request
+	current_req_id: u32,
+
+	/// Keeps track of all requests that have been sent
+	/// but for which no response has been received
+	ongoing_requests: HashMap<u32, OngoingRequest>,
+	prefetched: HashMap<PathBuf, LoadResult>,
+	texture_cache: BTreeMap<PathBuf, CachedTexture>,
 	loader: ImageLoader,
 }
 
@@ -70,25 +151,26 @@ impl ImageCache {
 			dir_path: PathBuf::new(),
 			current_index: 0,
 			dir_files: Vec::new(),
-
+			
 			remaining_capacity: capacity,
 			total_capacity: capacity,
 			curr_est_size: capacity,
 			requested_images: 0,
-			texture_cache: BTreeMap::new(),
 
+			current_req_id: 0,
+			ongoing_requests: HashMap::new(),
+			prefetched: HashMap::new(),
+			texture_cache: BTreeMap::new(),
 			loader: ImageLoader::new(threads),
 		}
 	}
 
 	pub fn cached_from_dir(&self) -> Vec<bool> {
 		let mut result = Vec::with_capacity(self.dir_files.len());
-
 		for i in 0..self.dir_files.len() {
-			let file_name = self.dir_files[i].dir_entry.file_name();
-			result.push(self.texture_cache.contains_key(&file_name));
+			let file_path = self.dir_files[i].dir_entry.path();
+			result.push(self.texture_cache.contains_key(&file_path));
 		}
-
 		result
 	}
 
@@ -122,8 +204,13 @@ impl ImageCache {
 	/// Returns the error that might occure while fetching the files from the directory. Otherwise
 	/// returns `Ok(())`
 	pub fn update_directory(&mut self) -> Result<()> {
+		self.dir_files = self.collect_directory()?;
 		let curr_filename = self.current_filename();
-		self.dir_files = Self::collect_directory(self.dir_path.as_path())?;
+
+		// TODO add a `needs_update` field to the cached texture struct
+		// and set all of those to true to indicate that the an update directory
+		// call was made since those were created and they should all be
+		// checked against the modification time of the file system file.
 
 		for (index, desc) in self.dir_files.iter().enumerate() {
 			if desc.dir_entry.file_name() == curr_filename {
@@ -146,7 +233,8 @@ impl ImageCache {
 		&mut self,
 		display: &glium::Display,
 		index: usize,
-	) -> Result<(Rc<SrgbTexture2d>, OsString)> {
+		frame_id: usize,
+	) -> Result<(AnimationFrameTexture, OsString)> {
 		let path = self
 			.dir_files
 			.get(index)
@@ -160,20 +248,20 @@ impl ImageCache {
 			.dir_entry
 			.path();
 
-		let result = self.load_specific(display, &path)?;
-
+		let result = self.load_specific(display, &path, frame_id)?;
 		self.current_index = index;
-
 		Ok((result, path.file_name().unwrap_or_else(|| OsStr::new("")).to_owned()))
 	}
 
+	/// Returns `Err(errors::Error::from_kind(errors::ErrorKind::WaitingOnLoader))`
+	/// when the image
 	pub fn load_specific(
 		&mut self,
 		display: &glium::Display,
 		path: &Path,
-	) -> Result<Rc<SrgbTexture2d>> {
+		frame_id: usize,
+	) -> Result<AnimationFrameTexture> {
 		use std::collections::btree_map::Entry;
-
 		let path = path.canonicalize()?;
 
 		let target_file_name = match path.file_name() {
@@ -186,107 +274,104 @@ impl ImageCache {
 		// Lets just process incoming images
 		self.process_prefetched(display)?;
 
+		let current_index;
 		if self.dir_path != parent {
 			self.texture_cache.clear();
+			self.prefetched.clear();
 			self.remaining_capacity = self.total_capacity;
-			self.change_directory(parent, target_file_name.clone())?;
+			self.change_directory(&parent, &target_file_name)?;
+			self.force_load_at_index(self.current_index);
+			return Err(errors::Error::from_kind(errors::ErrorKind::WaitingOnLoader));
 		} else {
+			let mut option_index = None;
 			for (index, desc) in self.dir_files.iter().enumerate() {
 				if desc.dir_entry.file_name() == target_file_name {
+					option_index = Some(index);
 					self.current_index = index;
+					break;
 				}
 			}
+			if let Some(index) = option_index {
+				current_index = index;
+			} else {
+				// The image must have been removed from the folder. It cannot be loaded
+				bail!("Image not found at '{:?}'", path);
+			}
 
-			// Delete all entries that are outside the window of files around the current file
-			// allowed by the capacity
-			// And there is just one more thing left to do...
+			let mut tmp_cache = BTreeMap::new();
+			mem::swap(&mut self.texture_cache, &mut tmp_cache);
+			
+			// Delete all entries that are outside the range of files around the current file
+			// allowed by the capacity.
 			// Walk through our list of directory entries sorted by their distance from the current
 			// file and in each step remove an entry from the cache until we reach the desired cache
 			// size
-
-			let (mut new_cache, remaining_capacity) = {
-				let mut sorted_files: Vec<_> =
-					self.texture_cache.iter().enumerate().rev().collect();
-				sorted_files.sort_by_key(|(index, _)| {
-					(*index as isize - self.current_index as isize).abs()
-				});
-
-				let mut remaining_capacity = self.total_capacity;
-				//let mut est_file_capacity = self.total_capacity / self.curr_est_size;
-				let mut new_cache = BTreeMap::new();
-				for (_, (path, texture)) in sorted_files.into_iter() {
-					match texture {
-						CachedTexture::LoadRequested => {
-							new_cache.insert(path.clone(), CachedTexture::LoadRequested);
-						}
-						CachedTexture::Texture(texture) => {
-							// Thew new file has to fit in the cache after this operation
-							// which is why we multiply the estimated size by two
-							if remaining_capacity > (self.curr_est_size * 2) {
-								let dimensions = (texture.1.width(), texture.1.height());
-								remaining_capacity -= get_image_size_estimate(dimensions) as isize;
-								new_cache
-									.insert(path.clone(), CachedTexture::Texture(texture.clone()));
-							}
-						}
-					}
+			let mut sorted_files: Vec<_> = tmp_cache.into_iter().enumerate().collect();
+			sorted_files.sort_unstable_by_key(|(index, _)| {
+				(*index as isize - self.current_index as isize).abs()
+			});
+			let mut remaining_capacity = self.total_capacity;
+			sorted_files.retain(|cached| {
+				let (_path, texture) = &cached.1;
+				let mut all_frames_size = 0;
+				// TODO consider retaining individual frames.
+				for t in texture.frames.iter() {
+					// Thew new file has to fit in the cache after this operation
+					// which is why we multiply the estimated size by two
+					let dimensions = (t.texture.width(), t.texture.height());
+					all_frames_size += get_image_size_estimate(dimensions) as isize;
 				}
-
-				(new_cache, remaining_capacity)
-			};
-
-			mem::swap(&mut self.texture_cache, &mut new_cache);
+				let shoudl_retain = remaining_capacity > all_frames_size + self.curr_est_size;
+				if shoudl_retain {
+					remaining_capacity -= all_frames_size;
+				}
+				shoudl_retain
+			});
+			tmp_cache = sorted_files.into_iter().map(|(_, entry)| entry).collect();
+			mem::swap(&mut self.texture_cache, &mut tmp_cache);
 			self.remaining_capacity = remaining_capacity;
 		}
 
-		let metadata = fs::metadata(path.as_path())?;
+		let metadata = fs::metadata(&path)?;
+
+		// First check if it's among the prefetched, and upload it, if it is
+		if let Some(load_result) = self.prefetched.remove(&path) {
+			if let Ok(Some(texture)) = self.upload_to_texture(display, load_result) {
+				return Ok(texture);
+			}
+		}
 
 		// Check if it is inside the texture cache first
 		{
-			let texture_entry = self.texture_cache.entry(target_file_name.clone());
-			if let Entry::Occupied(ref entry) = texture_entry {
-				if let CachedTexture::Texture(ref entry) = entry.get() {
-					if entry.0.modified().unwrap() == metadata.modified().unwrap() {
-						return Ok(entry.1.clone());
+			if let Some(tex) = self.texture_cache.get(&path) {
+				let mut get_from_cache = false;
+				if let Some(curr_mod_time) = metadata.modified().ok() {
+					if let Some(mod_time) = tex.mod_time {
+						if mod_time == curr_mod_time {
+							get_from_cache = true;
+						}
+					}
+				} else {
+					get_from_cache = true;
+				}
+				if get_from_cache {
+					if let Some(frame) = tex.frames.get(frame_id) {
+						return Ok(frame.clone());
 					}
 				}
 			}
 		}
-
-		let image = load_image(path.as_path())?;
-		self.curr_est_size = get_image_size_estimate((image.width(), image.height())) as isize;
-		let image_size_estimate = self.curr_est_size;
-		if self.remaining_capacity < image_size_estimate {
-			self.texture_cache.clear();
-			self.remaining_capacity = self.total_capacity;
-		}
-		self.remaining_capacity -= image_size_estimate;
-
-		let result_texture = Rc::new(texture_from_image(display, image)?);
-		match self.texture_cache.entry(target_file_name) {
-			Entry::Vacant(entry) => {
-				entry.insert(CachedTexture::Texture((metadata, result_texture.clone())));
-			}
-			Entry::Occupied(mut entry) => match entry.get_mut() {
-				entry @ CachedTexture::LoadRequested => {
-					*entry = CachedTexture::Texture((metadata, result_texture.clone()));
-				}
-				CachedTexture::Texture(ref mut entry) => {
-					if entry.0.modified().unwrap() != metadata.modified().unwrap() {
-						*entry = (metadata, result_texture.clone());
-					}
-				}
-			},
-		}
-
-		Ok(result_texture)
+		self.force_load_at_index(current_index);
+		// If the texture is not in the cache just throw our hands in the air
+		// and tell the caller that we gotta wait for the loader to load this texture.
+		Err(Error::from_kind(ErrorKind::WaitingOnLoader))
 	}
 
-	pub fn load_next(&mut self, display: &glium::Display) -> Result<(Rc<SrgbTexture2d>, OsString)> {
+	pub fn load_next(&mut self, display: &glium::Display) -> Result<(AnimationFrameTexture, OsString)> {
 		self.load_jump(display, 1)
 	}
 
-	pub fn load_prev(&mut self, display: &glium::Display) -> Result<(Rc<SrgbTexture2d>, OsString)> {
+	pub fn load_prev(&mut self, display: &glium::Display) -> Result<(AnimationFrameTexture, OsString)> {
 		self.load_jump(display, -1)
 	}
 
@@ -294,16 +379,19 @@ impl ImageCache {
 		&mut self,
 		display: &glium::Display,
 		jump_count: i32,
-	) -> Result<(Rc<SrgbTexture2d>, OsString)> {
+	) -> Result<(AnimationFrameTexture, OsString)> {
 		if jump_count == 0 {
-			let filename = self.current_filename();
-			return Ok((
-				match self.texture_cache.get(&filename) {
-					Some(CachedTexture::Texture(ref entry)) => entry.1.clone(),
-					_ => bail!(Error::from("Could not find current file in cache.")),
+			let path =self.current_file_path();
+			let texture;
+			match self.texture_cache.get(&path) {
+				Some(cached) => {
+					// The first frame of a texture sequence must always exist.
+					texture = cached.frames.get(0).unwrap().clone()
 				},
-				filename,
-			));
+				_ => bail!(Error::from("Could not find current file in cache.")),
+			}
+			let filename = self.current_filename();
+			return Ok((texture, filename));
 		}
 
 		if self.dir_files.is_empty() {
@@ -317,63 +405,107 @@ impl ImageCache {
 		}
 
 		let target_path = self.dir_files[target_index as usize].dir_entry.path();
-		let result = self.load_specific(display, &target_path)?;
+		let result = self.load_specific(display, &target_path, 0)?;
 		self.current_index = target_index as usize;
 
 		Ok((result, target_path.file_name().unwrap_or_else(|| OsStr::new("")).to_owned()))
 	}
 
-	pub fn process_prefetched(&mut self, display: &glium::Display) -> Result<()> {
-		use std::collections::btree_map::Entry;
+	fn receive_prefetched(&mut self) {
 		use std::sync::mpsc::TryRecvError;
+		loop {
+			match self.loader.try_recv_prefetched() {
+				Ok(load_result) => {
+					self.requested_images -= 1;
+					let request = self.ongoing_requests.get(&load_result.req_id()).unwrap();
+					self.prefetched.insert(request.path.clone(), load_result);
+				}
+				Err(TryRecvError::Disconnected) => panic!("Channel disconnected unexpectidly."),
+				Err(TryRecvError::Empty) => break,
+			}
+		}
+	}
 
+	pub fn process_prefetched(&mut self, display: &glium::Display) -> Result<()> {
+		use std::sync::mpsc::TryRecvError;
 		let mut processed = 0;
 		while processed < 2 {
 			match self.loader.try_recv_prefetched() {
 				Ok(load_result) => {
 					self.requested_images -= 1;
-					if let LoadResult::Ok { path, metadata, image } = load_result {
+					if let Ok(_) = self.upload_to_texture(display, load_result) {
 						processed += 1;
-						let size_estimate =
-							get_image_size_estimate((image.width(), image.height())) as isize;
-						match self.texture_cache.entry(path.file_name().unwrap().to_owned()) {
-							Entry::Vacant(entry) => {
-								let texture = Rc::new(texture_from_image(display, image)?);
-								entry.insert(CachedTexture::Texture((metadata, texture)));
-								self.remaining_capacity -= size_estimate;
-							}
-							Entry::Occupied(mut entry) => match entry.get_mut() {
-								CachedTexture::Texture(ref mut entry) => {
-									if entry.0.modified().unwrap() < metadata.modified().unwrap() {
-										let old_size_estimate = {
-											let old_image = &entry.1;
-											get_image_size_estimate((
-												old_image.width(),
-												old_image.height(),
-											)) as isize
-										};
-										let texture = Rc::new(texture_from_image(display, image)?);
-										entry.0 = metadata;
-										entry.1 = texture;
-										self.remaining_capacity += old_size_estimate;
-										self.remaining_capacity -= size_estimate;
-									}
-								}
-								entry @ CachedTexture::LoadRequested => {
-									let texture = Rc::new(texture_from_image(display, image)?);
-									*entry = CachedTexture::Texture((metadata, texture));
-									self.remaining_capacity -= size_estimate;
-								}
-							},
-						}
 					}
 				}
-				Err(TryRecvError::Disconnected) => return Ok(()),
+				Err(TryRecvError::Disconnected) => panic!("Channel disconnected unexpectidly."),
 				Err(TryRecvError::Empty) => break,
 			}
 		}
 
 		Ok(())
+	}
+
+	fn upload_to_texture(&mut self, display: &glium::Display, load_result: LoadResult) -> Result<Option<AnimationFrameTexture>> {
+		use std::collections::btree_map::Entry;
+		match load_result {
+			LoadResult::Start { req_id, metadata } => {
+				println!("Received metadata for {}", req_id);
+				let curr_mod_time = metadata.modified().ok();
+				let request = self.ongoing_requests.get_mut(&req_id).unwrap();
+				//request.mod_time = curr_mod_time;
+				match self.texture_cache.entry(request.path.clone()) {
+					Entry::Vacant(mut entry) => {
+						entry.insert(CachedTexture {req_id, mod_time: curr_mod_time, frames: Vec::new()});
+					}
+					Entry::Occupied(mut entry) => {
+						let mut overwrite = true;
+						if let Some(curr_mod_time) = curr_mod_time {
+							let cached = entry.get();
+							if let Some(existing_mod_time) = cached.mod_time {
+								if existing_mod_time == curr_mod_time {
+									overwrite = false;
+								}
+							}
+						}
+						if overwrite {
+							let old_size_estimate = get_anim_size_estimate(&entry.get().frames) as isize;
+							self.remaining_capacity += old_size_estimate;
+							let mut_entry = entry.get_mut();
+							mut_entry.frames.clear();
+							mut_entry.mod_time = curr_mod_time;
+						}
+					}
+				}
+				return Ok(None);
+			}
+			LoadResult::Frame { req_id, image, delay_nano } => {
+				println!("Received frame for {}", req_id);
+				let request = self.ongoing_requests.get(&req_id).unwrap();
+				let size_estimate =
+					get_image_size_estimate((image.width(), image.height())) as isize;
+				if let Some(entry) = self.texture_cache.get_mut(&request.path) {
+					let texture = Rc::new(texture_from_image(display, image)?);
+					let anim_frame = AnimationFrameTexture {texture, delay_nano};
+					entry.frames.push(anim_frame.clone());
+					self.remaining_capacity -= size_estimate;
+					return Ok(Some(anim_frame));
+				} else {
+					// The entry should be occupied at this point
+					eprintln!("Texture cache entry became vacant during the transmission of image data");
+					return Ok(None);
+				}
+			}
+			LoadResult::Done { req_id } => {
+				println!("Received done for {}", req_id);
+				self.ongoing_requests.remove(&req_id);
+				Ok(None)
+			}
+			LoadResult::Failed { req_id} => {
+				println!("Received FAILED for {}", req_id);
+				self.ongoing_requests.remove(&req_id);
+				Err(errors::Error::from_kind(errors::ErrorKind::FailedToLoadImage))
+			}
+		}
 	}
 
 	pub fn prefetch_neighbors(&mut self) {
@@ -397,39 +529,70 @@ impl ImageCache {
 	}
 
 	pub fn prefetch_at_index(&mut self, index: usize) -> bool {
-		use std::collections::btree_map::Entry;
-
 		if self.requested_images >= Self::MAX_PENDING_PREFETCH_REQUESTS {
 			return false;
 		}
-
 		if self.remaining_capacity > self.curr_est_size as isize {
-			if let Some(desc) = self.dir_files.get(index) {
-				let file = &desc.dir_entry;
-				let file_path = file.path();
-				let file_name = if let Some(file_name) = file_path.file_name() {
-					file_name.to_owned()
-				} else {
-					return false;
-				};
-				match self.texture_cache.entry(file_name) {
-					Entry::Vacant(entry) => {
-						if is_file_supported(file_path.as_ref()) {
-							entry.insert(CachedTexture::LoadRequested);
-							self.loader.send_load_request(file_path);
-							self.requested_images += 1;
-							return true;
-						}
+			return self.force_load_at_index(index);
+		}
+		false
+	}
+
+	/// This is used for initiating a load when said load was directly
+	/// requested by a higher level component through one of the public
+	/// `load_...` fuctions.
+	/// 
+	/// This is almost identical to `prefetch_at_index` but different in that
+	/// it does not care whether the new image will fit into the allowed
+	/// remaining capacity.
+	fn force_load_at_index(&mut self, index: usize) -> bool {
+		use std::collections::btree_map::Entry;
+		if let Some(desc) = self.dir_files.get(index) {
+			let file = &desc.dir_entry;
+			let new_mod_time = file.metadata().ok().and_then(|m| m.modified().ok());
+			let file_path = file.path();
+			
+			macro_rules! send_load_request {
+				($path:ident) => {
+					if self.requested_images >= Self::MAX_PENDING_PREFETCH_REQUESTS {
+						None
+					} else {
+						self.current_req_id += 1;
+						let req_id = self.current_req_id;
+						println!("Sending load request {} for {:?}", req_id, $path);
+						self.ongoing_requests.insert(req_id, OngoingRequest { path: $path.clone() });
+						self.loader.send_load_request(LoadRequest { req_id,  path: $path });
+						self.requested_images += 1;
+						Some(req_id)
 					}
-					Entry::Occupied(entry) => {
-						if let CachedTexture::Texture(ref entry) = entry.get() {
-							if entry.0.modified().unwrap()
-								!= file.metadata().unwrap().modified().unwrap()
-							{
-								self.loader.send_load_request(file_path);
-								self.requested_images += 1;
+				}
+			}
+
+			match self.texture_cache.entry(file_path.clone()) {
+				Entry::Vacant(entry) => {
+					if is_file_supported(file_path.as_ref()) {
+						if let Some(req_id) = send_load_request!(file_path) {
+							entry.insert(CachedTexture {
+								req_id,
+								mod_time: new_mod_time,
+								frames: Vec::new(),
+							});
+						}
+						return true;
+					}
+				}
+				Entry::Occupied(entry) => {
+					let texture = entry.get();
+					let mut should_update = true;
+					if let Some(existing_mod_time) = texture.mod_time {
+						if let Some(new_mod_time) = new_mod_time {
+							if new_mod_time == existing_mod_time {
+								should_update = false;
 							}
 						}
+					}
+					if should_update {
+						send_load_request!(file_path);
 						return true;
 					}
 				}
@@ -438,14 +601,14 @@ impl ImageCache {
 		false
 	}
 
-	fn change_directory(&mut self, dir_path: PathBuf, filename: OsString) -> Result<()> {
-		self.dir_files = Self::collect_directory(dir_path.as_path())?;
+	fn change_directory(&mut self, dir_path: &Path, filename: &OsStr) -> Result<()> {
+		self.dir_path = dir_path.to_owned();
+		self.dir_files = self.collect_directory()?;
 
 		// Look up the index of the filename in the directory
 		for (index, desc) in self.dir_files.iter().enumerate() {
 			if desc.dir_entry.file_name() == filename {
 				self.current_index = index;
-				self.dir_path = dir_path;
 				return Ok(());
 			}
 		}
@@ -458,14 +621,15 @@ impl ImageCache {
 		.into())
 	}
 
-	fn collect_directory(path: &Path) -> Result<Vec<ImageDescriptor>> {
-		let mut dir_files: Vec<_> = fs::read_dir(path)?
+	fn collect_directory(&mut self) -> Result<Vec<ImageDescriptor>> {
+		let mut dir_files: Vec<_> = fs::read_dir(&self.dir_path)?
 			.filter_map(|x| match x {
 				Ok(entry) => match entry.file_type() {
 					Ok(file_type) => {
 						if file_type.is_file() {
 							if is_file_supported(entry.path().as_path()) {
-								Some(ImageDescriptor::from_entry(entry))
+								self.current_req_id += 1;
+								Some(ImageDescriptor::from_entry(entry, self.current_req_id))
 							} else {
 								None
 							}
