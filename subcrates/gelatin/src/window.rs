@@ -1,3 +1,4 @@
+use cgmath::{Matrix4, Vector3};
 use glium::glutin::window::Icon;
 use glium::glutin::{
 	self,
@@ -5,7 +6,8 @@ use glium::glutin::{
 	event::WindowEvent,
 	window::{CursorIcon, WindowId},
 };
-use glium::{program, Display, IndexBuffer, Program, Rect, Surface, VertexBuffer};
+use glium::{program, uniform, Display, Frame, IndexBuffer, Program, Rect, Surface, VertexBuffer};
+use glium::{Blend, BlendingFunction};
 
 use std::cell::{RefCell, RefMut};
 use std::cmp::Eq;
@@ -319,6 +321,12 @@ impl Window {
 		self.data.borrow_mut().display.gl_window().window().request_redraw();
 	}
 
+	pub fn main_events_cleared(&self) {
+		// this way self.data is not borrowed while `before_draw` is running.
+		let root_widget = self.data.borrow().root_widget.clone();
+		root_widget.before_draw(self);
+	}
+
 	pub fn redraw_needed(&self) -> bool {
 		// TODO return true if any of the components
 		// `is_valid` returns false
@@ -329,12 +337,12 @@ impl Window {
 	/// This means that trying to borrow the window *mutably* in a widget's
 	/// draw function will fail.
 	pub fn redraw(&self) -> crate::NextUpdate {
-		let root_widget = self.data.borrow().root_widget.clone();
 		// this way self.data is not borrowed while before draw is running.
-		root_widget.before_draw(self);
-		let mut target = self.data.borrow_mut().display.draw();
-		let dpi_scaling = self.data.borrow_mut().display.gl_window().window().scale_factor();
+		let dpi_scaling = self.data.borrow().display.gl_window().window().scale_factor();
+		let mut target = self.data.borrow().display.draw();
 
+		// Can't change the window during drawing phase. Deal with it.
+		let borrowed = self.data.borrow();
 		let dimensions = target.get_dimensions();
 		let phys_dimensions =
 			glutin::dpi::PhysicalSize::new(dimensions.0 as f32, dimensions.1 as f32);
@@ -345,7 +353,7 @@ impl Window {
 		// Invoke the layout functions
 		let available_widget_space =
 			LogicalRect { pos: LogicalVector::new(0.0, 0.0), size: logical_dimensions };
-		root_widget.layout(available_widget_space);
+		borrowed.root_widget.layout(available_widget_space);
 
 		let left = 0f32;
 		let right = logical_dimensions.vec.x;
@@ -360,14 +368,6 @@ impl Window {
 			height: phys_height as u32,
 		};
 
-		// Can't change the window during drawing phase. Deal with it.
-		let borrowed = self.data.borrow();
-		target.clear_color(
-			borrowed.bg_color[0],
-			borrowed.bg_color[1],
-			borrowed.bg_color[2],
-			borrowed.bg_color[3],
-		);
 		let draw_context = DrawContext {
 			display: &borrowed.display,
 			dpi_scale_factor: dpi_scaling as f32,
@@ -380,9 +380,21 @@ impl Window {
 			projection_transform: &projection_transform,
 		};
 
+		// Clearing the framebuffer with fully black
+		// then drawing a full-screen quad to emulate colored clearing.
+		// This is a workaround for https://github.com/glium/glium/issues/1842
+		target.clear_color(0.0, 0.0, 0.0, 1.0);
+		draw_context.clear_color(&mut target, borrowed.bg_color, None);
+
 		// Using the cloned root instead of self.root_widget doesn't make much difference
 		// because self is being borrowed by through the draw_context anyways but it's fine.
-		let retval = root_widget.draw(&mut target, &draw_context).unwrap();
+		let retval = borrowed.root_widget.draw(&mut target, &draw_context).unwrap();
+
+		// After all widgets are drawn, let's set the alpha values of all the pixels to 1.
+		// This is required on Wayland because the Wayland compositor very kindly takes
+		// the alpha values into account and blends the framebuffer set by applications
+		// with the rest of the desktop.
+		self.set_alpha_to_1(&mut target, &draw_context);
 
 		target.finish().unwrap();
 		retval
@@ -408,5 +420,33 @@ impl Window {
 		};
 		let gl_win = borrowed.display.gl_window();
 		gl_win.window().set_fullscreen(monitor);
+	}
+
+	/// Sets the alpha values by drawing a quad covering the entire framebuffer
+	/// with a blending mode set to max and a shader that draws (0,0,0,1) values
+	fn set_alpha_to_1(&self, target: &mut Frame, context: &DrawContext) {
+		let transform = Matrix4::from_scale(2.0);
+		let transform = Matrix4::from_translation(Vector3::new(-1.0, -1.0, 0.0)) * transform;
+		let image_draw_params = glium::DrawParameters {
+			blend: Blend {
+				color: BlendingFunction::Max,
+				alpha: BlendingFunction::Max,
+				..Default::default()
+			},
+			..Default::default()
+		};
+		let uniforms = uniform! {
+			matrix: Into::<[[f32; 4]; 4]>::into(transform),
+			color: [0.0f32, 0.0, 0.0, 1.0],
+		};
+		target
+			.draw(
+				context.unit_quad_vertices,
+				context.unit_quad_indices,
+				context.colored_program,
+				&uniforms,
+				&image_draw_params,
+			)
+			.unwrap();
 	}
 }

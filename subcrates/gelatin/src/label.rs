@@ -118,7 +118,6 @@ impl Widget for Label {
 					)
 					.unwrap();
 			} else {
-				// building the uniforms
 				let uniforms = uniform! {
 					matrix: Into::<[[f32; 4]; 4]>::into(transform),
 					color: [1.0f32, 0.1, 0.5, 0.5],
