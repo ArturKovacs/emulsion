@@ -5,6 +5,7 @@ extern crate error_chain;
 
 use std::cell::{Cell, RefCell};
 use std::f32;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::{
@@ -40,6 +41,7 @@ use crate::help_screen::*;
 use crate::picture_widget::*;
 #[cfg(feature = "networking")]
 use crate::version::Version;
+use configuration::Cache;
 
 mod configuration;
 mod handle_panic;
@@ -67,51 +69,39 @@ fn main() {
 	let (w, h) = rgba.dimensions();
 	let icon = Icon::from_rgba(rgba.into_raw(), w, h).unwrap();
 
-	let cfg_folder;
-	if let Some(ref project_dirs) = *PROJECT_DIRS {
-		cfg_folder = project_dirs.config_dir().to_owned();
-	} else {
-		let exe_path = std::env::current_exe().unwrap();
-		let exe_folder = exe_path.parent().unwrap();
-		cfg_folder = exe_folder.to_owned();
-	}
-	if !cfg_folder.exists() {
-		std::fs::create_dir_all(&cfg_folder).unwrap();
-	}
-	let cfg_path = cfg_folder.join("cfg.toml");
-	let first_lanuch;
-	let config: Rc<RefCell<Configuration>>;
-	if let Ok(cfg) = Configuration::load(cfg_path.as_path()) {
-		first_lanuch = false;
-		config = Rc::new(RefCell::new(cfg));
-	} else {
-		first_lanuch = true;
-		config = Rc::new(RefCell::new(Configuration::default()));
-	}
+	let (config_path, cache_path) = get_config_and_cache_paths();
+
+	let cache = Cache::load(&cache_path);
+	let config = Configuration::load(&config_path);
+
+	let first_launch = cache.is_err();
+	let cache = Rc::new(RefCell::new(cache.unwrap_or_default()));
+	let config = Rc::new(RefCell::new(config.unwrap_or_default()));
+
 	let mut application = Application::new();
 	let window: Rc<Window>;
 	{
-		let config = config.borrow();
+		let cache = cache.borrow();
 		let window_desc = WindowDescriptorBuilder::default()
 			.icon(Some(icon))
-			.size(PhysicalSize::new(config.window.win_w, config.window.win_h))
-			.position(Some(PhysicalPosition::new(config.window.win_x, config.window.win_y)))
+			.size(PhysicalSize::new(cache.window.win_w, cache.window.win_h))
+			.position(Some(PhysicalPosition::new(cache.window.win_x, cache.window.win_y)))
 			.build()
 			.unwrap();
 		window = Window::new(&mut application, window_desc);
 	}
 	{
-		let config_clone = config.clone();
+		let cache = cache.clone();
 		window.add_global_event_handler(move |event| match event {
 			WindowEvent::Resized(new_size) => {
-				let mut config = config_clone.borrow_mut();
-				config.window.win_w = new_size.width;
-				config.window.win_h = new_size.height;
+				let mut cache = cache.borrow_mut();
+				cache.window.win_w = new_size.width;
+				cache.window.win_h = new_size.height;
 			}
 			WindowEvent::Moved(new_pos) => {
-				let mut config = config_clone.borrow_mut();
-				config.window.win_x = new_pos.x;
-				config.window.win_y = new_pos.y;
+				let mut cache = cache.borrow_mut();
+				cache.window.win_x = new_pos.x;
+				cache.window.win_y = new_pos.y;
 			}
 			_ => (),
 		});
@@ -234,7 +224,7 @@ fn main() {
 
 	let update_available = Arc::new(AtomicBool::new(false));
 	let update_check_done = Arc::new(AtomicBool::new(false));
-	let light_theme = Rc::new(Cell::new(!config.borrow().window.dark));
+	let light_theme = Rc::new(Cell::new(!cache.borrow().window.dark));
 	let theme_button_clone = theme_button.clone();
 	let help_button_clone = help_button.clone();
 	let update_label_clone = update_label;
@@ -276,11 +266,11 @@ fn main() {
 	});
 	set_theme();
 	{
-		let config = config.clone();
+		let cache = cache.clone();
 		let set_theme = set_theme.clone();
 		theme_button.set_on_click(move || {
 			light_theme.set(!light_theme.get());
-			config.borrow_mut().window.dark = !light_theme.get();
+			cache.borrow_mut().window.dark = !light_theme.get();
 			set_theme();
 		});
 	}
@@ -289,7 +279,7 @@ fn main() {
 	slider.set_on_value_change(move || {
 		image_widget_clone.jump_to_index(slider_clone2.value());
 	});
-	let help_visible = Cell::new(first_lanuch);
+	let help_visible = Cell::new(first_launch);
 	help_screen.set_visible(help_visible.get());
 	let update_available_clone = update_available.clone();
 	let help_screen_clone = help_screen.clone();
@@ -328,7 +318,7 @@ fn main() {
 		NextUpdate::WaitUntil(Instant::now() + Duration::from_secs(1))
 	});
 	application.set_at_exit(Some(move || {
-		config.borrow().save(cfg_path).unwrap();
+		cache.borrow().save(cache_path).unwrap();
 		update_checker.join().unwrap();
 	}));
 	application.start_event_loop();
@@ -338,6 +328,29 @@ fn main() {
 #[derive(Deserialize)]
 struct ReleaseInfoJson {
 	tag_name: String,
+}
+
+fn get_config_and_cache_paths() -> (PathBuf, PathBuf) {
+	let config_folder;
+	let cache_folder;
+
+	if let Some(ref project_dirs) = *PROJECT_DIRS {
+		config_folder = project_dirs.config_dir().to_owned();
+		cache_folder = project_dirs.cache_dir().to_owned();
+	} else {
+		let exe_path = std::env::current_exe().unwrap();
+		let exe_folder = exe_path.parent().unwrap();
+		config_folder = exe_folder.to_owned();
+		cache_folder = exe_folder.to_owned();
+	}
+	if !config_folder.exists() {
+		std::fs::create_dir_all(&config_folder).unwrap();
+	}
+	if !cache_folder.exists() {
+		std::fs::create_dir_all(&cache_folder).unwrap();
+	}
+
+	(config_folder.join("config.toml"), config_folder.join("cache.toml"))
 }
 
 #[cfg(not(feature = "networking"))]
