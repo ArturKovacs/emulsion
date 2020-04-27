@@ -303,7 +303,6 @@ fn main() {
 
 	window.set_root(vertical_container);
 
-	// kick off a thread that will check for an update in the background
 	let update_checker_join_handle = {
 		let updates = &mut config.lock().unwrap().updates;
 		let config = config.clone();
@@ -311,6 +310,7 @@ fn main() {
 		let update_check_done = update_check_done.clone();
 
 		if updates.should_check() {
+			// kick off a thread that will check for an update in the background
 			Some(std::thread::spawn(move || {
 				let has_update = check_for_updates();
 				update_available.store(has_update, Ordering::SeqCst);
@@ -323,6 +323,7 @@ fn main() {
 			None
 		}
 	};
+
 	let mut nothing_to_do = false;
 	application.add_global_event_handler(move |_| {
 		if nothing_to_do {
@@ -382,7 +383,7 @@ fn check_for_updates() -> bool {
 
 				match Version::from_str(&info.tag_name) {
 					Ok(latest) => {
-						println!("Parsed latest version is {}", latest);
+						println!("Parsed latest version is '{}'", latest);
 
 						if latest > current {
 							return true;
