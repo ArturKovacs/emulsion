@@ -312,14 +312,11 @@ fn main() {
 		if updates.should_check() {
 			// kick off a thread that will check for an update in the background
 			Some(std::thread::spawn(move || {
-				let has_update = check_for_updates();
-				update_available.store(has_update, Ordering::SeqCst);
+				update_available.store(check_for_updates(), Ordering::SeqCst);
 				update_check_done.store(true, Ordering::SeqCst);
-				config.lock().unwrap().updates.set_has_update(has_update);
+				config.lock().unwrap().updates.set_update_check_time();
 			}))
 		} else {
-			update_available.store(updates.has_update, Ordering::SeqCst);
-			update_check_done.store(true, Ordering::SeqCst);
 			None
 		}
 	};

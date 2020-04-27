@@ -15,14 +15,13 @@ pub struct WindowSection {
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct UpdateSection {
-	pub has_update: bool,
-	pub disable_update_check: bool,
+	pub check_updates: bool,
 	pub last_checked: u64,
 }
 
 impl UpdateSection {
 	pub fn should_check(&self) -> bool {
-		if self.has_update || self.disable_update_check {
+		if !self.check_updates {
 			false
 		} else {
 			let duration = SystemTime::now()
@@ -33,8 +32,7 @@ impl UpdateSection {
 		}
 	}
 
-	pub fn set_has_update(&mut self, has_update: bool) {
-		self.has_update = has_update;
+	pub fn set_update_check_time(&mut self) {
 		self.last_checked = SystemTime::now()
 			.duration_since(UNIX_EPOCH)
 			.unwrap_or_else(|_| Duration::from_secs(0))
@@ -73,11 +71,7 @@ impl Default for Configuration {
 		Configuration {
 			window: WindowSection { dark: false, win_w: 580, win_h: 558, win_x: 64, win_y: 64 },
 			bindings: None,
-			updates: UpdateSection {
-				has_update: false,
-				disable_update_check: false,
-				last_checked: 0,
-			},
+			updates: UpdateSection { check_updates: true, last_checked: 0 },
 		}
 	}
 }
