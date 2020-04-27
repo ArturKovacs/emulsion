@@ -236,73 +236,73 @@ pub trait Widget: Any {
 
 #[macro_export]
 macro_rules! add_common_widget_functions {
-    ($data_field:ident) => {
-        pub fn set_margin_all(&self, pixels: f32) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.placement.margin_left = pixels;
-            borrowed.placement.margin_right = pixels;
-            borrowed.placement.margin_top = pixels;
-            borrowed.placement.margin_bottom = pixels;
-            borrowed.rendered_valid = false;
-        }
+	($data_field:ident) => {
+		pub fn set_margin_all(&self, pixels: f32) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.placement.margin_left = pixels;
+			borrowed.placement.margin_right = pixels;
+			borrowed.placement.margin_top = pixels;
+			borrowed.placement.margin_bottom = pixels;
+			borrowed.rendered_valid = false;
+		}
 
-        pub fn set_margin_left(&self, pixels: f32) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.placement.margin_left = pixels;
-            borrowed.rendered_valid = false;
-        }
-        pub fn set_margin_right(&self, pixels: f32) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.placement.margin_right = pixels;
-            borrowed.rendered_valid = false;
-        }
-        pub fn set_margin_top(&self, pixels: f32) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.placement.margin_top = pixels;
-            borrowed.rendered_valid = false;
-        }
-        pub fn set_margin_bottom(&self, pixels: f32) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.placement.margin_bottom = pixels;
-            borrowed.rendered_valid = false;
-        }
-        pub fn set_horizontal_align(&self, align: Alignment) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.placement.horizontal_align = align;
-            borrowed.rendered_valid = false;
-        }
-        pub fn set_vertical_align(&self, align: Alignment) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.placement.vertical_align = align;
-            borrowed.rendered_valid = false;
-        }
-        pub fn set_fixed_size(&self, size: LogicalVector) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.placement.width = Length::Fixed(size.vec.x);
-            borrowed.placement.height = Length::Fixed(size.vec.y);
-            borrowed.rendered_valid = false;
-        }
-        pub fn set_width(&self, width: Length) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.placement.width = width;
-            borrowed.rendered_valid = false;
-        }
-        pub fn set_height(&self, height: Length) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.placement.height = height;
-            borrowed.rendered_valid = false;
-        }
-        pub fn set_ignore_layout(&self, ignore: bool) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.placement.ignore_layout = ignore;
-            borrowed.rendered_valid = false;
-        }
-        pub fn set_visible(&self, visible: bool) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.visible = visible;
-            borrowed.rendered_valid = false;
-        }
-    };
+		pub fn set_margin_left(&self, pixels: f32) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.placement.margin_left = pixels;
+			borrowed.rendered_valid = false;
+		}
+		pub fn set_margin_right(&self, pixels: f32) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.placement.margin_right = pixels;
+			borrowed.rendered_valid = false;
+		}
+		pub fn set_margin_top(&self, pixels: f32) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.placement.margin_top = pixels;
+			borrowed.rendered_valid = false;
+		}
+		pub fn set_margin_bottom(&self, pixels: f32) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.placement.margin_bottom = pixels;
+			borrowed.rendered_valid = false;
+		}
+		pub fn set_horizontal_align(&self, align: Alignment) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.placement.horizontal_align = align;
+			borrowed.rendered_valid = false;
+		}
+		pub fn set_vertical_align(&self, align: Alignment) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.placement.vertical_align = align;
+			borrowed.rendered_valid = false;
+		}
+		pub fn set_fixed_size(&self, size: LogicalVector) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.placement.width = Length::Fixed(size.vec.x);
+			borrowed.placement.height = Length::Fixed(size.vec.y);
+			borrowed.rendered_valid = false;
+		}
+		pub fn set_width(&self, width: Length) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.placement.width = width;
+			borrowed.rendered_valid = false;
+		}
+		pub fn set_height(&self, height: Length) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.placement.height = height;
+			borrowed.rendered_valid = false;
+		}
+		pub fn set_ignore_layout(&self, ignore: bool) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.placement.ignore_layout = ignore;
+			borrowed.rendered_valid = false;
+		}
+		pub fn set_visible(&self, visible: bool) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.visible = visible;
+			borrowed.rendered_valid = false;
+		}
+	};
 }
 
 pub struct Event {

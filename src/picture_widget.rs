@@ -23,19 +23,21 @@ use gelatin::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
 
 use std::time::{Duration, Instant};
 
-static IMG_NEXT_NAME: &'static str = "img_next";
-static IMG_PREV_NAME: &'static str = "img_prev";
-static IMG_ORIG_NAME: &'static str = "img_orig";
-static IMG_FIT_NAME: &'static str = "img_fit";
-static IMG_DEL_NAME: &'static str = "img_del";
-static PAN_NAME: &'static str = "pan";
-static PLAY_ANIM_NAME: &'static str = "play_anim";
-static PLAY_PRESENT_NAME: &'static str = "play_present";
-static PLAY_PRESENT_RND_NAME: &'static str = "play_present_rnd";
+static TOGGLE_FULLSCREEN_NAME: &str = "toggle_fullscreen";
+static IMG_NEXT_NAME: &str = "img_next";
+static IMG_PREV_NAME: &str = "img_prev";
+static IMG_ORIG_NAME: &str = "img_orig";
+static IMG_FIT_NAME: &str = "img_fit";
+static IMG_DEL_NAME: &str = "img_del";
+static PAN_NAME: &str = "pan";
+static PLAY_ANIM_NAME: &str = "play_anim";
+static PLAY_PRESENT_NAME: &str = "play_present";
+static PLAY_PRESENT_RND_NAME: &str = "play_present_rnd";
 
 lazy_static! {
 	static ref DEFAULT_BINDINGS: HashMap<&'static str, Vec<&'static str>> = {
 		let mut m = HashMap::new();
+		m.insert(TOGGLE_FULLSCREEN_NAME, vec!["F11"]);
 		m.insert(IMG_NEXT_NAME, vec!["D", "Right"]);
 		m.insert(IMG_PREV_NAME, vec!["A", "Left"]);
 		m.insert(IMG_ORIG_NAME, vec!["Q"]);
@@ -230,16 +232,21 @@ impl PictureWidget {
 			if input_key != *key {
 				continue;
 			}
-			let mut all_modifiers_active = true;
+			let mut has_alt = false;
+			let mut has_ctrl = false;
+			let mut has_logo = false;
 			for mod_str in parts.iter().take(parts.len() - 1) {
 				match mod_str.as_ref() {
-					"alt" if !modifiers.alt() => all_modifiers_active = false,
-					"ctrl" if !modifiers.ctrl() => all_modifiers_active = false,
-					"logo" if !modifiers.logo() => all_modifiers_active = false,
+					"alt" => has_alt = true,
+					"ctrl" => has_ctrl = true,
+					"logo" => has_logo = true,
 					_ => (),
 				}
 			}
-			if all_modifiers_active {
+			if has_alt == modifiers.alt()
+				&& has_ctrl == modifiers.ctrl()
+				&& has_logo == modifiers.logo()
+			{
 				return true;
 			}
 		}
@@ -268,6 +275,13 @@ impl PictureWidget {
 			($action_name:ident) => {
 				Self::triggered(&borrowed.configuration, $action_name, input_key, modifiers)
 			};
+		}
+		if triggered!(TOGGLE_FULLSCREEN_NAME) {
+			if let Some(window) = borrowed.window.upgrade() {
+				let fullscreen = !window.fullscreen();
+				window.set_fullscreen(fullscreen);
+				borrowed.bottom_panel.set_visible(!fullscreen);
+			}
 		}
 		if triggered!(PLAY_ANIM_NAME) {
 			match borrowed.playback_manager.playback_state() {
@@ -457,21 +471,21 @@ impl Widget for PictureWidget {
 			EventKind::MouseButton { state, button, .. } => match button {
 				MouseButton::Left => {
 					let mut borrowed = self.data.borrow_mut();
-					if state == ElementState::Pressed {
-						if borrowed.hover {
-							let now = Instant::now();
-							let duration_since_last_click =
-								now.duration_since(borrowed.last_click_time);
-							borrowed.last_click_time = now;
-							if duration_since_last_click < Duration::from_millis(250) {
-								match borrowed.window.upgrade() {
-									Some(window) => {
-										let fullscreen = !window.fullscreen();
-										window.set_fullscreen(fullscreen);
-										borrowed.bottom_panel.set_visible(!fullscreen);
-									}
-									None => unreachable!(),
+					if state == ElementState::Pressed && borrowed.hover {
+						let now = Instant::now();
+						let duration_since_last_click =
+							now.duration_since(borrowed.last_click_time);
+						borrowed.last_click_time = now;
+						if duration_since_last_click < Duration::from_millis(250) {
+							// TODO
+							//borrowed.toggle_fullscreen(window, bottom_panel);
+							match borrowed.window.upgrade() {
+								Some(window) => {
+									let fullscreen = !window.fullscreen();
+									window.set_fullscreen(fullscreen);
+									borrowed.bottom_panel.set_visible(!fullscreen);
 								}
+								None => unreachable!(),
 							}
 						}
 					}
@@ -514,10 +528,8 @@ impl Widget for PictureWidget {
 			EventKind::KeyInput { input } => {
 				if let Some(key) = input.virtual_keycode {
 					let input_key_str = virtual_keycode_to_string(key).to_lowercase();
-					if !virtual_keycode_is_char(key) {
-						if input.state == ElementState::Pressed {
-							self.handle_key_input(input_key_str.as_str(), event.modifiers)
-						}
+					if !virtual_keycode_is_char(key) && input.state == ElementState::Pressed {
+						self.handle_key_input(input_key_str.as_str(), event.modifiers)
 					}
 					// Panning is a special snowflake
 					let mut borrowed = self.data.borrow_mut();
