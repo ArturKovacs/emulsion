@@ -272,7 +272,10 @@ impl PlaybackManager {
 					self.image_texture = Some(frame.texture);
 					self.filename = Some(filename);
 				}
-				Err(image_cache::errors::Error(image_cache::errors::ErrorKind::WaitingOnLoader, _)) => {
+				Err(image_cache::errors::Error(
+					image_cache::errors::ErrorKind::WaitingOnLoader,
+					_,
+				)) => {
 					//println!("load_result was waity stuff");
 					next_update = gelatin::NextUpdate::WaitUntil(a_millisec_from_now);
 					// Set the load request to jump in place so that

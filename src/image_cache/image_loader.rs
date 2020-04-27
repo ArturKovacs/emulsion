@@ -10,7 +10,7 @@ use std::thread;
 use gelatin::glium;
 use gelatin::image;
 
-use glium::texture::{RawImage2d, SrgbTexture2d, MipmapsOption};
+use glium::texture::{MipmapsOption, RawImage2d, SrgbTexture2d};
 
 pub mod errors {
 	use gelatin::glium::texture;
@@ -77,7 +77,7 @@ pub struct LoadRequest {
 }
 
 pub enum LoadResult {
-	Start {req_id: u32, metadata: fs::Metadata },
+	Start { req_id: u32, metadata: fs::Metadata },
 	Frame { req_id: u32, image: image::RgbaImage, delay_nano: u64 },
 	Done { req_id: u32 },
 	Failed { req_id: u32 },
@@ -93,7 +93,7 @@ impl LoadResult {
 		}
 	}
 	pub fn is_failed(&self) -> bool {
-		if let LoadResult::Failed {..} = *self {
+		if let LoadResult::Failed { .. } = *self {
 			true
 		} else {
 			false
@@ -164,7 +164,9 @@ impl ImageLoader {
 			if let Ok(metadata) = fs::metadata(&request.path) {
 				loaded_img_tx.send(LoadResult::Start { req_id: request.req_id, metadata }).unwrap();
 				if let Ok(image) = load_image(request.path.as_path()) {
-					loaded_img_tx.send(LoadResult::Frame { req_id: request.req_id, image, delay_nano: 0 }).unwrap();
+					loaded_img_tx
+						.send(LoadResult::Frame { req_id: request.req_id, image, delay_nano: 0 })
+						.unwrap();
 					loaded_img_tx.send(LoadResult::Done { req_id: request.req_id }).unwrap();
 				} else {
 					loaded_img_tx.send(LoadResult::Failed { req_id: request.req_id }).unwrap();
