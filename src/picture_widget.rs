@@ -445,6 +445,7 @@ impl Widget for PictureWidget {
 	fn layout(&self, available_space: LogicalRect) {
 		let mut borrowed = self.data.borrow_mut();
 		borrowed.default_layout(available_space);
+		borrowed.hover = borrowed.drawn_bounds.contains(borrowed.last_mouse_pos);
 	}
 
 	fn handle_event(&self, event: &Event) {
