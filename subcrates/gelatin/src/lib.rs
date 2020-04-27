@@ -64,6 +64,8 @@ pub trait WidgetData {
 	/// window in logical pixels. This area does not include the widget's margins.
 	fn drawn_bounds(&mut self) -> &mut LogicalRect;
 
+	/// This function is called every time after the drawn bounds were updated using the trait methods
+	/// `apply_horizontal_alignement`, `apply_vertical_alignement` or `default_layout`.
 	fn drawn_bounds_updated(&mut self) {}
 
 	fn visible(&mut self) -> &mut bool;
