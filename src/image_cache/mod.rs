@@ -416,21 +416,16 @@ impl ImageCache {
 	}
 
 	pub fn process_prefetched(&mut self, display: &glium::Display) -> Result<()> {
-		use std::sync::mpsc::TryRecvError;
-		let mut processed = 0;
-		while processed < 2 {
-			match self.loader.try_recv_prefetched() {
-				Ok(load_result) => {
-					self.requested_images -= 1;
-					if let Ok(_) = self.upload_to_texture(display, load_result) {
-						processed += 1;
-					}
+		self.receive_prefetched();
+		// Prefetched are NOT ordered but for now this is better than nothing.
+		let first_key = self.prefetched.iter().nth(0).map(|v| v.0.clone());
+		if let Some(first_key) = first_key {
+			if let Some(result_vec) = self.prefetched.remove(&first_key) {
+				for result in result_vec {
+					self.upload_to_texture(display, result)?;
 				}
-				Err(TryRecvError::Disconnected) => panic!("Channel disconnected unexpectidly."),
-				Err(TryRecvError::Empty) => break,
 			}
 		}
-
 		Ok(())
 	}
 
