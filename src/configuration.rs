@@ -31,7 +31,7 @@ impl UpdateSection {
 				.duration_since(UNIX_EPOCH + Duration::from_secs(self.last_checked))
 				.unwrap_or_else(|_| Duration::from_secs(0));
 
-			duration > Duration::from_secs(60 * 10)
+			duration > Duration::from_secs(60 * 60 * 24) // 24 hours
 		}
 	}
 

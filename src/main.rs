@@ -3,15 +3,13 @@
 #[macro_use]
 extern crate error_chain;
 
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::f32;
 use std::rc::Rc;
 use std::str::FromStr;
-use std::sync::{
-	atomic::{AtomicBool, AtomicU64, Ordering},
-	Arc,
-};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use directories::ProjectDirs;
 use lazy_static::lazy_static;
@@ -80,18 +78,18 @@ fn main() {
 	}
 	let cfg_path = cfg_folder.join("cfg.toml");
 	let first_lanuch;
-	let config: Rc<RefCell<Configuration>>;
+	let config: Arc<Mutex<Configuration>>;
 	if let Ok(cfg) = Configuration::load(cfg_path.as_path()) {
 		first_lanuch = false;
-		config = Rc::new(RefCell::new(cfg));
+		config = Arc::new(Mutex::new(cfg));
 	} else {
 		first_lanuch = true;
-		config = Rc::new(RefCell::new(Configuration::default()));
+		config = Arc::new(Mutex::new(Configuration::default()));
 	}
 	let mut application = Application::new();
 	let window: Rc<Window>;
 	{
-		let config = config.borrow();
+		let config = config.lock().unwrap();
 		let window_desc = WindowDescriptorBuilder::default()
 			.icon(Some(icon))
 			.size(PhysicalSize::new(config.window.win_w, config.window.win_h))
@@ -104,12 +102,12 @@ fn main() {
 		let config_clone = config.clone();
 		window.add_global_event_handler(move |event| match event {
 			WindowEvent::Resized(new_size) => {
-				let mut config = config_clone.borrow_mut();
+				let mut config = config_clone.lock().unwrap();
 				config.window.win_w = new_size.width;
 				config.window.win_h = new_size.height;
 			}
 			WindowEvent::Moved(new_pos) => {
-				let mut config = config_clone.borrow_mut();
+				let mut config = config_clone.lock().unwrap();
 				config.window.win_x = new_pos.x;
 				config.window.win_y = new_pos.y;
 			}
@@ -233,9 +231,8 @@ fn main() {
 	vertical_container.add_child(bottom_container.clone());
 
 	let update_available = Arc::new(AtomicBool::new(false));
-	let last_update = Arc::new(AtomicU64::new(0));
 	let update_check_done = Arc::new(AtomicBool::new(false));
-	let light_theme = Rc::new(Cell::new(!config.borrow().window.dark));
+	let light_theme = Rc::new(Cell::new(!config.lock().unwrap().window.dark));
 	let theme_button_clone = theme_button.clone();
 	let help_button_clone = help_button.clone();
 	let update_label_clone = update_label;
@@ -281,7 +278,7 @@ fn main() {
 		let set_theme = set_theme.clone();
 		theme_button.set_on_click(move || {
 			light_theme.set(!light_theme.get());
-			config.borrow_mut().window.dark = !light_theme.get();
+			config.lock().unwrap().window.dark = !light_theme.get();
 			set_theme();
 		});
 	}
@@ -309,24 +306,19 @@ fn main() {
 	let update_available_clone = update_available.clone();
 	let update_available_clone2 = update_available_clone.clone();
 	let update_check_done_clone = update_check_done.clone();
-	let last_update_clone = last_update.clone();
 
-	let update_checker_join_handle = if config.borrow().updates.should_check() {
+	let update_checker_join_handle = if config.lock().unwrap().updates.should_check() {
+		let config_clone = config.clone();
 		Some(std::thread::spawn(move || {
-			update_available_clone.store(check_for_updates(), Ordering::SeqCst);
+			let has_update = check_for_updates();
+			update_available_clone.store(has_update, Ordering::SeqCst);
 			update_check_done_clone.store(true, Ordering::SeqCst);
-			last_update_clone.store(
-				SystemTime::now()
-					.duration_since(UNIX_EPOCH)
-					.unwrap_or_else(|_| Duration::from_secs(0))
-					.as_secs(),
-				Ordering::SeqCst,
-			);
+
+			config_clone.lock().unwrap().updates.set_has_update(has_update);
 		}))
 	} else {
 		None
 	};
-	let update_check_done_clone = update_check_done.clone();
 	let mut nothing_to_do = false;
 	application.add_global_event_handler(move |_| {
 		if nothing_to_do {
@@ -343,12 +335,7 @@ fn main() {
 	});
 
 	application.set_at_exit(Some(move || {
-		if update_check_done_clone.load(Ordering::SeqCst) {
-			let updates = &mut config.borrow_mut().updates;
-			updates.has_update = update_available.load(Ordering::SeqCst);
-			updates.last_checked = last_update.load(Ordering::SeqCst);
-		}
-		config.borrow().save(cfg_path).unwrap();
+		config.lock().unwrap().save(cfg_path).unwrap();
 		if let Some(h) = update_checker_join_handle {
 			h.join().unwrap();
 		}
