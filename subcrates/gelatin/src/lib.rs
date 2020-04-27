@@ -64,6 +64,8 @@ pub trait WidgetData {
 	/// window in logical pixels. This area does not include the widget's margins.
 	fn drawn_bounds(&mut self) -> &mut LogicalRect;
 
+	fn drawn_bounds_updated(&mut self) {}
+
 	fn visible(&mut self) -> &mut bool;
 
 	fn apply_horizontal_alignement(&mut self, available_space: LogicalRect, width: f32) {
@@ -84,6 +86,7 @@ pub trait WidgetData {
 					available_space.right() - (self.placement().margin_right + width);
 			}
 		}
+		self.drawn_bounds_updated();
 	}
 	fn apply_vertical_alignement(&mut self, available_space: LogicalRect, height: f32) {
 		self.drawn_bounds().pos.vec.y = available_space.pos.vec.y;
@@ -103,6 +106,7 @@ pub trait WidgetData {
 					available_space.bottom() - (self.placement().margin_bottom + height);
 			}
 		}
+		self.drawn_bounds_updated();
 	}
 	fn default_layout(&mut self, available_space: LogicalRect) {
 		if !*self.visible() {
@@ -110,6 +114,7 @@ pub trait WidgetData {
 				pos: LogicalVector::new(0.0, 0.0),
 				size: LogicalVector::new(0.0, 0.0),
 			};
+			self.drawn_bounds_updated();
 			return;
 		}
 		*self.drawn_bounds() = available_space;
@@ -146,6 +151,7 @@ pub trait WidgetData {
 				self.drawn_bounds().pos.vec.y += self.placement().margin_top;
 			}
 		}
+		self.drawn_bounds_updated();
 	}
 }
 
@@ -309,6 +315,8 @@ pub struct Event {
 	pub modifiers: glutin::event::ModifiersState,
 	pub kind: EventKind,
 }
+
+#[derive(Debug)]
 pub enum EventKind {
 	MouseMove,
 	MouseButton { state: glutin::event::ElementState, button: glutin::event::MouseButton },

@@ -95,6 +95,9 @@ impl WidgetData for PictureWidgetData {
 	fn drawn_bounds(&mut self) -> &mut LogicalRect {
 		&mut self.drawn_bounds
 	}
+	fn drawn_bounds_updated(&mut self) {
+		self.hover = self.drawn_bounds.contains(self.last_mouse_pos);
+	}
 	fn visible(&mut self) -> &mut bool {
 		&mut self.visible
 	}
