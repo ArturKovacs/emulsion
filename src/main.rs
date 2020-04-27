@@ -6,6 +6,7 @@ extern crate error_chain;
 use std::cell::{Cell, RefCell};
 use std::f32;
 use std::rc::Rc;
+use std::str::FromStr;
 use std::sync::{
 	atomic::{AtomicBool, Ordering},
 	Arc,
@@ -37,6 +38,8 @@ use gelatin::{
 use crate::configuration::Configuration;
 use crate::help_screen::*;
 use crate::picture_widget::*;
+#[cfg(feature = "networking")]
+use crate::version::Version;
 
 mod configuration;
 mod handle_panic;
@@ -46,6 +49,8 @@ mod picture_widget;
 mod playback_manager;
 mod shaders;
 mod utils;
+#[cfg(feature = "networking")]
+mod version;
 
 lazy_static! {
 	pub static ref PROJECT_DIRS: Option<ProjectDirs> = ProjectDirs::from("", "", "emulsion");
@@ -358,38 +363,21 @@ fn check_for_updates() -> bool {
 		Ok(response) => match response.json::<ReleaseInfoJson>() {
 			Ok(info) => {
 				println!("Found latest version tag {}", info.tag_name);
-				let curr_major = env!("CARGO_PKG_VERSION_MAJOR");
-				let curr_minor = env!("CARGO_PKG_VERSION_MINOR");
-				let curr_patch = env!("CARGO_PKG_VERSION_PATCH");
-				println!("Current version is '{}.{}.{}'", curr_major, curr_minor, curr_patch);
 
-				let latest_full = info.tag_name.chars().skip(1).collect::<String>();
-				let mut latest_parts = latest_full.split('.');
-				let mut extract_part = || {
-					let result;
-					if let Some(part) = latest_parts.next() {
-						if part.is_empty() {
-							result = "0";
-						} else {
-							result = part;
+				let current = Version::cargo_pkg_version();
+				println!("Current version is '{}'", current);
+
+				match Version::from_str(&info.tag_name) {
+					Ok(latest) => {
+						println!("Parsed latest version is {}", latest);
+
+						if latest > current {
+							return true;
 						}
-					} else {
-						result = "0";
 					}
-					result
-				};
-				let latest_major = extract_part();
-				let latest_minor = extract_part();
-				let latest_patch = extract_part();
-				println!(
-					"Parsed latest version is '{}.{}.{}'",
-					latest_major, latest_minor, latest_patch
-				);
-				if curr_major != latest_major
-					|| curr_minor != latest_minor
-					|| curr_patch != latest_patch
-				{
-					return true;
+					Err(error) => {
+						println!("Error parsing version: {}", error.to_string());
+					}
 				}
 			}
 			Err(e) => println!("Failed to create json from response: {}", e),
