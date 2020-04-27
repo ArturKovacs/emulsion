@@ -69,6 +69,7 @@ fn main() {
 	let (w, h) = rgba.dimensions();
 	let icon = Icon::from_rgba(rgba.into_raw(), w, h).unwrap();
 
+	// Load configuration and cache files
 	let (config_path, cache_path) = get_config_and_cache_paths();
 
 	let cache = Cache::load(&cache_path);
@@ -350,7 +351,7 @@ fn get_config_and_cache_paths() -> (PathBuf, PathBuf) {
 		std::fs::create_dir_all(&cache_folder).unwrap();
 	}
 
-	(config_folder.join("config.toml"), config_folder.join("cache.toml"))
+	(config_folder.join("cfg.toml"), cache_folder.join("cache.toml"))
 }
 
 #[cfg(not(feature = "networking"))]
