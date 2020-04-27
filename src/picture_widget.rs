@@ -323,7 +323,7 @@ impl PictureWidget {
 impl Widget for PictureWidget {
 	fn is_valid(&self) -> bool {
 		let borrowed = self.data.borrow();
-		borrowed.rendered_valid && borrowed.playback_manager.should_sleep()
+		borrowed.rendered_valid
 	}
 
 	fn before_draw(&self, window: &Window) {

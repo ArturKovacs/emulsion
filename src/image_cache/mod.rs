@@ -352,7 +352,6 @@ impl ImageCache {
 	) -> Result<(AnimationFrameTexture, OsString)> {
 		self.load_jump(display, 1, 0)
 	}
-
 	pub fn load_prev(
 		&mut self,
 		display: &glium::Display,

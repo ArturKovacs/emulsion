@@ -1,7 +1,7 @@
 use std::ffi::OsString;
 use std::io::Write;
 use std::mem;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
@@ -15,8 +15,7 @@ use gelatin::glium;
 use gelatin::window::Window;
 //use crate::window::Window;
 
-use crate::image_cache;
-use crate::image_cache::ImageCache;
+use crate::image_cache::{self, ImageCache, AnimationFrameTexture};
 
 #[derive(Debug, PartialEq)]
 pub enum LoadRequest {
@@ -37,20 +36,48 @@ pub enum PlaybackState {
 	//Backward,
 }
 
+
+fn folder_load_next(image_cache: &mut ImageCache, display: &glium::Display) -> FrameLoadResult {
+	image_cache.load_next(display)
+}
+fn folder_load_prev(image_cache: &mut ImageCache, display: &glium::Display) -> FrameLoadResult {
+	image_cache.load_prev(display)
+}
+fn folder_load_jump(image_cache: &mut ImageCache, display: &glium::Display, amount: i32) -> FrameLoadResult {
+	image_cache.load_jump(display, amount, 0)
+}
+fn folder_load_path(image_cache: &mut ImageCache, display: &glium::Display, path: &Path) -> image_cache::Result<AnimationFrameTexture> {
+	image_cache.load_specific(display, path, 0)
+}
+fn folder_load_at_index(image_cache: &mut ImageCache, display: &glium::Display, index: usize) -> FrameLoadResult {
+	image_cache.load_at_index(display, index, 0)
+}
+
+fn anim_load_next(image_cache: &mut ImageCache, display: &glium::Display) -> FrameLoadResult {
+	image_cache.load_jump(display, 0, 1)
+}
+fn anim_load_prev(image_cache: &mut ImageCache, display: &glium::Display) -> FrameLoadResult {
+	image_cache.load_jump(display, 0, -1)
+}
+fn anim_load_jump(image_cache: &mut ImageCache, display: &glium::Display, amount: i32) -> FrameLoadResult {
+	image_cache.load_jump(display, 0, amount as isize)
+}
+fn anim_load_path(image_cache: &mut ImageCache, display: &glium::Display, path: &Path) -> image_cache::Result<AnimationFrameTexture> {
+	image_cache.load_specific(display, path, 0)
+}
+fn anim_load_at_index(image_cache: &mut ImageCache, display: &glium::Display, index: usize) -> FrameLoadResult {
+	image_cache.load_at_index(display, 0, index as isize)
+}
+
 pub struct PlaybackManager {
-	playback_state: PlaybackState,
+	//playback_state: PlaybackState,
 	image_cache: ImageCache,
 
-	present_remaining: Vec<usize>,
+	// image_texture: Option<Rc<glium::texture::SrgbTexture2d>>,
+	// filename: Option<OsString>,
 
-	playback_start_time: Instant,
-	frame_count_since_playback_start: u64,
-
-	load_request: LoadRequest,
-
-	//should_sleep: bool,
-	image_texture: Option<Rc<glium::texture::SrgbTexture2d>>,
-	filename: Option<OsString>,
+	folder_player: ImgSequencePlayer,
+	image_player: ImgSequencePlayer,
 }
 
 impl PlaybackManager {
@@ -73,45 +100,54 @@ impl PlaybackManager {
 		};
 
 		PlaybackManager {
-			playback_state: PlaybackState::Paused,
+			//playback_state: PlaybackState::Paused,
 			image_cache: ImageCache::new(cache_capaxity, thread_count),
-
-			present_remaining: Vec::new(),
-
-			playback_start_time: Instant::now(),
-			frame_count_since_playback_start: 0,
-			load_request: LoadRequest::None,
-			//should_sleep: true,
-			image_texture: None,
-			filename: None,
+			folder_player: ImgSequencePlayer::new(
+				&folder_load_next,
+				&folder_load_prev,
+				&folder_load_jump,
+				&folder_load_path,
+				&folder_load_at_index,
+			),
+			image_player: ImgSequencePlayer::new(
+				&anim_load_next,
+				&anim_load_prev,
+				&anim_load_jump,
+				&anim_load_path,
+				&anim_load_at_index,
+			),
 		}
 	}
 
 	pub fn playback_state(&self) -> PlaybackState {
-		self.playback_state
+		self.folder_player.playback_state()
 	}
 
 	pub fn start_playback_forward(&mut self) {
-		self.playback_start_time = Instant::now();
-		self.frame_count_since_playback_start = 0;
-		self.playback_state = PlaybackState::Forward;
+		self.folder_player.start_playback_forward();
+		// self.playback_start_time = Instant::now();
+		// self.frame_count_since_playback_start = 0;
+		// self.playback_state = PlaybackState::Forward;
 	}
 
 	pub fn pause_playback(&mut self) {
-		self.playback_state = PlaybackState::Paused;
+		self.folder_player.pause_playback();
+		//self.playback_state = PlaybackState::Paused;
 	}
 
 	pub fn start_random_presentation(&mut self) {
-		self.playback_start_time = Instant::now();
-		self.frame_count_since_playback_start = 0;
-		self.playback_state = PlaybackState::RandomPresent;
-		self.fill_present_remainig_with_random();
+		self.folder_player.start_random_presentation(&self.image_cache);
+		//self.playback_start_time = Instant::now();
+		//self.frame_count_since_playback_start = 0;
+		//self.playback_state = PlaybackState::RandomPresent;
+		//self.fill_present_remainig_with_random();
 	}
 
 	pub fn start_presentation(&mut self) {
-		self.playback_start_time = Instant::now();
-		self.frame_count_since_playback_start = 0;
-		self.playback_state = PlaybackState::Present;
+		self.folder_player.start_presentation();
+		// self.playback_start_time = Instant::now();
+		// self.frame_count_since_playback_start = 0;
+		// self.playback_state = PlaybackState::Present;
 	}
 
 	pub fn current_filename(&self) -> OsString {
@@ -141,37 +177,122 @@ impl PlaybackManager {
 		self.image_cache.cached_from_dir()
 	}
 
-	pub fn should_sleep(&self) -> bool {
-		//self.should_sleep
-		false
+	pub fn request_load(&mut self, request: LoadRequest) {
+		self.folder_player.request_load(request);
+	}
+
+	pub fn image_texture(&self) -> Option<Rc<glium::texture::SrgbTexture2d>> {
+		self.folder_player.image_texture()
+	}
+
+	pub fn filename(&self) -> &Option<OsString> {
+		&self.folder_player.filename
+	}
+
+	pub fn update_image(&mut self, window: &Window) -> gelatin::NextUpdate {
+		let display = window.display_mut();
+		self.folder_player.update_image(&display, &mut self.image_cache)
+	}
+}
+
+type FrameLoadResult = image_cache::Result<(AnimationFrameTexture, OsString)>;
+trait LoadHandler {
+	fn load_next(&mut self) -> FrameLoadResult;
+	fn load_prev(&mut self) -> FrameLoadResult;
+	fn load_jump(&mut self, steps: isize) -> FrameLoadResult;
+	fn load_path(&mut self, path: &Path) -> FrameLoadResult;
+	fn load_at_index(&mut self, index: usize) -> FrameLoadResult;
+}
+struct ImgSequencePlayer {
+	playback_state: PlaybackState,
+	present_remaining: Vec<usize>,
+
+	playback_start_time: Instant,
+	frame_count_since_playback_start: u64,
+
+	load_request: LoadRequest,
+
+	image_texture: Option<AnimationFrameTexture>,
+	filename: Option<OsString>,
+
+	load_next: &'static dyn Fn(&mut ImageCache, &glium::Display) -> FrameLoadResult,
+	load_prev: &'static dyn Fn(&mut ImageCache, &glium::Display) -> FrameLoadResult,
+	load_jump: &'static dyn Fn(&mut ImageCache, &glium::Display, i32) -> FrameLoadResult,
+	load_path: &'static dyn Fn(&mut ImageCache, &glium::Display, &Path) -> image_cache::Result<AnimationFrameTexture>,
+	load_at_index: &'static dyn Fn(&mut ImageCache, &glium::Display, usize) -> FrameLoadResult,
+}
+
+impl ImgSequencePlayer {
+	pub fn new(
+		load_next: &'static dyn Fn(&mut ImageCache, &glium::Display) -> FrameLoadResult,
+		load_prev: &'static dyn Fn(&mut ImageCache, &glium::Display) -> FrameLoadResult,
+		load_jump: &'static dyn Fn(&mut ImageCache, &glium::Display, i32) -> FrameLoadResult,
+		load_path: &'static dyn Fn(&mut ImageCache, &glium::Display, &Path) -> image_cache::Result<AnimationFrameTexture>,
+		load_at_index: &'static dyn Fn(&mut ImageCache, &glium::Display, usize) -> FrameLoadResult,
+	) -> ImgSequencePlayer {
+		ImgSequencePlayer {
+			playback_state: PlaybackState::Paused,
+			present_remaining: Vec::new(),
+			playback_start_time: Instant::now(),
+			frame_count_since_playback_start: 0,
+			load_request: LoadRequest::None,
+			//should_sleep: true,
+			image_texture: None,
+			filename: None,
+			load_next,
+			load_prev,
+			load_jump,
+			load_path,
+			load_at_index,
+		}
+	}
+
+	pub fn playback_state(&self) -> PlaybackState {
+		self.playback_state
+	}
+
+	pub fn start_playback_forward(&mut self) {
+		self.playback_start_time = Instant::now();
+		self.frame_count_since_playback_start = 0;
+		self.playback_state = PlaybackState::Forward;
+	}
+
+	pub fn pause_playback(&mut self) {
+		self.playback_state = PlaybackState::Paused;
+	}
+
+	pub fn start_random_presentation(&mut self, image_cache: &ImageCache) {
+		self.playback_start_time = Instant::now();
+		self.frame_count_since_playback_start = 0;
+		self.playback_state = PlaybackState::RandomPresent;
+		self.fill_present_remainig_with_random(image_cache);
+	}
+
+	pub fn start_presentation(&mut self) {
+		self.playback_start_time = Instant::now();
+		self.frame_count_since_playback_start = 0;
+		self.playback_state = PlaybackState::Present;
 	}
 
 	pub fn request_load(&mut self, request: LoadRequest) {
 		self.load_request = request;
 	}
 
-	pub fn image_texture<'a>(&'a self) -> &'a Option<Rc<glium::texture::SrgbTexture2d>> {
-		&self.image_texture
+	pub fn image_texture(&self) -> Option<Rc<glium::texture::SrgbTexture2d>> {
+		self.image_texture.clone().map(|t| t.texture)
 	}
 
 	pub fn filename(&self) -> &Option<OsString> {
 		&self.filename
 	}
 
-	pub fn update_image(&mut self, window: &Window) -> gelatin::NextUpdate {
-		//self.should_sleep = true;
+	pub fn update_image(&mut self, display: &glium::Display, image_cache: &mut ImageCache) -> gelatin::NextUpdate {
 		let now = Instant::now();
 		let a_millisec_from_now = now.checked_add(Duration::from_millis(1)).unwrap();
 		let mut next_update;
-		// The reason why I reset the load request in such a convoluted way is that
-		// it has to guaranteprefetch_neighborsequest will be reset even if I return from this
-		// function early
-		match &self.load_request {
-			LoadRequest::None => (),
-			lr => {
-				//println!("Updating imagte with load request {:?}", lr);
-			}
-		}
+		// The reason why I reset the `self.load_request` in such a convoluted way is that
+		// it has to be guaranteed that it will be reset even if I return from this
+		// function early. And at the same time I want to use it's value as it is at this line.
 		let mut load_request = LoadRequest::None;
 		mem::swap(&mut self.load_request, &mut load_request);
 		let framerate = match self.playback_state {
@@ -182,8 +303,10 @@ impl PlaybackManager {
 		let frame_delta_time_nanos = (NANOS_PER_SEC as f64 / framerate) as u64;
 
 		if self.playback_state == PlaybackState::Paused {
-			self.image_cache.process_prefetched(&window.display_mut()).unwrap();
-			self.image_cache.prefetch_neighbors();
+			if let Err(e) = image_cache.process_prefetched(display) {
+				eprintln!("Failed to process prefetched images with error '{:?}'", e);
+			}
+			image_cache.prefetch_neighbors();
 			next_update = gelatin::NextUpdate::Latest;
 		} else if load_request == LoadRequest::None {
 			let elapsed = self.playback_start_time.elapsed();
@@ -208,7 +331,7 @@ impl PlaybackManager {
 							target = self.present_remaining.pop();
 							if target == None {
 								// Restart
-								self.fill_present_remainig_with_random();
+								self.fill_present_remainig_with_random(image_cache);
 								target = self.present_remaining.pop();
 							}
 						}
@@ -221,7 +344,7 @@ impl PlaybackManager {
 				};
 				self.frame_count_since_playback_start += frame_step;
 			} else {
-				self.image_cache.process_prefetched(&window.display_mut()).unwrap();
+				image_cache.process_prefetched(display).unwrap();
 
 				let nanos_since_last = elapsed_nanos % frame_delta_time_nanos;
 				const BUISY_WAIT_TRESHOLD: f32 = 0.8;
@@ -232,51 +355,46 @@ impl PlaybackManager {
 					match self.playback_state {
 						PlaybackState::RandomPresent => {
 							if let Some(&last) = self.present_remaining.iter().last() {
-								self.image_cache.prefetch_at_index(last);
+								image_cache.prefetch_at_index(last);
 							}
 						}
-						_ => self.image_cache.prefetch_neighbors(),
+						_ => image_cache.prefetch_neighbors(),
 					}
 				}
 			}
 		} else {
 			next_update = gelatin::NextUpdate::WaitUntil(a_millisec_from_now);
 		}
-		//let should_sleep = load_request == LoadRequest::None && running && !update_screen;
-		// Process long operations here
 		let load_result = match load_request {
-			LoadRequest::LoadNext => Some(self.image_cache.load_next(&window.display_mut())),
-			LoadRequest::LoadPrevious => Some(self.image_cache.load_prev(&window.display_mut())),
+			LoadRequest::LoadNext => Some((self.load_next)(image_cache, display)),
+			LoadRequest::LoadPrevious => Some((self.load_prev)(image_cache, display)),
 			LoadRequest::FilePath(ref file_path) => {
 				Some(if let Some(file_name) = file_path.file_name() {
-					self.image_cache
-						.load_specific(&window.display_mut(), file_path.as_ref(), 0)
-						.map(|x| (x, OsString::from(file_name)))
+					let load_path = self.load_path;
+					load_path(image_cache, display, file_path.as_ref()).map(|x| (x, OsString::from(file_name)))
 				} else {
 					Err(String::from("Could not extract filename").into())
 				})
 			}
 			LoadRequest::LoadAtIndex(index) => {
-				Some(self.image_cache.load_at_index(&window.display_mut(), index, 0))
+				Some((self.load_at_index)(image_cache, display, index))
 			}
 			LoadRequest::Jump(jump_count) => {
-				Some(self.image_cache.load_jump(&window.display_mut(), jump_count, 0))
+				Some((self.load_jump)(image_cache, display, jump_count))
 			}
 			LoadRequest::None => None,
 		};
 		if let Some(result) = load_result {
-			//println!("load_result was some");
 			match result {
 				Ok((frame, filename)) => {
 					println!("load_result was some ok");
-					self.image_texture = Some(frame.texture);
+					self.image_texture = Some(frame);
 					self.filename = Some(filename);
 				}
 				Err(image_cache::errors::Error(
 					image_cache::errors::ErrorKind::WaitingOnLoader,
 					_,
 				)) => {
-					//println!("load_result was waity stuff");
 					next_update = gelatin::NextUpdate::WaitUntil(a_millisec_from_now);
 					// Set the load request to jump in place so that
 					// next time we attempt to load this again.
@@ -303,9 +421,9 @@ impl PlaybackManager {
 		next_update
 	}
 
-	fn fill_present_remainig_with_random(&mut self) {
+	fn fill_present_remainig_with_random(&mut self, image_cache: &ImageCache) {
 		self.present_remaining.clear();
-		for i in 0..self.image_cache.current_dir_len() {
+		for i in 0..image_cache.current_dir_len() {
 			self.present_remaining.push(i);
 		}
 		let mut rng = thread_rng();
