@@ -25,7 +25,7 @@ pub struct UpdateSection {
 impl UpdateSection {
 	pub fn should_check(&self) -> bool {
 		if self.has_update || self.disable_update_check {
-			true
+			false
 		} else {
 			let duration = SystemTime::now()
 				.duration_since(UNIX_EPOCH + Duration::from_secs(self.last_checked))

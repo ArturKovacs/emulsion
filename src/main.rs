@@ -302,22 +302,26 @@ fn main() {
 	});
 
 	window.set_root(vertical_container);
+
 	// kick off a thread that will check for an update in the background
-	let update_available_clone = update_available.clone();
-	let update_available_clone2 = update_available_clone.clone();
-	let update_check_done_clone = update_check_done.clone();
+	let update_checker_join_handle = {
+		let updates = &mut config.lock().unwrap().updates;
+		let config = config.clone();
+		let update_available = update_available.clone();
+		let update_check_done = update_check_done.clone();
 
-	let update_checker_join_handle = if config.lock().unwrap().updates.should_check() {
-		let config_clone = config.clone();
-		Some(std::thread::spawn(move || {
-			let has_update = check_for_updates();
-			update_available_clone.store(has_update, Ordering::SeqCst);
-			update_check_done_clone.store(true, Ordering::SeqCst);
-
-			config_clone.lock().unwrap().updates.set_has_update(has_update);
-		}))
-	} else {
-		None
+		if updates.should_check() {
+			Some(std::thread::spawn(move || {
+				let has_update = check_for_updates();
+				update_available.store(has_update, Ordering::SeqCst);
+				update_check_done.store(true, Ordering::SeqCst);
+				config.lock().unwrap().updates.set_has_update(has_update);
+			}))
+		} else {
+			update_available.store(updates.has_update, Ordering::SeqCst);
+			update_check_done.store(true, Ordering::SeqCst);
+			None
+		}
 	};
 	let mut nothing_to_do = false;
 	application.add_global_event_handler(move |_| {
@@ -327,7 +331,7 @@ fn main() {
 		if update_check_done.load(Ordering::SeqCst) {
 			nothing_to_do = true;
 			set_theme();
-			if help_screen.visible() && update_available_clone2.load(Ordering::SeqCst) {
+			if help_screen.visible() && update_available.load(Ordering::SeqCst) {
 				update_notification.set_visible(true);
 			}
 		}
