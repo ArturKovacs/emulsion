@@ -1,7 +1,10 @@
 use serde_derive::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::Path;
+use std::{
+	path::Path,
+	time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct WindowSection {
@@ -13,9 +16,39 @@ pub struct WindowSection {
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct UpdateSection {
+	pub has_update: bool,
+	pub disable_update_check: bool,
+	pub last_checked: u64,
+}
+
+impl UpdateSection {
+	pub fn should_check(&self) -> bool {
+		if self.has_update || self.disable_update_check {
+			true
+		} else {
+			let duration = SystemTime::now()
+				.duration_since(UNIX_EPOCH + Duration::from_secs(self.last_checked))
+				.unwrap_or_else(|_| Duration::from_secs(0));
+
+			duration > Duration::from_secs(60 * 10)
+		}
+	}
+
+	pub fn set_has_update(&mut self, has_update: bool) {
+		self.has_update = has_update;
+		self.last_checked = SystemTime::now()
+			.duration_since(UNIX_EPOCH)
+			.unwrap_or_else(|_| Duration::from_secs(0))
+			.as_secs();
+	}
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Configuration {
 	pub window: WindowSection,
 	pub bindings: Option<BTreeMap<String, Vec<String>>>,
+	pub updates: UpdateSection,
 }
 
 impl Configuration {
@@ -42,6 +75,11 @@ impl Default for Configuration {
 		Configuration {
 			window: WindowSection { dark: false, win_w: 580, win_h: 558, win_x: 64, win_y: 64 },
 			bindings: None,
+			updates: UpdateSection {
+				has_update: false,
+				disable_update_check: false,
+				last_checked: 0,
+			},
 		}
 	}
 }

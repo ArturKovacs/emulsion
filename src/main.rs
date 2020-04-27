@@ -7,10 +7,10 @@ use std::cell::{Cell, RefCell};
 use std::f32;
 use std::rc::Rc;
 use std::sync::{
-	atomic::{AtomicBool, Ordering},
+	atomic::{AtomicBool, AtomicU64, Ordering},
 	Arc,
 };
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use directories::ProjectDirs;
 use lazy_static::lazy_static;
@@ -228,6 +228,7 @@ fn main() {
 	vertical_container.add_child(bottom_container.clone());
 
 	let update_available = Arc::new(AtomicBool::new(false));
+	let last_update = Arc::new(AtomicU64::new(0));
 	let update_check_done = Arc::new(AtomicBool::new(false));
 	let light_theme = Rc::new(Cell::new(!config.borrow().window.dark));
 	let theme_button_clone = theme_button.clone();
@@ -301,30 +302,51 @@ fn main() {
 	window.set_root(vertical_container);
 	// kick off a thread that will check for an update in the background
 	let update_available_clone = update_available.clone();
+	let update_available_clone2 = update_available_clone.clone();
 	let update_check_done_clone = update_check_done.clone();
-	let update_checker = std::thread::spawn(move || {
-		update_available_clone.store(check_for_updates(), Ordering::SeqCst);
-		update_check_done_clone.store(true, Ordering::SeqCst);
-	});
-	let update_check_done_clone = update_check_done;
-	let help_screen_clone = help_screen;
+	let last_update_clone = last_update.clone();
+
+	let update_checker_join_handle = if config.borrow().updates.should_check() {
+		Some(std::thread::spawn(move || {
+			update_available_clone.store(check_for_updates(), Ordering::SeqCst);
+			update_check_done_clone.store(true, Ordering::SeqCst);
+			last_update_clone.store(
+				SystemTime::now()
+					.duration_since(UNIX_EPOCH)
+					.unwrap_or_else(|_| Duration::from_secs(0))
+					.as_secs(),
+				Ordering::SeqCst,
+			);
+		}))
+	} else {
+		None
+	};
+	let update_check_done_clone = update_check_done.clone();
 	let mut nothing_to_do = false;
 	application.add_global_event_handler(move |_| {
 		if nothing_to_do {
 			return NextUpdate::Latest;
 		}
-		if update_check_done_clone.load(Ordering::SeqCst) {
+		if update_check_done.load(Ordering::SeqCst) {
 			nothing_to_do = true;
 			set_theme();
-			if help_screen_clone.visible() && update_available.load(Ordering::SeqCst) {
+			if help_screen.visible() && update_available_clone2.load(Ordering::SeqCst) {
 				update_notification.set_visible(true);
 			}
 		}
 		NextUpdate::WaitUntil(Instant::now() + Duration::from_secs(1))
 	});
+
 	application.set_at_exit(Some(move || {
+		if update_check_done_clone.load(Ordering::SeqCst) {
+			let updates = &mut config.borrow_mut().updates;
+			updates.has_update = update_available.load(Ordering::SeqCst);
+			updates.last_checked = last_update.load(Ordering::SeqCst);
+		}
 		config.borrow().save(cfg_path).unwrap();
-		update_checker.join().unwrap();
+		if let Some(h) = update_checker_join_handle {
+			h.join().unwrap();
+		}
 	}));
 	application.start_event_loop();
 }
