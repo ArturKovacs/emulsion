@@ -54,7 +54,7 @@ fn write_to_file(msg: &str) -> io::Result<()> {
 		local_data_folder = curr_exe_dir.to_owned();
 	}
 	if !local_data_folder.exists() {
-		std::fs::create_dir_all(&local_data_folder).unwrap();
+		std::fs::create_dir_all(&local_data_folder)?;
 	}
 	let mut file =
 		OpenOptions::new().create(true).append(true).open(local_data_folder.join("panic.txt"))?;
