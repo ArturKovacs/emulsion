@@ -99,7 +99,7 @@ impl PlaybackManager {
 			_ => 4,
 		};
 
-		PlaybackManager {
+		let mut result = PlaybackManager {
 			//playback_state: PlaybackState::Paused,
 			image_cache: ImageCache::new(cache_capaxity, thread_count),
 			folder_player: ImgSequencePlayer::new(
@@ -116,7 +116,9 @@ impl PlaybackManager {
 				&anim_load_path,
 				&anim_load_at_index,
 			),
-		}
+		};
+		result.image_player.start_playback_forward();
+		result
 	}
 
 	pub fn playback_state(&self) -> PlaybackState {
@@ -182,7 +184,7 @@ impl PlaybackManager {
 	}
 
 	pub fn image_texture(&self) -> Option<Rc<glium::texture::SrgbTexture2d>> {
-		self.folder_player.image_texture()
+		self.image_player.image_texture()
 	}
 
 	pub fn filename(&self) -> &Option<OsString> {
@@ -191,7 +193,17 @@ impl PlaybackManager {
 
 	pub fn update_image(&mut self, window: &Window) -> gelatin::NextUpdate {
 		let display = window.display_mut();
-		self.folder_player.update_image(&display, &mut self.image_cache)
+		let prev_file = self.folder_player.image_texture();
+		let next_update = self.folder_player.update_image(&display, &mut self.image_cache);
+		let new_file = self.folder_player.image_texture();
+		if let (Some(prev), Some(new)) = (prev_file, new_file) {
+			let file_changed = !Rc::ptr_eq(&prev, &new);
+			if file_changed {
+				self.image_player.pause_playback();
+				self.image_player.start_playback_forward();
+			}
+		}
+		next_update.aggregate(self.image_player.update_image(&display, &mut self.image_cache))
 	}
 }
 
@@ -365,6 +377,12 @@ impl ImgSequencePlayer {
 		} else {
 			next_update = gelatin::NextUpdate::WaitUntil(a_millisec_from_now);
 		}
+		match load_request {
+			LoadRequest::None | LoadRequest::FilePath(..) => (),
+			_ => if image_cache.current_dir_len() == 0 {
+				return gelatin::NextUpdate::Latest;
+			}
+		}
 		let load_result = match load_request {
 			LoadRequest::LoadNext => Some((self.load_next)(image_cache, display)),
 			LoadRequest::LoadPrevious => Some((self.load_prev)(image_cache, display)),
@@ -387,7 +405,6 @@ impl ImgSequencePlayer {
 		if let Some(result) = load_result {
 			match result {
 				Ok((frame, filename)) => {
-					println!("load_result was some ok");
 					self.image_texture = Some(frame);
 					self.filename = Some(filename);
 				}

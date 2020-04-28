@@ -369,7 +369,7 @@ impl ImageCache {
 			let path = self.current_file_path();
 			// Here, it is possible that the current image was already
 			// requested but not yet loaded.
-			let mut target_frame = self.current_frame_idx as isize + frame_jump_count;
+			let target_frame = self.current_frame_idx as isize + frame_jump_count;
 			let requested = self.try_getting_requested_image(display, &path, target_frame);
 			return requested.map(|t| (t, self.current_filename()));
 		} else {
@@ -474,6 +474,7 @@ impl ImageCache {
 						wrapped_id = frame_id % count;
 					}
 					if let Some(frame) = tex.frames.get(wrapped_id as usize) {
+						self.current_frame_idx = wrapped_id as usize;
 						return Ok(frame.clone());
 					}
 				}
@@ -481,9 +482,15 @@ impl ImageCache {
 			return Err(Error::from_kind(ErrorKind::WaitingOnLoader));
 		}
 		// Check if it's been requested
-		let req_id = self.dir_files.get(self.current_file_idx).unwrap().request_id;
-		if self.ongoing_requests.contains_key(&req_id) {
-			return Err(Error::from_kind(ErrorKind::WaitingOnLoader));
+		if let Some(img_desc) = self.dir_files.get(self.current_file_idx) {
+			let req_id = img_desc.request_id;
+			if self.ongoing_requests.contains_key(&req_id) {
+				return Err(Error::from_kind(ErrorKind::WaitingOnLoader));
+			}
+		} else {
+			// If it's not among the dir files then maybe there's no directory open 
+			// or some other error occured
+			bail!("Not found in directory.");
 		}
 		self.send_request_for_index(self.current_file_idx);
 		// If the texture is not in the cache just throw our hands in the air
