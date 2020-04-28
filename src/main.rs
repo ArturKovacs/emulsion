@@ -8,10 +8,8 @@ use std::f32;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::str::FromStr;
-use std::sync::{
-	atomic::{AtomicBool, Ordering},
-	Arc,
-};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use directories::ProjectDirs;
@@ -36,12 +34,11 @@ use gelatin::{
 	NextUpdate, Widget,
 };
 
-use crate::configuration::Configuration;
+use crate::configuration::{Cache, Configuration};
 use crate::help_screen::*;
 use crate::picture_widget::*;
 #[cfg(feature = "networking")]
 use crate::version::Version;
-use configuration::Cache;
 
 mod configuration;
 mod handle_panic;
@@ -76,13 +73,14 @@ fn main() {
 	let config = Configuration::load(&config_path);
 
 	let first_launch = cache.is_err();
-	let cache = Rc::new(RefCell::new(cache.unwrap_or_default()));
+	let cache = Arc::new(Mutex::new(cache.unwrap_or_default()));
 	let config = Rc::new(RefCell::new(config.unwrap_or_default()));
 
 	let mut application = Application::new();
 	let window: Rc<Window>;
 	{
-		let cache = cache.borrow();
+		let cache = cache.lock().unwrap();
+
 		let window_desc = WindowDescriptorBuilder::default()
 			.icon(Some(icon))
 			.size(PhysicalSize::new(cache.window.win_w, cache.window.win_h))
@@ -95,12 +93,12 @@ fn main() {
 		let cache = cache.clone();
 		window.add_global_event_handler(move |event| match event {
 			WindowEvent::Resized(new_size) => {
-				let mut cache = cache.borrow_mut();
+				let mut cache = cache.lock().unwrap();
 				cache.window.win_w = new_size.width;
 				cache.window.win_h = new_size.height;
 			}
 			WindowEvent::Moved(new_pos) => {
-				let mut cache = cache.borrow_mut();
+				let mut cache = cache.lock().unwrap();
 				cache.window.win_x = new_pos.x;
 				cache.window.win_y = new_pos.y;
 			}
@@ -225,7 +223,7 @@ fn main() {
 
 	let update_available = Arc::new(AtomicBool::new(false));
 	let update_check_done = Arc::new(AtomicBool::new(false));
-	let light_theme = Rc::new(Cell::new(!cache.borrow().window.dark));
+	let light_theme = Rc::new(Cell::new(!cache.lock().unwrap().window.dark));
 	let theme_button_clone = theme_button.clone();
 	let help_button_clone = help_button.clone();
 	let update_label_clone = update_label;
@@ -271,7 +269,7 @@ fn main() {
 		let set_theme = set_theme.clone();
 		theme_button.set_on_click(move || {
 			light_theme.set(!light_theme.get());
-			cache.borrow_mut().window.dark = !light_theme.get();
+			cache.lock().unwrap().window.dark = !light_theme.get();
 			set_theme();
 		});
 	}
@@ -295,32 +293,53 @@ fn main() {
 	});
 
 	window.set_root(vertical_container);
-	// kick off a thread that will check for an update in the background
-	let update_available_clone = update_available.clone();
-	let update_check_done_clone = update_check_done.clone();
-	let update_checker = std::thread::spawn(move || {
-		update_available_clone.store(check_for_updates(), Ordering::SeqCst);
-		update_check_done_clone.store(true, Ordering::SeqCst);
-	});
-	let update_check_done_clone = update_check_done;
-	let help_screen_clone = help_screen;
+
+	let check_updates_enabled = match &config.borrow().updates {
+		Some(u) if !u.check_updates => false,
+		_ => true,
+	};
+
+	let update_checker_join_handle = {
+		let updates = &mut cache.lock().unwrap().updates;
+		let cache = cache.clone();
+		let update_available = update_available.clone();
+		let update_check_done = update_check_done.clone();
+
+		if check_updates_enabled && updates.update_check_needed() {
+			// kick off a thread that will check for an update in the background
+			Some(std::thread::spawn(move || {
+				let has_update = check_for_updates();
+				update_available.store(has_update, Ordering::SeqCst);
+				update_check_done.store(true, Ordering::SeqCst);
+				if !has_update {
+					cache.lock().unwrap().updates.set_update_check_time();
+				}
+			}))
+		} else {
+			None
+		}
+	};
+
 	let mut nothing_to_do = false;
 	application.add_global_event_handler(move |_| {
 		if nothing_to_do {
 			return NextUpdate::Latest;
 		}
-		if update_check_done_clone.load(Ordering::SeqCst) {
+		if update_check_done.load(Ordering::SeqCst) {
 			nothing_to_do = true;
 			set_theme();
-			if help_screen_clone.visible() && update_available.load(Ordering::SeqCst) {
+			if help_screen.visible() && update_available.load(Ordering::SeqCst) {
 				update_notification.set_visible(true);
 			}
 		}
 		NextUpdate::WaitUntil(Instant::now() + Duration::from_secs(1))
 	});
+
 	application.set_at_exit(Some(move || {
-		cache.borrow().save(cache_path).unwrap();
-		update_checker.join().unwrap();
+		cache.lock().unwrap().save(cache_path).unwrap();
+		if let Some(h) = update_checker_join_handle {
+			h.join().unwrap();
+		}
 	}));
 	application.start_event_loop();
 }
@@ -383,7 +402,7 @@ fn check_for_updates() -> bool {
 
 				match Version::from_str(&info.tag_name) {
 					Ok(latest) => {
-						println!("Parsed latest version is {}", latest);
+						println!("Parsed latest version is '{}'", latest);
 
 						if latest > current {
 							return true;
