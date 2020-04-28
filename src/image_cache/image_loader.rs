@@ -32,6 +32,11 @@ pub fn load_image(image_path: &Path) -> Result<image::RgbaImage> {
 	Ok(image::open(image_path)?.to_rgba())
 }
 
+#[cfg(feature = "networking")]
+pub fn load_image_data(bytes: &[u8]) -> Result<image::RgbaImage> {
+	Ok(image::load_from_memory(bytes)?.to_rgba())
+}
+
 pub fn texture_from_image(
 	display: &glium::Display,
 	image: image::RgbaImage,

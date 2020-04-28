@@ -220,6 +220,21 @@ impl PictureWidget {
 		borrowed.rendered_valid = false;
 	}
 
+	#[cfg(not(feature = "networking"))]
+	pub fn jump_to_url(&self, url: String) {
+		eprintln!(
+			"Error: Can't open image over HTTP, because emulsion was compiled \
+			without the networking feature"
+		);
+	}
+
+	#[cfg(feature = "networking")]
+	pub fn jump_to_url(&self, url: String) {
+		let mut borrowed = self.data.borrow_mut();
+		borrowed.playback_manager.request_load(LoadRequest::Url(url));
+		borrowed.rendered_valid = false;
+	}
+
 	fn keys_triggered<S: AsRef<str>>(
 		keys: &[S],
 		input_key: &str,

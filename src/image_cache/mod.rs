@@ -282,6 +282,49 @@ impl ImageCache {
 		Ok(result_texture)
 	}
 
+	#[cfg(feature = "networking")]
+	pub fn load_url(
+		&mut self,
+		display: &glium::Display,
+		url: &str,
+	) -> Result<(Rc<SrgbTexture2d>, OsString)> {
+		let client = reqwest::blocking::Client::builder()
+			.user_agent("emulsion")
+			.build()
+			.map_err(|e| Error::from(format!("Could not build client for request: {}", e)))?;
+
+		let response = client
+			.get(url)
+			.send()
+			.map_err(|e| Error::from(format!("Failed to get image: {}", e)))?;
+
+		let bytes = response
+			.bytes()
+			.map_err(|e| Error::from(format!("Failed to get image content: {}", e)))?;
+
+		// Lets just process incoming images
+		self.process_prefetched(display)?;
+
+		let image = load_image_data(&bytes)?;
+		self.curr_est_size = get_image_size_estimate((image.width(), image.height())) as isize;
+		let image_size_estimate = self.curr_est_size;
+		if self.remaining_capacity < image_size_estimate {
+			self.texture_cache.clear();
+			self.remaining_capacity = self.total_capacity;
+		}
+		self.remaining_capacity -= image_size_estimate;
+
+		let result_texture = Rc::new(texture_from_image(display, image)?);
+
+		let title = url.trim_start_matches("https://").trim_start_matches("http://");
+		let title = match title.find(|c| c == '?' || c == '#') {
+			Some(end) => &title[..end],
+			None => title,
+		};
+
+		Ok((result_texture, OsString::from(title)))
+	}
+
 	pub fn load_next(&mut self, display: &glium::Display) -> Result<(Rc<SrgbTexture2d>, OsString)> {
 		self.load_jump(display, 1)
 	}

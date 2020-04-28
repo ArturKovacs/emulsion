@@ -216,7 +216,11 @@ fn main() {
 	picture_widget.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
 	picture_widget.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
 	if let Some(file_path) = std::env::args().nth(1) {
-		picture_widget.jump_to_path(file_path);
+		if file_path.starts_with("http://") || file_path.starts_with("https://") {
+			picture_widget.jump_to_url(file_path);
+		} else {
+			picture_widget.jump_to_path(file_path);
+		}
 	}
 
 	bottom_container.add_child(theme_button.clone());

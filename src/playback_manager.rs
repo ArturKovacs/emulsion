@@ -24,6 +24,8 @@ pub enum LoadRequest {
 	LoadNext,
 	LoadPrevious,
 	FilePath(PathBuf),
+	#[cfg(feature = "networking")]
+	Url(String),
 	LoadAtIndex(usize),
 	Jump(i32),
 }
@@ -259,6 +261,8 @@ impl PlaybackManager {
 				Some(self.image_cache.load_jump(&window.display_mut(), jump_count))
 			}
 			LoadRequest::None => None,
+			#[cfg(feature = "networking")]
+			LoadRequest::Url(url) => Some(self.image_cache.load_url(&window.display_mut(), &url)),
 		};
 		if let Some(result) = load_result {
 			match result {
