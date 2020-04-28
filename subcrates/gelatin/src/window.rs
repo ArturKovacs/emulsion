@@ -90,9 +90,6 @@ impl Eq for Window {}
 
 impl Window {
 	pub fn new(application: &mut Application, desc: WindowDescriptor) -> Rc<Self> {
-		//use glium::glutin::window::Icon;
-		//let exe_parent = std::env::current_exe().unwrap().parent().unwrap().to_owned();
-
 		let window = glutin::window::WindowBuilder::new()
 			.with_title("Loading")
 			.with_fullscreen(None)
