@@ -342,13 +342,19 @@ impl ImgSequencePlayer {
 				frame_delta_time_nanos = (self.get_delay_nanos)(&self) as i64;
 			},
 		};
-
 		if self.playback_state == PlaybackState::Paused {
 			if let Err(e) = image_cache.process_prefetched(display) {
 				eprintln!("Failed to process prefetched images with error '{:?}'", e);
 			}
-			image_cache.prefetch_neighbors();
-			next_update = gelatin::NextUpdate::Latest;
+			match load_request {
+				LoadRequest::Jump(0) => { // Waiting on current image to be loaded. 
+					next_update = gelatin::NextUpdate::WaitUntil(a_millisec_from_now);
+				}, 
+				_ => {
+					image_cache.prefetch_neighbors();
+					next_update = gelatin::NextUpdate::Latest;
+				}
+			}
 		} else if load_request == LoadRequest::None {
 			let elapsed = self.last_frame_change_time.elapsed();
 			let elapsed_nanos = elapsed.as_secs() * NANOS_PER_SEC + elapsed.subsec_nanos() as u64;

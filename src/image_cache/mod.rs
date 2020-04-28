@@ -149,7 +149,7 @@ pub struct ImageCache {
 ///
 /// The basic idea is to have a few images already in the memory while an image is shown on the screen
 impl ImageCache {
-	const MAX_PENDING_PREFETCH_REQUESTS: i32 = 4;
+	const MAX_PENDING_PREFETCH_REQUESTS: i32 = 5;
 
 	/// # Arguments
 	/// * `capacity` - Number of bytes. The last image loaded will be the one at which the allocated memory reaches or exceeds capacity
@@ -399,7 +399,10 @@ impl ImageCache {
 		loop {
 			match self.loader.try_recv_prefetched() {
 				Ok(load_result) => {
-					self.requested_images -= 1;
+					match load_result {
+						LoadResult::Failed{..} | LoadResult::Done{..} => { self.requested_images -= 1; }
+						_ => {}
+					}
 					let request = self.ongoing_requests.get(&load_result.req_id()).unwrap();
 					match self.prefetched.entry(request.path.clone()) {
 						Entry::Vacant(entry) => {
