@@ -59,24 +59,24 @@ lazy_static! {
 // ========================================================
 // Not-so glorious main function
 // ========================================================
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
 	std::panic::set_hook(Box::new(handle_panic::handle_panic));
 
-	let img = image::load_from_memory(include_bytes!("../resource/emulsion48.png")).unwrap();
+	let img = image::load_from_memory(include_bytes!("../resource/emulsion48.png"))?;
 	let rgba = img.into_rgba();
 	let (w, h) = rgba.dimensions();
-	let icon = Icon::from_rgba(rgba.into_raw(), w, h).unwrap();
+	let icon = Icon::from_rgba(rgba.into_raw(), w, h)?;
 
 	let cfg_folder;
 	if let Some(ref project_dirs) = *PROJECT_DIRS {
 		cfg_folder = project_dirs.config_dir().to_owned();
 	} else {
-		let exe_path = std::env::current_exe().unwrap();
+		let exe_path = std::env::current_exe()?;
 		let exe_folder = exe_path.parent().unwrap();
 		cfg_folder = exe_folder.to_owned();
 	}
 	if !cfg_folder.exists() {
-		std::fs::create_dir_all(&cfg_folder).unwrap();
+		std::fs::create_dir_all(&cfg_folder)?;
 	}
 	let cfg_path = cfg_folder.join("cfg.toml");
 	let first_lanuch;
@@ -96,8 +96,7 @@ fn main() {
 			.icon(Some(icon))
 			.size(PhysicalSize::new(config.window.win_w, config.window.win_h))
 			.position(Some(PhysicalPosition::new(config.window.win_x, config.window.win_y)))
-			.build()
-			.unwrap();
+			.build()?;
 		window = Window::new(&mut application, window_desc);
 	}
 	{
