@@ -23,7 +23,6 @@ name = "Emulsion"
 identifier = "io.github.arturkovacs.emulsion"
 icon = ["resource_dev/emulsion.png"]
 version = "1.9"
-copyright = "Creative Commons Attribution 3.0 License"
 short_description = "A lightweight and minimalistic image viewer"
 
 [target.'cfg(windows)'.build-dependencies]
