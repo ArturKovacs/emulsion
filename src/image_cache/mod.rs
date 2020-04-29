@@ -587,7 +587,6 @@ impl ImageCache {
 				return Ok(None);
 			}
 			LoadResult::Done { req_id } => {
-
 				let request;
 				if let Some(req) = self.ongoing_requests.get(&req_id) {
 					request = req;
