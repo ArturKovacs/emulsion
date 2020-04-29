@@ -8,51 +8,57 @@ To build the software, obtain the latest stable release of [Rust](https://www.ru
 
 Contribution is welcome. Feel free to post feature requests, bug reports, and make pull requests.
 
-## Custom key-bindings
+## Custom configuration
 
-To change the default key-bindings, locate the `cfg.toml` file first. For this file to be created run and then close emulsion at least once with the current user. Depending on your OS you can find it under
+The `cfg.toml` file allows for some modifications in the behavour of emulsion. 
 
-- Windows: `%appdata%\emulsion\config`
-- MacOS: `$HOME/Library/Preferences/emulsion`
-- Linux: `$XDG_CONFIG_HOME/emulsion` or `$HOME/.config/emulsion`
+Depending on the platform this file can be found or created at the following location.
 
-This file may contain a `[bindings]` section. If there is no such section, the defaults are used. If we were to add all the default bindings to this file it would look somethings like the following
+- Windows: `%appdata%\emulsion\config\cfg.toml`
+- MacOS: `$HOME/Library/Preferences/emulsion/cfg.toml`
+- Linux: `$XDG_CONFIG_HOME/emulsion/cfg.toml` or `$HOME/.config/emulsion/cfg.toml`
 
-```toml
-dark = false
-win_w = 835
-win_h = 759
-win_x = 109
-win_y = 70
-
-[bindings]
-img_next = ["d", "right"]
-img_prev = ["a", "left"]
-img_orig = ["q"]
-img_fit = ["f"]
-img_del = ["delete"]
-pan = ["space"]
-play_anim = ["alt+a", "alt+v"]
-play_present = ["p"]
-play_present_rnd = ["alt+p"]
-```
-
-Note that all items in this section are optional so it's fully valid to only specify one of the actions. In this case all the rest will use the default bindings. For example
+The contenst of the `cfg.toml` file may for example be the following:
 
 ```toml
 [bindings]
-img_next = ["space", "right"]
-pan = []
+img_next = ["k"]
+img_prev = ["j"]
+
+[updates]
+check_updates = true   # set to false to disable checking for updates
 ```
 
-For more information and available inputs please refer to the [Bindings.md](Bindings.md) file.
+Currently the only valid sections are: `[bindings]` and `[updates]`. All sections in this file are optional, meaning
+that if for example only `[updates]` is specified then the default key-bindings will be used.
+
+The `[updates]` section can contain only one field, namely `check_updates` which may be set to either `true` or `false`.
+Emulsion fetches the latest version number and provides a notification only if `check_updates` is set to `true`.
+The default value is `true`. (Note that this field has no effect when emulsion is compiled without networking.)
+
+This file may contain a `[bindings]` section which allows defining custom key-bindings.
+For more on that please refer to the [Bindings.md](Bindings.md) file.
+
+## Notes on Networking
+
+When installing Emulsion through a perpared package like the Windows installer, Emulsion will have networking enabled and by default
+will check for updates. However the default feature-set for emulsion does not include networking. This means that Emulsion will
+not have networking related featureswhen invoking
+```
+cargo install emulsion
+```
+
+To enable such features with this method, run
+```
+cargo install emulsion --features=networking
+```
 
 ## Reporting bugs
 
-If Emulsion closed unexpectedly please locate the "panic.txt" file. This file has a different location depending on the target platform.
+If Emulsion closed unexpectedly please locate the `"panic.txt"` file. This file has a different location depending on the target platform.
 
 - Windows: `%localappdata%\emulsion\data`
 - MacOS: `$HOME/Library/Application Support/emulsion`
 - Linux: `$XDG_DATA_HOME/emulsion` or `$HOME/.local/share/emulsion`
 
-When posting a bug report please upload the contents of this file to GitHub. If you deem it too large just paste the last panic entry between the rows of equal signs. If there's no "panic.txt" file describe the scenario in which emulsion closed, and steps to reproduce if you believe that could help.
+When posting a bug report please upload the contents of this file to GitHub. If you deem it too large just paste the last panic entry between the rows of equal signs. If there's no `"panic.txt"` file, describe the scenario in which you experienced the faulty behaviour, and steps to reproduce it if you believe that could help.
