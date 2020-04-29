@@ -21,10 +21,7 @@ use gelatin::window::Window;
 use gelatin::NextUpdate;
 use gelatin::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
 
-use std::{
-	sync::{Arc, Mutex},
-	time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 static TOGGLE_FULLSCREEN_NAME: &str = "toggle_fullscreen";
 static IMG_NEXT_NAME: &str = "img_next";
@@ -70,7 +67,7 @@ struct PictureWidgetData {
 	click: bool,
 	hover: bool,
 
-	configuration: Arc<Mutex<Configuration>>,
+	configuration: Rc<RefCell<Configuration>>,
 	playback_manager: PlaybackManager,
 
 	program: Program,
@@ -157,7 +154,7 @@ impl PictureWidget {
 		window: &Rc<Window>,
 		slider: Rc<gelatin::slider::Slider>,
 		bottom_panel: Rc<HorizontalLayoutContainer>,
-		configuration: Arc<Mutex<Configuration>>,
+		configuration: Rc<RefCell<Configuration>>,
 	) -> PictureWidget {
 		let program = program!(display,
 			140 => {
@@ -257,12 +254,12 @@ impl PictureWidget {
 	}
 
 	fn triggered(
-		config: &Arc<Mutex<Configuration>>,
+		config: &Rc<RefCell<Configuration>>,
 		action_name: &str,
 		input_key: &str,
 		modifiers: ModifiersState,
 	) -> bool {
-		let config = config.lock().unwrap();
+		let config = config.borrow();
 		let bindings = config.bindings.as_ref();
 		if let Some(Some(keys)) = bindings.map(|b| b.get(action_name)) {
 			Self::keys_triggered(keys.as_slice(), input_key, modifiers)
