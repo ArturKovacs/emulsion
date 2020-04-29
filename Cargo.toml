@@ -22,8 +22,8 @@ networking = ["reqwest"]
 name = "Emulsion"
 identifier = "io.github.arturkovacs.emulsion"
 icon = ["resource_dev/emulsion.png"]
-version = "1.9"
 short_description = "A lightweight and minimalistic image viewer"
+copyright = "Copyright (c) 2020 Artúr Barnabás Kovács"
 
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1"
