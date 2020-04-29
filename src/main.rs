@@ -249,10 +249,10 @@ fn main() {
 				help_button_clone.set_icon(Some(question.clone()));
 			}
 		} else {
-			picture_widget_clone.set_bright_shade(0.3);
-			bottom_container_clone.set_bg_color([0.1, 0.1, 0.1, 1.0]);
+			picture_widget_clone.set_bright_shade(0.11);
+			bottom_container_clone.set_bg_color([0.08, 0.08, 0.08, 1.0]);
 			slider_clone.set_shadow_color([0.0, 0.0, 0.0]);
-			window_clone.set_bg_color([0.05, 0.05, 0.05, 1.0]);
+			window_clone.set_bg_color([0.03, 0.03, 0.03, 1.0]);
 			theme_button_clone.set_icon(Some(light_img.clone()));
 			update_notification_clone.set_bg_color([0.85, 0.85, 0.85, 1.0]);
 			update_label_clone.set_icon(Some(update_label_image.clone()));
