@@ -110,9 +110,9 @@ impl Application {
 				Event::MainEventsCleared => {
 					if !close_requested {
 						for (_, window) in windows.iter() {
+							window.main_events_cleared();
 							if window.redraw_needed() {
 								window.request_redraw();
-								//event_loop
 							}
 						}
 					}

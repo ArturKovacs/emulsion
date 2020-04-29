@@ -23,19 +23,21 @@ use gelatin::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
 
 use std::time::{Duration, Instant};
 
-static IMG_NEXT_NAME: &'static str = "img_next";
-static IMG_PREV_NAME: &'static str = "img_prev";
-static IMG_ORIG_NAME: &'static str = "img_orig";
-static IMG_FIT_NAME: &'static str = "img_fit";
-static IMG_DEL_NAME: &'static str = "img_del";
-static PAN_NAME: &'static str = "pan";
-static PLAY_ANIM_NAME: &'static str = "play_anim";
-static PLAY_PRESENT_NAME: &'static str = "play_present";
-static PLAY_PRESENT_RND_NAME: &'static str = "play_present_rnd";
+static TOGGLE_FULLSCREEN_NAME: &str = "toggle_fullscreen";
+static IMG_NEXT_NAME: &str = "img_next";
+static IMG_PREV_NAME: &str = "img_prev";
+static IMG_ORIG_NAME: &str = "img_orig";
+static IMG_FIT_NAME: &str = "img_fit";
+static IMG_DEL_NAME: &str = "img_del";
+static PAN_NAME: &str = "pan";
+static PLAY_ANIM_NAME: &str = "play_anim";
+static PLAY_PRESENT_NAME: &str = "play_present";
+static PLAY_PRESENT_RND_NAME: &str = "play_present_rnd";
 
 lazy_static! {
 	static ref DEFAULT_BINDINGS: HashMap<&'static str, Vec<&'static str>> = {
 		let mut m = HashMap::new();
+		m.insert(TOGGLE_FULLSCREEN_NAME, vec!["F11"]);
 		m.insert(IMG_NEXT_NAME, vec!["D", "Right"]);
 		m.insert(IMG_PREV_NAME, vec!["A", "Left"]);
 		m.insert(IMG_ORIG_NAME, vec!["Q"]);
@@ -159,7 +161,6 @@ impl PictureWidget {
 				vertex: shaders::VERTEX_140,
 				fragment: shaders::FRAGMENT_140
 			},
-
 			110 => {
 				vertex: shaders::VERTEX_110,
 				fragment: shaders::FRAGMENT_110
@@ -231,16 +232,21 @@ impl PictureWidget {
 			if input_key != *key {
 				continue;
 			}
-			let mut all_modifiers_active = true;
+			let mut has_alt = false;
+			let mut has_ctrl = false;
+			let mut has_logo = false;
 			for mod_str in parts.iter().take(parts.len() - 1) {
 				match mod_str.as_ref() {
-					"alt" if !modifiers.alt() => all_modifiers_active = false,
-					"ctrl" if !modifiers.ctrl() => all_modifiers_active = false,
-					"logo" if !modifiers.logo() => all_modifiers_active = false,
+					"alt" => has_alt = true,
+					"ctrl" => has_ctrl = true,
+					"logo" => has_logo = true,
 					_ => (),
 				}
 			}
-			if all_modifiers_active {
+			if has_alt == modifiers.alt()
+				&& has_ctrl == modifiers.ctrl()
+				&& has_logo == modifiers.logo()
+			{
 				return true;
 			}
 		}
@@ -269,6 +275,13 @@ impl PictureWidget {
 			($action_name:ident) => {
 				Self::triggered(&borrowed.configuration, $action_name, input_key, modifiers)
 			};
+		}
+		if triggered!(TOGGLE_FULLSCREEN_NAME) {
+			if let Some(window) = borrowed.window.upgrade() {
+				let fullscreen = !window.fullscreen();
+				window.set_fullscreen(fullscreen);
+				borrowed.bottom_panel.set_visible(!fullscreen);
+			}
 		}
 		if triggered!(PLAY_ANIM_NAME) {
 			match borrowed.playback_manager.playback_state() {
@@ -370,8 +383,9 @@ impl Widget for PictureWidget {
 			let size = data.drawn_bounds.size.vec;
 			let projection_transform = gelatin::cgmath::ortho(0.0, size.x, size.y, 0.0, -1.0, 1.0);
 
+			let viewport_rect = context.logical_rect_to_viewport(&data.drawn_bounds);
 			let image_draw_params = gelatin::glium::DrawParameters {
-				viewport: Some(context.logical_rect_to_viewport(&data.drawn_bounds)),
+				viewport: Some(viewport_rect),
 				..Default::default()
 			};
 
@@ -385,14 +399,19 @@ impl Widget for PictureWidget {
 				// Model tranform
 				let image_display_height = image_display_width * img_height_over_width;
 				let img_pyhs_pos = data.img_pos.vec * context.dpi_scale_factor;
-				let img_phys_siz = LogicalVector::new(image_display_width, image_display_height)
-					* context.dpi_scale_factor;
+				let img_phys_siz;
+				{
+					let img_phys_w = image_display_width * context.dpi_scale_factor;
+					let img_phys_h = image_display_height * context.dpi_scale_factor;
+					img_phys_siz = LogicalVector::new(img_phys_w.ceil(), img_phys_h.ceil());
+				}
 				let corner_x =
 					(img_pyhs_pos.x - img_phys_siz.vec.x * 0.5).floor() / context.dpi_scale_factor;
 				let corner_y =
 					(img_pyhs_pos.y - img_phys_siz.vec.y * 0.5).floor() / context.dpi_scale_factor;
-				let transform =
-					Matrix4::from_nonuniform_scale(image_display_width, image_display_height, 1.0);
+				let adjusted_w = img_phys_siz.vec.x / context.dpi_scale_factor;
+				let adjusted_h = img_phys_siz.vec.y / context.dpi_scale_factor;
+				let transform = Matrix4::from_nonuniform_scale(adjusted_w, adjusted_h, 1.0);
 				let transform =
 					Matrix4::from_translation(Vector3::new(corner_x, corner_y, 0.0)) * transform;
 				// Projection tranform
@@ -431,6 +450,7 @@ impl Widget for PictureWidget {
 	fn layout(&self, available_space: LogicalRect) {
 		let mut borrowed = self.data.borrow_mut();
 		borrowed.default_layout(available_space);
+		borrowed.hover = borrowed.drawn_bounds.contains(borrowed.last_mouse_pos);
 	}
 
 	fn handle_event(&self, event: &Event) {
@@ -452,23 +472,21 @@ impl Widget for PictureWidget {
 			EventKind::MouseButton { state, button, .. } => match button {
 				MouseButton::Left => {
 					let mut borrowed = self.data.borrow_mut();
-					if state == ElementState::Pressed {
-						if borrowed.hover {
-							let now = Instant::now();
-							let duration_since_last_click =
-								now.duration_since(borrowed.last_click_time);
-							borrowed.last_click_time = now;
-							if duration_since_last_click < Duration::from_millis(250) {
-								// TODO
-								//borrowed.toggle_fullscreen(window, bottom_panel);
-								match borrowed.window.upgrade() {
-									Some(window) => {
-										let fullscreen = !window.fullscreen();
-										window.set_fullscreen(fullscreen);
-										borrowed.bottom_panel.set_visible(!fullscreen);
-									}
-									None => unreachable!(),
+					if state == ElementState::Pressed && borrowed.hover {
+						let now = Instant::now();
+						let duration_since_last_click =
+							now.duration_since(borrowed.last_click_time);
+						borrowed.last_click_time = now;
+						if duration_since_last_click < Duration::from_millis(250) {
+							// TODO
+							//borrowed.toggle_fullscreen(window, bottom_panel);
+							match borrowed.window.upgrade() {
+								Some(window) => {
+									let fullscreen = !window.fullscreen();
+									window.set_fullscreen(fullscreen);
+									borrowed.bottom_panel.set_visible(!fullscreen);
 								}
+								None => unreachable!(),
 							}
 						}
 					}
@@ -501,6 +519,8 @@ impl Widget for PictureWidget {
 				let mut input_key = String::with_capacity(5);
 				if ch == ' ' {
 					input_key.push_str("space");
+				} else if ch == '+' {
+					input_key.push_str("add");
 				} else {
 					input_key.push(ch);
 				}
@@ -509,10 +529,8 @@ impl Widget for PictureWidget {
 			EventKind::KeyInput { input } => {
 				if let Some(key) = input.virtual_keycode {
 					let input_key_str = virtual_keycode_to_string(key).to_lowercase();
-					if !virtual_keycode_is_char(key) {
-						if input.state == ElementState::Pressed {
-							self.handle_key_input(input_key_str.as_str(), event.modifiers)
-						}
+					if !virtual_keycode_is_char(key) && input.state == ElementState::Pressed {
+						self.handle_key_input(input_key_str.as_str(), event.modifiers)
 					}
 					// Panning is a special snowflake
 					let mut borrowed = self.data.borrow_mut();

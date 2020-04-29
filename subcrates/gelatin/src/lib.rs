@@ -4,9 +4,12 @@ pub use cgmath;
 pub use glium;
 pub use image;
 
-use cgmath::Matrix4;
+use cgmath::{Matrix4, Vector3};
 use glium::glutin;
-use glium::{implement_vertex, Display, Frame, IndexBuffer, Program, Rect, VertexBuffer};
+use glium::{
+	implement_vertex, uniform, Blend, BlendingFunction, Display, Frame, IndexBuffer,
+	LinearBlendingFactor, Program, Rect, Surface, VertexBuffer,
+};
 use glutin::event_loop::ControlFlow;
 use std::any::Any;
 use std::error::Error;
@@ -233,73 +236,73 @@ pub trait Widget: Any {
 
 #[macro_export]
 macro_rules! add_common_widget_functions {
-    ($data_field:ident) => {
-        pub fn set_margin_all(&self, pixels: f32) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.placement.margin_left = pixels;
-            borrowed.placement.margin_right = pixels;
-            borrowed.placement.margin_top = pixels;
-            borrowed.placement.margin_bottom = pixels;
-            borrowed.rendered_valid = false;
-        }
+	($data_field:ident) => {
+		pub fn set_margin_all(&self, pixels: f32) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.placement.margin_left = pixels;
+			borrowed.placement.margin_right = pixels;
+			borrowed.placement.margin_top = pixels;
+			borrowed.placement.margin_bottom = pixels;
+			borrowed.rendered_valid = false;
+		}
 
-        pub fn set_margin_left(&self, pixels: f32) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.placement.margin_left = pixels;
-            borrowed.rendered_valid = false;
-        }
-        pub fn set_margin_right(&self, pixels: f32) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.placement.margin_right = pixels;
-            borrowed.rendered_valid = false;
-        }
-        pub fn set_margin_top(&self, pixels: f32) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.placement.margin_top = pixels;
-            borrowed.rendered_valid = false;
-        }
-        pub fn set_margin_bottom(&self, pixels: f32) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.placement.margin_bottom = pixels;
-            borrowed.rendered_valid = false;
-        }
-        pub fn set_horizontal_align(&self, align: Alignment) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.placement.horizontal_align = align;
-            borrowed.rendered_valid = false;
-        }
-        pub fn set_vertical_align(&self, align: Alignment) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.placement.vertical_align = align;
-            borrowed.rendered_valid = false;
-        }
-        pub fn set_fixed_size(&self, size: LogicalVector) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.placement.width = Length::Fixed(size.vec.x);
-            borrowed.placement.height = Length::Fixed(size.vec.y);
-            borrowed.rendered_valid = false;
-        }
-        pub fn set_width(&self, width: Length) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.placement.width = width;
-            borrowed.rendered_valid = false;
-        }
-        pub fn set_height(&self, height: Length) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.placement.height = height;
-            borrowed.rendered_valid = false;
-        }
-        pub fn set_ignore_layout(&self, ignore: bool) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.placement.ignore_layout = ignore;
-            borrowed.rendered_valid = false;
-        }
-        pub fn set_visible(&self, visible: bool) {
-            let mut borrowed = self.$data_field.borrow_mut();
-            borrowed.visible = visible;
-            borrowed.rendered_valid = false;
-        }
-    };
+		pub fn set_margin_left(&self, pixels: f32) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.placement.margin_left = pixels;
+			borrowed.rendered_valid = false;
+		}
+		pub fn set_margin_right(&self, pixels: f32) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.placement.margin_right = pixels;
+			borrowed.rendered_valid = false;
+		}
+		pub fn set_margin_top(&self, pixels: f32) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.placement.margin_top = pixels;
+			borrowed.rendered_valid = false;
+		}
+		pub fn set_margin_bottom(&self, pixels: f32) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.placement.margin_bottom = pixels;
+			borrowed.rendered_valid = false;
+		}
+		pub fn set_horizontal_align(&self, align: Alignment) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.placement.horizontal_align = align;
+			borrowed.rendered_valid = false;
+		}
+		pub fn set_vertical_align(&self, align: Alignment) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.placement.vertical_align = align;
+			borrowed.rendered_valid = false;
+		}
+		pub fn set_fixed_size(&self, size: LogicalVector) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.placement.width = Length::Fixed(size.vec.x);
+			borrowed.placement.height = Length::Fixed(size.vec.y);
+			borrowed.rendered_valid = false;
+		}
+		pub fn set_width(&self, width: Length) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.placement.width = width;
+			borrowed.rendered_valid = false;
+		}
+		pub fn set_height(&self, height: Length) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.placement.height = height;
+			borrowed.rendered_valid = false;
+		}
+		pub fn set_ignore_layout(&self, ignore: bool) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.placement.ignore_layout = ignore;
+			borrowed.rendered_valid = false;
+		}
+		pub fn set_visible(&self, visible: bool) {
+			let mut borrowed = self.$data_field.borrow_mut();
+			borrowed.visible = visible;
+			borrowed.rendered_valid = false;
+		}
+	};
 }
 
 pub struct Event {
@@ -350,5 +353,45 @@ impl<'a> DrawContext<'a> {
 			bottom: window_phys_height - (rect.bottom() * dpi_scale) as u32,
 			height: (rect.size.vec.y * dpi_scale) as u32,
 		}
+	}
+	pub fn clear_color(&self, target: &mut Frame, color: [f32; 4], rect: Option<LogicalRect>) {
+		// Rendering a quad to emulate clear.
+		// This is a workaround for https://github.com/glium/glium/issues/1842
+
+		let transform;
+		if let Some(rect) = rect {
+			let width = rect.size.vec.x;
+			let height = rect.size.vec.y;
+			// Model tranform
+			let scale = Matrix4::from_nonuniform_scale(width, height, 1.0);
+			let translate = Matrix4::from_translation(rect.pos.vec.extend(0.0)) * scale;
+			transform = self.projection_transform * translate;
+		} else {
+			let scale = Matrix4::from_scale(2.0);
+			transform = Matrix4::from_translation(Vector3::new(-1.0, -1.0, 0.0)) * scale;
+		}
+		let image_draw_params = glium::DrawParameters {
+			blend: Blend {
+				color: BlendingFunction::Addition {
+					source: LinearBlendingFactor::SourceAlpha,
+					destination: LinearBlendingFactor::OneMinusSourceAlpha,
+				},
+				..Default::default()
+			},
+			..Default::default()
+		};
+		let uniforms = uniform! {
+			matrix: Into::<[[f32; 4]; 4]>::into(transform),
+			color: color,
+		};
+		target
+			.draw(
+				self.unit_quad_vertices,
+				self.unit_quad_indices,
+				self.colored_program,
+				&uniforms,
+				&image_draw_params,
+			)
+			.unwrap();
 	}
 }

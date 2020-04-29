@@ -5,11 +5,11 @@ extern crate error_chain;
 
 use std::cell::{Cell, RefCell};
 use std::f32;
+use std::path::PathBuf;
 use std::rc::Rc;
-use std::sync::{
-	atomic::{AtomicBool, Ordering},
-	Arc,
-};
+use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use directories::ProjectDirs;
@@ -34,9 +34,11 @@ use gelatin::{
 	NextUpdate, Widget,
 };
 
-use crate::configuration::Configuration;
+use crate::configuration::{Cache, Configuration};
 use crate::help_screen::*;
 use crate::picture_widget::*;
+#[cfg(feature = "networking")]
+use crate::version::Version;
 
 mod configuration;
 mod handle_panic;
@@ -46,6 +48,8 @@ mod picture_widget;
 mod playback_manager;
 mod shaders;
 mod utils;
+#[cfg(feature = "networking")]
+mod version;
 
 lazy_static! {
 	pub static ref PROJECT_DIRS: Option<ProjectDirs> = ProjectDirs::from("", "", "emulsion");
@@ -62,51 +66,41 @@ fn main() {
 	let (w, h) = rgba.dimensions();
 	let icon = Icon::from_rgba(rgba.into_raw(), w, h).unwrap();
 
-	let cfg_folder;
-	if let Some(ref project_dirs) = *PROJECT_DIRS {
-		cfg_folder = project_dirs.config_dir().to_owned();
-	} else {
-		let exe_path = std::env::current_exe().unwrap();
-		let exe_folder = exe_path.parent().unwrap();
-		cfg_folder = exe_folder.to_owned();
-	}
-	if !cfg_folder.exists() {
-		std::fs::create_dir_all(&cfg_folder).unwrap();
-	}
-	let cfg_path = cfg_folder.join("cfg.toml").to_owned();
-	let first_lanuch;
-	let config: Rc<RefCell<Configuration>>;
-	if let Ok(cfg) = Configuration::load(cfg_path.as_path()) {
-		first_lanuch = false;
-		config = Rc::new(RefCell::new(cfg));
-	} else {
-		first_lanuch = true;
-		config = Rc::new(RefCell::new(Configuration::default()));
-	}
+	// Load configuration and cache files
+	let (config_path, cache_path) = get_config_and_cache_paths();
+
+	let cache = Cache::load(&cache_path);
+	let config = Configuration::load(&config_path);
+
+	let first_launch = cache.is_err();
+	let cache = Arc::new(Mutex::new(cache.unwrap_or_default()));
+	let config = Rc::new(RefCell::new(config.unwrap_or_default()));
+
 	let mut application = Application::new();
 	let window: Rc<Window>;
 	{
-		let config = config.borrow();
+		let cache = cache.lock().unwrap();
+
 		let window_desc = WindowDescriptorBuilder::default()
 			.icon(Some(icon))
-			.size(PhysicalSize::new(config.window.win_w, config.window.win_h))
-			.position(Some(PhysicalPosition::new(config.window.win_x, config.window.win_y)))
+			.size(PhysicalSize::new(cache.window.win_w, cache.window.win_h))
+			.position(Some(PhysicalPosition::new(cache.window.win_x, cache.window.win_y)))
 			.build()
 			.unwrap();
 		window = Window::new(&mut application, window_desc);
 	}
 	{
-		let config_clone = config.clone();
+		let cache = cache.clone();
 		window.add_global_event_handler(move |event| match event {
 			WindowEvent::Resized(new_size) => {
-				let mut config = config_clone.borrow_mut();
-				config.window.win_w = new_size.width;
-				config.window.win_h = new_size.height;
+				let mut cache = cache.lock().unwrap();
+				cache.window.win_w = new_size.width;
+				cache.window.win_h = new_size.height;
 			}
 			WindowEvent::Moved(new_pos) => {
-				let mut config = config_clone.borrow_mut();
-				config.window.win_x = new_pos.x;
-				config.window.win_y = new_pos.y;
+				let mut cache = cache.lock().unwrap();
+				cache.window.win_x = new_pos.x;
+				cache.window.win_y = new_pos.y;
 			}
 			_ => (),
 		});
@@ -229,7 +223,7 @@ fn main() {
 
 	let update_available = Arc::new(AtomicBool::new(false));
 	let update_check_done = Arc::new(AtomicBool::new(false));
-	let light_theme = Rc::new(Cell::new(!config.borrow().window.dark));
+	let light_theme = Rc::new(Cell::new(!cache.lock().unwrap().window.dark));
 	let theme_button_clone = theme_button.clone();
 	let help_button_clone = help_button.clone();
 	let update_label_clone = update_label;
@@ -271,11 +265,11 @@ fn main() {
 	});
 	set_theme();
 	{
-		let config = config.clone();
+		let cache = cache.clone();
 		let set_theme = set_theme.clone();
 		theme_button.set_on_click(move || {
 			light_theme.set(!light_theme.get());
-			config.borrow_mut().window.dark = !light_theme.get();
+			cache.lock().unwrap().window.dark = !light_theme.get();
 			set_theme();
 		});
 	}
@@ -284,7 +278,7 @@ fn main() {
 	slider.set_on_value_change(move || {
 		image_widget_clone.jump_to_index(slider_clone2.value());
 	});
-	let help_visible = Cell::new(first_lanuch);
+	let help_visible = Cell::new(first_launch);
 	help_screen.set_visible(help_visible.get());
 	let update_available_clone = update_available.clone();
 	let help_screen_clone = help_screen.clone();
@@ -299,32 +293,53 @@ fn main() {
 	});
 
 	window.set_root(vertical_container);
-	// kick off a thread that will check for an update in the background
-	let update_available_clone = update_available.clone();
-	let update_check_done_clone = update_check_done.clone();
-	let update_checker = std::thread::spawn(move || {
-		update_available_clone.store(check_for_updates(), Ordering::SeqCst);
-		update_check_done_clone.store(true, Ordering::SeqCst);
-	});
-	let update_check_done_clone = update_check_done;
-	let help_screen_clone = help_screen;
+
+	let check_updates_enabled = match &config.borrow().updates {
+		Some(u) if !u.check_updates => false,
+		_ => true,
+	};
+
+	let update_checker_join_handle = {
+		let updates = &mut cache.lock().unwrap().updates;
+		let cache = cache.clone();
+		let update_available = update_available.clone();
+		let update_check_done = update_check_done.clone();
+
+		if check_updates_enabled && updates.update_check_needed() {
+			// kick off a thread that will check for an update in the background
+			Some(std::thread::spawn(move || {
+				let has_update = check_for_updates();
+				update_available.store(has_update, Ordering::SeqCst);
+				update_check_done.store(true, Ordering::SeqCst);
+				if !has_update {
+					cache.lock().unwrap().updates.set_update_check_time();
+				}
+			}))
+		} else {
+			None
+		}
+	};
+
 	let mut nothing_to_do = false;
 	application.add_global_event_handler(move |_| {
 		if nothing_to_do {
 			return NextUpdate::Latest;
 		}
-		if update_check_done_clone.load(Ordering::SeqCst) {
+		if update_check_done.load(Ordering::SeqCst) {
 			nothing_to_do = true;
 			set_theme();
-			if help_screen_clone.visible() && update_available.load(Ordering::SeqCst) {
+			if help_screen.visible() && update_available.load(Ordering::SeqCst) {
 				update_notification.set_visible(true);
 			}
 		}
 		NextUpdate::WaitUntil(Instant::now() + Duration::from_secs(1))
 	});
+
 	application.set_at_exit(Some(move || {
-		config.borrow().save(cfg_path).unwrap();
-		update_checker.join().unwrap();
+		cache.lock().unwrap().save(cache_path).unwrap();
+		if let Some(h) = update_checker_join_handle {
+			h.join().unwrap();
+		}
 	}));
 	application.start_event_loop();
 }
@@ -333,6 +348,29 @@ fn main() {
 #[derive(Deserialize)]
 struct ReleaseInfoJson {
 	tag_name: String,
+}
+
+fn get_config_and_cache_paths() -> (PathBuf, PathBuf) {
+	let config_folder;
+	let cache_folder;
+
+	if let Some(ref project_dirs) = *PROJECT_DIRS {
+		config_folder = project_dirs.config_dir().to_owned();
+		cache_folder = project_dirs.cache_dir().to_owned();
+	} else {
+		let exe_path = std::env::current_exe().unwrap();
+		let exe_folder = exe_path.parent().unwrap();
+		config_folder = exe_folder.to_owned();
+		cache_folder = exe_folder.to_owned();
+	}
+	if !config_folder.exists() {
+		std::fs::create_dir_all(&config_folder).unwrap();
+	}
+	if !cache_folder.exists() {
+		std::fs::create_dir_all(&cache_folder).unwrap();
+	}
+
+	(config_folder.join("cfg.toml"), cache_folder.join("cache.toml"))
 }
 
 #[cfg(not(feature = "networking"))]
@@ -358,38 +396,21 @@ fn check_for_updates() -> bool {
 		Ok(response) => match response.json::<ReleaseInfoJson>() {
 			Ok(info) => {
 				println!("Found latest version tag {}", info.tag_name);
-				let curr_major = env!("CARGO_PKG_VERSION_MAJOR");
-				let curr_minor = env!("CARGO_PKG_VERSION_MINOR");
-				let curr_patch = env!("CARGO_PKG_VERSION_PATCH");
-				println!("Current version is '{}.{}.{}'", curr_major, curr_minor, curr_patch);
 
-				let latest_full = info.tag_name.chars().skip(1).collect::<String>();
-				let mut latest_parts = latest_full.split('.');
-				let mut extract_part = || {
-					let result;
-					if let Some(part) = latest_parts.next() {
-						if part.is_empty() {
-							result = "0";
-						} else {
-							result = part;
+				let current = Version::cargo_pkg_version();
+				println!("Current version is '{}'", current);
+
+				match Version::from_str(&info.tag_name) {
+					Ok(latest) => {
+						println!("Parsed latest version is '{}'", latest);
+
+						if latest > current {
+							return true;
 						}
-					} else {
-						result = "0";
 					}
-					result
-				};
-				let latest_major = extract_part();
-				let latest_minor = extract_part();
-				let latest_patch = extract_part();
-				println!(
-					"Parsed latest version is '{}.{}.{}'",
-					latest_major, latest_minor, latest_patch
-				);
-				if curr_major != latest_major
-					|| curr_minor != latest_minor
-					|| curr_patch != latest_patch
-				{
-					return true;
+					Err(error) => {
+						println!("Error parsing version: {}", error.to_string());
+					}
 				}
 			}
 			Err(e) => println!("Failed to create json from response: {}", e),

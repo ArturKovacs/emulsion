@@ -498,7 +498,6 @@ impl ImgSequencePlayer {
 					next_update = gelatin::NextUpdate::WaitUntil(a_millisec_from_now);
 				}
 				Err(err) => {
-					println!("load_result was err stufff");
 					self.image_texture = None;
 					self.filename = None;
 					let stderr = &mut ::std::io::stderr();

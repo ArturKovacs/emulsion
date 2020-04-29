@@ -287,7 +287,6 @@ impl ImageCache {
 		let requested_frame_id;
 		self.receive_prefetched();
 		if self.dir_path != parent {
-			println!("Requested dir is different from current dir. Current: {:?}", self.dir_path);
 			self.texture_cache.clear();
 			self.prefetched.clear();
 			self.remaining_capacity = self.total_capacity;
@@ -316,7 +315,6 @@ impl ImageCache {
 				requested_frame_id = self.current_frame_idx as isize;
 			}
 			self.current_file_idx = new_file_index;
-			//println!("Cache has a length of {} before reduction", self.texture_cache.len());
 			let mut tmp_cache = BTreeMap::new();
 			mem::swap(&mut self.texture_cache, &mut tmp_cache);
 
@@ -348,7 +346,6 @@ impl ImageCache {
 			});
 			tmp_cache = sorted_files.into_iter().map(|(_, entry)| entry).collect();
 			mem::swap(&mut self.texture_cache, &mut tmp_cache);
-			//println!("Reduced cache to a length of {}", self.texture_cache.len());
 			self.remaining_capacity = remaining_capacity;
 		}
 
@@ -525,7 +522,6 @@ impl ImageCache {
 		use std::collections::btree_map::Entry;
 		match load_result {
 			LoadResult::Start { req_id, metadata } => {
-				println!("Received metadata for {}", req_id);
 				let curr_mod_time = metadata.modified().ok();
 				let request;
 				if let Some(req) = self.ongoing_requests.get(&req_id) {
@@ -570,7 +566,6 @@ impl ImageCache {
 				return Ok(None);
 			}
 			LoadResult::Frame { req_id, image, delay_nano } => {
-				println!("Received frame for {}", req_id);
 				let request;
 				if let Some(req) = self.ongoing_requests.get(&req_id) {
 					request = req;
@@ -588,16 +583,11 @@ impl ImageCache {
 					entry.frames.push(anim_frame.clone());
 					self.remaining_capacity -= size_estimate;
 					return Ok(Some(anim_frame));
-				} else {
-					// The entry should be occupied at this point
-					eprintln!(
-						"Texture cache entry became vacant during the transmission of image data"
-					);
 				}
 				return Ok(None);
 			}
 			LoadResult::Done { req_id } => {
-				eprintln!("Received done for {}", req_id);
+
 				let request;
 				if let Some(req) = self.ongoing_requests.get(&req_id) {
 					request = req;
@@ -611,7 +601,6 @@ impl ImageCache {
 				return Ok(None);
 			}
 			LoadResult::Failed { req_id } => {
-				eprintln!("Received FAILED for {}", req_id);
 				let request;
 				if let Some(req) = self.ongoing_requests.get(&req_id) {
 					request = req;
@@ -695,7 +684,6 @@ impl ImageCache {
 				self.texture_cache.remove(&file_path);
 			}
 			let req_id = desc.request_id;
-			println!("Sending load request {} for {:?}", req_id, file_path);
 			self.ongoing_requests
 				.insert(req_id, OngoingRequest { path: file_path.clone(), cancelled: false });
 			self.loader.send_load_request(LoadRequest { req_id, path: file_path });
