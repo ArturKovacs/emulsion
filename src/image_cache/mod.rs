@@ -409,7 +409,7 @@ impl ImageCache {
 			match self.loader.try_recv_prefetched() {
 				Ok(load_result) => {
 					match load_result {
-						LoadResult::Failed{..} | LoadResult::Done{..} => { 
+						LoadResult::Failed { .. } | LoadResult::Done { .. } => {
 							self.requested_images -= 1;
 						}
 						_ => {}
@@ -417,7 +417,9 @@ impl ImageCache {
 					let request;
 					if let Some(req) = self.ongoing_requests.get(&load_result.req_id()) {
 						request = req;
-					} else { continue; }
+					} else {
+						continue;
+					}
 					match self.prefetched.entry(request.path.clone()) {
 						Entry::Vacant(entry) => {
 							let mut result_vec = Vec::with_capacity(3);
@@ -505,7 +507,7 @@ impl ImageCache {
 				return Err(Error::from_kind(ErrorKind::WaitingOnLoader));
 			}
 		} else {
-			// If it's not among the dir files then maybe there's no directory open 
+			// If it's not among the dir files then maybe there's no directory open
 			// or some other error occured
 			bail!("Not found in directory.");
 		}
@@ -694,7 +696,8 @@ impl ImageCache {
 			}
 			let req_id = desc.request_id;
 			println!("Sending load request {} for {:?}", req_id, file_path);
-			self.ongoing_requests.insert(req_id, OngoingRequest { path: file_path.clone(), cancelled: false });
+			self.ongoing_requests
+				.insert(req_id, OngoingRequest { path: file_path.clone(), cancelled: false });
 			self.loader.send_load_request(LoadRequest { req_id, path: file_path });
 			self.requested_images += 1;
 			return true;

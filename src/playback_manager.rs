@@ -15,7 +15,7 @@ use gelatin::glium;
 use gelatin::window::Window;
 //use crate::window::Window;
 
-use crate::image_cache::{self, ImageCache, AnimationFrameTexture};
+use crate::image_cache::{self, AnimationFrameTexture, ImageCache};
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 
@@ -38,20 +38,31 @@ pub enum PlaybackState {
 	//Backward,
 }
 
-
 fn folder_load_next(image_cache: &mut ImageCache, display: &glium::Display) -> FrameLoadResult {
 	image_cache.load_next(display)
 }
 fn folder_load_prev(image_cache: &mut ImageCache, display: &glium::Display) -> FrameLoadResult {
 	image_cache.load_prev(display)
 }
-fn folder_load_jump(image_cache: &mut ImageCache, display: &glium::Display, amount: i32) -> FrameLoadResult {
+fn folder_load_jump(
+	image_cache: &mut ImageCache,
+	display: &glium::Display,
+	amount: i32,
+) -> FrameLoadResult {
 	image_cache.load_jump(display, amount, 0)
 }
-fn folder_load_path(image_cache: &mut ImageCache, display: &glium::Display, path: &Path) -> image_cache::Result<AnimationFrameTexture> {
+fn folder_load_path(
+	image_cache: &mut ImageCache,
+	display: &glium::Display,
+	path: &Path,
+) -> image_cache::Result<AnimationFrameTexture> {
 	image_cache.load_specific(display, path, None)
 }
-fn folder_load_at_index(image_cache: &mut ImageCache, display: &glium::Display, index: usize) -> FrameLoadResult {
+fn folder_load_at_index(
+	image_cache: &mut ImageCache,
+	display: &glium::Display,
+	index: usize,
+) -> FrameLoadResult {
 	image_cache.load_at_index(display, index, None)
 }
 fn folder_delay_nanos(_player: &ImgSequencePlayer) -> u64 {
@@ -65,13 +76,25 @@ fn anim_load_next(image_cache: &mut ImageCache, display: &glium::Display) -> Fra
 fn anim_load_prev(image_cache: &mut ImageCache, display: &glium::Display) -> FrameLoadResult {
 	image_cache.load_jump(display, 0, -1)
 }
-fn anim_load_jump(image_cache: &mut ImageCache, display: &glium::Display, amount: i32) -> FrameLoadResult {
+fn anim_load_jump(
+	image_cache: &mut ImageCache,
+	display: &glium::Display,
+	amount: i32,
+) -> FrameLoadResult {
 	image_cache.load_jump(display, 0, amount as isize)
 }
-fn anim_load_path(image_cache: &mut ImageCache, display: &glium::Display, path: &Path) -> image_cache::Result<AnimationFrameTexture> {
+fn anim_load_path(
+	image_cache: &mut ImageCache,
+	display: &glium::Display,
+	path: &Path,
+) -> image_cache::Result<AnimationFrameTexture> {
 	image_cache.load_specific(display, path, None)
 }
-fn anim_load_at_index(image_cache: &mut ImageCache, display: &glium::Display, index: usize) -> FrameLoadResult {
+fn anim_load_at_index(
+	image_cache: &mut ImageCache,
+	display: &glium::Display,
+	index: usize,
+) -> FrameLoadResult {
 	image_cache.load_at_index(display, image_cache.current_file_index(), Some(index as isize))
 }
 fn anim_delay_nanos(player: &ImgSequencePlayer) -> u64 {
@@ -82,14 +105,12 @@ fn anim_delay_nanos(player: &ImgSequencePlayer) -> u64 {
 	}
 }
 
-
 pub struct PlaybackManager {
 	//playback_state: PlaybackState,
 	image_cache: ImageCache,
 
 	// image_texture: Option<Rc<glium::texture::SrgbTexture2d>>,
 	// filename: Option<OsString>,
-
 	folder_player: ImgSequencePlayer,
 	image_player: ImgSequencePlayer,
 }
@@ -239,7 +260,6 @@ struct ImgSequencePlayer {
 	last_frame_change_time: Instant,
 	frametime_drift_offset: i64, // in nanosecs
 	//frame_count_since_playback_start: u64,
-
 	load_request: LoadRequest,
 
 	image_texture: Option<AnimationFrameTexture>,
@@ -248,7 +268,11 @@ struct ImgSequencePlayer {
 	load_next: &'static dyn Fn(&mut ImageCache, &glium::Display) -> FrameLoadResult,
 	load_prev: &'static dyn Fn(&mut ImageCache, &glium::Display) -> FrameLoadResult,
 	load_jump: &'static dyn Fn(&mut ImageCache, &glium::Display, i32) -> FrameLoadResult,
-	load_path: &'static dyn Fn(&mut ImageCache, &glium::Display, &Path) -> image_cache::Result<AnimationFrameTexture>,
+	load_path: &'static dyn Fn(
+		&mut ImageCache,
+		&glium::Display,
+		&Path,
+	) -> image_cache::Result<AnimationFrameTexture>,
 	load_at_index: &'static dyn Fn(&mut ImageCache, &glium::Display, usize) -> FrameLoadResult,
 
 	get_delay_nanos: &'static dyn Fn(&Self) -> u64,
@@ -259,7 +283,11 @@ impl ImgSequencePlayer {
 		load_next: &'static dyn Fn(&mut ImageCache, &glium::Display) -> FrameLoadResult,
 		load_prev: &'static dyn Fn(&mut ImageCache, &glium::Display) -> FrameLoadResult,
 		load_jump: &'static dyn Fn(&mut ImageCache, &glium::Display, i32) -> FrameLoadResult,
-		load_path: &'static dyn Fn(&mut ImageCache, &glium::Display, &Path) -> image_cache::Result<AnimationFrameTexture>,
+		load_path: &'static dyn Fn(
+			&mut ImageCache,
+			&glium::Display,
+			&Path,
+		) -> image_cache::Result<AnimationFrameTexture>,
 		load_at_index: &'static dyn Fn(&mut ImageCache, &glium::Display, usize) -> FrameLoadResult,
 		get_delay_nanos: &'static dyn Fn(&Self) -> u64,
 	) -> ImgSequencePlayer {
@@ -324,7 +352,11 @@ impl ImgSequencePlayer {
 		&self.filename
 	}
 
-	pub fn update_image(&mut self, display: &glium::Display, image_cache: &mut ImageCache) -> gelatin::NextUpdate {
+	pub fn update_image(
+		&mut self,
+		display: &glium::Display,
+		image_cache: &mut ImageCache,
+	) -> gelatin::NextUpdate {
 		let now = Instant::now();
 		let a_millisec_from_now = now.checked_add(Duration::from_millis(1)).unwrap();
 		let mut next_update;
@@ -340,16 +372,17 @@ impl ImgSequencePlayer {
 			}
 			_ => {
 				frame_delta_time_nanos = (self.get_delay_nanos)(&self) as i64;
-			},
+			}
 		};
 		if self.playback_state == PlaybackState::Paused {
 			if let Err(e) = image_cache.process_prefetched(display) {
 				eprintln!("Failed to process prefetched images with error '{:?}'", e);
 			}
 			match load_request {
-				LoadRequest::Jump(0) => { // Waiting on current image to be loaded. 
+				LoadRequest::Jump(0) => {
+					// Waiting on current image to be loaded.
 					next_update = gelatin::NextUpdate::WaitUntil(a_millisec_from_now);
-				}, 
+				}
 				_ => {
 					image_cache.prefetch_neighbors();
 					next_update = gelatin::NextUpdate::Latest;
@@ -363,7 +396,8 @@ impl ImgSequencePlayer {
 			let nanos_til_next = frame_delta_time_nanos - elapsed_nanos;
 			let millis_til_next = nanos_til_next / 1_000_000;
 			next_update = gelatin::NextUpdate::WaitUntil(
-				now.checked_add(Duration::from_millis((millis_til_next / 2).max(1) as u64)).unwrap(),
+				now.checked_add(Duration::from_millis((millis_til_next / 2).max(1) as u64))
+					.unwrap(),
 			);
 			// This assumes that the following frames have the same delay but that's okay considering that
 			// if frame step is greater than 1 it almost certainly means that we couldn't load the
@@ -422,8 +456,10 @@ impl ImgSequencePlayer {
 		}
 		match load_request {
 			LoadRequest::None | LoadRequest::FilePath(..) => (),
-			_ => if image_cache.current_dir_len() == 0 {
-				return gelatin::NextUpdate::Latest;
+			_ => {
+				if image_cache.current_dir_len() == 0 {
+					return gelatin::NextUpdate::Latest;
+				}
 			}
 		}
 		let load_result = match load_request {
@@ -432,7 +468,8 @@ impl ImgSequencePlayer {
 			LoadRequest::FilePath(ref file_path) => {
 				Some(if let Some(file_name) = file_path.file_name() {
 					let load_path = self.load_path;
-					load_path(image_cache, display, file_path.as_ref()).map(|x| (x, OsString::from(file_name)))
+					load_path(image_cache, display, file_path.as_ref())
+						.map(|x| (x, OsString::from(file_name)))
 				} else {
 					Err(String::from("Could not extract filename").into())
 				})

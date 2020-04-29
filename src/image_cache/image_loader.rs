@@ -1,6 +1,6 @@
 use std;
-use std::io::Read;
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use gelatin::glium;
-use gelatin::image::{self, gif::GifDecoder, io::Reader, ImageFormat, AnimationDecoder};
+use gelatin::image::{self, gif::GifDecoder, io::Reader, AnimationDecoder, ImageFormat};
 
 use glium::texture::{MipmapsOption, RawImage2d, SrgbTexture2d};
 
@@ -144,7 +144,7 @@ impl ImageLoader {
 	) {
 		// The size was an arbitrary choice made with the argument that this should be
 		// enough to fit enough image file info to determine the format.
-		let mut file_start_bytes = [0; 512]; 
+		let mut file_start_bytes = [0; 512];
 		while running.load(Ordering::Acquire) {
 			let request = {
 				// It is very important that we release the mutex before starting to load the image
@@ -175,7 +175,11 @@ impl ImageLoader {
 									let delay_nano = numerator_nano / denom_nano;
 									let image = frame.into_buffer();
 									loaded_img_tx
-										.send(LoadResult::Frame { req_id: request.req_id, image, delay_nano })
+										.send(LoadResult::Frame {
+											req_id: request.req_id,
+											image,
+											delay_nano,
+										})
 										.unwrap();
 								} else {
 									load_succeeded = false;
@@ -187,7 +191,11 @@ impl ImageLoader {
 				} else {
 					if let Ok(image) = load_image(request.path.as_path()) {
 						loaded_img_tx
-							.send(LoadResult::Frame { req_id: request.req_id, image, delay_nano: 0 })
+							.send(LoadResult::Frame {
+								req_id: request.req_id,
+								image,
+								delay_nano: 0,
+							})
 							.unwrap();
 						load_succeeded = true;
 					}
