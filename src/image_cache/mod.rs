@@ -75,6 +75,7 @@ impl ImageDescriptor {
 /// See: `ImageCache::ongoing_requests`
 struct OngoingRequest {
 	path: PathBuf,
+	cancelled: bool,
 	// mod_time: Option<SystemTime>,
 
 	// /// The index of this file within the sorted folder.
@@ -244,7 +245,7 @@ impl ImageCache {
 		&mut self,
 		display: &glium::Display,
 		index: usize,
-		frame_id: isize,
+		frame_id: Option<isize>,
 	) -> Result<(AnimationFrameTexture, OsString)> {
 		let path = self
 			.dir_files
@@ -270,7 +271,7 @@ impl ImageCache {
 		&mut self,
 		display: &glium::Display,
 		path: &Path,
-		frame_id: isize,
+		frame_id: Option<isize>,
 	) -> Result<AnimationFrameTexture> {
 		let path = path.canonicalize()?;
 
@@ -283,8 +284,8 @@ impl ImageCache {
 
 		// Lets just process incoming images
 		//self.process_prefetched(display)?;
+		let requested_frame_id;
 		self.receive_prefetched();
-
 		if self.dir_path != parent {
 			println!("Requested dir is different from current dir. Current: {:?}", self.dir_path);
 			self.texture_cache.clear();
@@ -295,10 +296,11 @@ impl ImageCache {
 			return Err(errors::Error::from_kind(errors::ErrorKind::WaitingOnLoader));
 		} else {
 			let mut image_found = false;
+			let mut new_file_index = self.current_file_idx;
 			for (index, desc) in self.dir_files.iter().enumerate() {
 				if desc.dir_entry.file_name() == target_file_name {
 					image_found = true;
-					self.current_file_idx = index;
+					new_file_index = index;
 					break;
 				}
 			}
@@ -306,7 +308,14 @@ impl ImageCache {
 				// The image must have been removed from the folder. It cannot be loaded
 				bail!("Image not found at '{:?}'", path);
 			}
-
+			if let Some(frame_id) = frame_id {
+				requested_frame_id = frame_id;
+			} else if self.current_file_idx != new_file_index {
+				requested_frame_id = 0;
+			} else {
+				requested_frame_id = self.current_frame_idx as isize;
+			}
+			self.current_file_idx = new_file_index;
 			//println!("Cache has a length of {} before reduction", self.texture_cache.len());
 			let mut tmp_cache = BTreeMap::new();
 			mem::swap(&mut self.texture_cache, &mut tmp_cache);
@@ -343,7 +352,7 @@ impl ImageCache {
 			self.remaining_capacity = remaining_capacity;
 		}
 
-		self.try_getting_requested_image(display, &path, frame_id)
+		self.try_getting_requested_image(display, &path, requested_frame_id)
 	}
 
 	pub fn load_next(
@@ -387,7 +396,7 @@ impl ImageCache {
 		}
 
 		let target_path = self.dir_files[target_index as usize].dir_entry.path();
-		let result = self.load_specific(display, &target_path, 0)?;
+		let result = self.load_specific(display, &target_path, None)?;
 		self.current_file_idx = target_index as usize;
 
 		Ok((result, target_path.file_name().unwrap_or_else(|| OsStr::new("")).to_owned()))
@@ -400,10 +409,15 @@ impl ImageCache {
 			match self.loader.try_recv_prefetched() {
 				Ok(load_result) => {
 					match load_result {
-						LoadResult::Failed{..} | LoadResult::Done{..} => { self.requested_images -= 1; }
+						LoadResult::Failed{..} | LoadResult::Done{..} => { 
+							self.requested_images -= 1;
+						}
 						_ => {}
 					}
-					let request = self.ongoing_requests.get(&load_result.req_id()).unwrap();
+					let request;
+					if let Some(req) = self.ongoing_requests.get(&load_result.req_id()) {
+						request = req;
+					} else { continue; }
 					match self.prefetched.entry(request.path.clone()) {
 						Entry::Vacant(entry) => {
 							let mut result_vec = Vec::with_capacity(3);
@@ -511,7 +525,15 @@ impl ImageCache {
 			LoadResult::Start { req_id, metadata } => {
 				println!("Received metadata for {}", req_id);
 				let curr_mod_time = metadata.modified().ok();
-				let request = self.ongoing_requests.get_mut(&req_id).unwrap();
+				let request;
+				if let Some(req) = self.ongoing_requests.get(&req_id) {
+					request = req;
+				} else {
+					return Ok(None);
+				}
+				if request.cancelled {
+					return Ok(None);
+				}
 				//request.mod_time = curr_mod_time;
 				match self.texture_cache.entry(request.path.clone()) {
 					Entry::Vacant(entry) => {
@@ -547,7 +569,15 @@ impl ImageCache {
 			}
 			LoadResult::Frame { req_id, image, delay_nano } => {
 				println!("Received frame for {}", req_id);
-				let request = self.ongoing_requests.get(&req_id).unwrap();
+				let request;
+				if let Some(req) = self.ongoing_requests.get(&req_id) {
+					request = req;
+				} else {
+					return Ok(None);
+				}
+				if request.cancelled {
+					return Ok(None);
+				}
 				let size_estimate =
 					get_image_size_estimate((image.width(), image.height())) as isize;
 				if let Some(entry) = self.texture_cache.get_mut(&request.path) {
@@ -561,12 +591,17 @@ impl ImageCache {
 					eprintln!(
 						"Texture cache entry became vacant during the transmission of image data"
 					);
-					return Ok(None);
 				}
+				return Ok(None);
 			}
 			LoadResult::Done { req_id } => {
 				eprintln!("Received done for {}", req_id);
-				let request = self.ongoing_requests.get(&req_id).unwrap();
+				let request;
+				if let Some(req) = self.ongoing_requests.get(&req_id) {
+					request = req;
+				} else {
+					return Ok(None);
+				}
 				if let Some(tex) = self.texture_cache.get_mut(&request.path) {
 					tex.fully_loaded = true;
 				}
@@ -575,7 +610,15 @@ impl ImageCache {
 			}
 			LoadResult::Failed { req_id } => {
 				eprintln!("Received FAILED for {}", req_id);
-				let request = self.ongoing_requests.get(&req_id).unwrap();
+				let request;
+				if let Some(req) = self.ongoing_requests.get(&req_id) {
+					request = req;
+				} else {
+					// If the request was cancelled, then it's OK that the image failed to load.
+					// We don't want to confuse the higher level components with telling them
+					// that something they don't even care about failed to load.
+					return Ok(None);
+				}
 				self.texture_cache.remove(&request.path);
 				self.ongoing_requests.remove(&req_id);
 				return Err(errors::Error::from_kind(errors::ErrorKind::FailedToLoadImage));
@@ -651,7 +694,7 @@ impl ImageCache {
 			}
 			let req_id = desc.request_id;
 			println!("Sending load request {} for {:?}", req_id, file_path);
-			self.ongoing_requests.insert(req_id, OngoingRequest { path: file_path.clone() });
+			self.ongoing_requests.insert(req_id, OngoingRequest { path: file_path.clone(), cancelled: false });
 			self.loader.send_load_request(LoadRequest { req_id, path: file_path });
 			self.requested_images += 1;
 			return true;
@@ -660,6 +703,11 @@ impl ImageCache {
 	}
 
 	fn change_directory(&mut self, dir_path: &Path, filename: &OsStr) -> Result<()> {
+		// Cancel all pending load requests
+		for (_, request) in self.ongoing_requests.iter_mut() {
+			request.cancelled = true;
+		}
+
 		self.dir_path = dir_path.to_owned();
 		self.dir_files = self.collect_directory()?;
 

@@ -49,10 +49,10 @@ fn folder_load_jump(image_cache: &mut ImageCache, display: &glium::Display, amou
 	image_cache.load_jump(display, amount, 0)
 }
 fn folder_load_path(image_cache: &mut ImageCache, display: &glium::Display, path: &Path) -> image_cache::Result<AnimationFrameTexture> {
-	image_cache.load_specific(display, path, 0)
+	image_cache.load_specific(display, path, None)
 }
 fn folder_load_at_index(image_cache: &mut ImageCache, display: &glium::Display, index: usize) -> FrameLoadResult {
-	image_cache.load_at_index(display, index, 0)
+	image_cache.load_at_index(display, index, None)
 }
 fn folder_delay_nanos(_player: &ImgSequencePlayer) -> u64 {
 	const FRAMERATE: u64 = 25;
@@ -69,10 +69,10 @@ fn anim_load_jump(image_cache: &mut ImageCache, display: &glium::Display, amount
 	image_cache.load_jump(display, 0, amount as isize)
 }
 fn anim_load_path(image_cache: &mut ImageCache, display: &glium::Display, path: &Path) -> image_cache::Result<AnimationFrameTexture> {
-	image_cache.load_specific(display, path, 0)
+	image_cache.load_specific(display, path, None)
 }
 fn anim_load_at_index(image_cache: &mut ImageCache, display: &glium::Display, index: usize) -> FrameLoadResult {
-	image_cache.load_at_index(display, image_cache.current_file_index(), index as isize)
+	image_cache.load_at_index(display, image_cache.current_file_index(), Some(index as isize))
 }
 fn anim_delay_nanos(player: &ImgSequencePlayer) -> u64 {
 	if let Some(ref frame) = player.image_texture {
