@@ -97,9 +97,12 @@ impl Application {
 								..
 							},
 						..
-					} => {
-						close_requested = true;
-					}
+					} => match windows.get(&control_flow_source) {
+						Some(window) if window.fullscreen() => {
+							window.set_fullscreen(false);
+						}
+						_ => close_requested = true,
+					},
 					event => {
 						if let WindowEvent::Resized { .. } = event {
 							windows.get(&window_id).unwrap().request_redraw();
