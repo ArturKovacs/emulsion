@@ -39,7 +39,10 @@ use crate::help_screen::*;
 use crate::picture_widget::*;
 #[cfg(feature = "networking")]
 use crate::version::Version;
+use bottom_bar::BottomBar;
+use configuration::Theme;
 
+mod bottom_bar;
 mod configuration;
 mod handle_panic;
 mod help_screen;
@@ -59,12 +62,6 @@ static NEW_VERSION: &[u8] = include_bytes!("../resource/new-version-available.pn
 static NEW_VERSION_LIGHT: &[u8] = include_bytes!("../resource/new-version-available-light.png");
 static VISIT_SITE: &[u8] = include_bytes!("../resource/visit-site.png");
 static USAGE: &[u8] = include_bytes!("../resource/usage.png");
-static MOON: &[u8] = include_bytes!("../resource/moon.png");
-static LIGHT: &[u8] = include_bytes!("../resource/light.png");
-static QUESTION_BUTTON: &[u8] = include_bytes!("../resource/question_button.png");
-static QUESTION_BUTTON_LIGHT: &[u8] = include_bytes!("../resource/question_button_light.png");
-static QUESTION_NOTI: &[u8] = include_bytes!("../resource/question-noti.png");
-static QUESTION_LIGHT_NOTI: &[u8] = include_bytes!("../resource/question-light-noti.png");
 
 // ========================================================
 // Not-so glorious main function
@@ -84,33 +81,17 @@ fn main() {
 
 	let mut application = Application::new();
 	let window: Rc<Window> = {
-		let cache = cache.lock().unwrap();
+		let window = &cache.lock().unwrap().window;
 
 		let window_desc = WindowDescriptorBuilder::default()
 			.icon(Some(make_icon()))
-			.size(PhysicalSize::new(cache.window.win_w, cache.window.win_h))
-			.position(Some(PhysicalPosition::new(cache.window.win_x, cache.window.win_y)))
+			.size(PhysicalSize::new(window.win_w, window.win_h))
+			.position(Some(PhysicalPosition::new(window.win_x, window.win_y)))
 			.build()
 			.unwrap();
 		Window::new(&mut application, window_desc)
 	};
-	{
-		let cache = cache.clone();
-
-		window.add_global_event_handler(move |event| match event {
-			WindowEvent::Resized(new_size) => {
-				let mut cache = cache.lock().unwrap();
-				cache.window.win_w = new_size.width;
-				cache.window.win_h = new_size.height;
-			}
-			WindowEvent::Moved(new_pos) => {
-				let mut cache = cache.lock().unwrap();
-				cache.window.win_x = new_pos.x;
-				cache.window.win_y = new_pos.y;
-			}
-			_ => (),
-		});
-	}
+	add_window_movement_listener(&window, cache.clone());
 
 	let update_label_image = Rc::new(Picture::from_encoded_bytes(NEW_VERSION));
 	let update_label_image_light = Rc::new(Picture::from_encoded_bytes(NEW_VERSION_LIGHT));
@@ -121,24 +102,10 @@ fn main() {
 	let usage_img = Picture::from_encoded_bytes(USAGE);
 	let help_screen = Rc::new(HelpScreen::new(usage_img));
 
-	let question = Rc::new(Picture::from_encoded_bytes(QUESTION_BUTTON));
-	let question_light = Rc::new(Picture::from_encoded_bytes(QUESTION_BUTTON_LIGHT));
-	let question_noti = Rc::new(Picture::from_encoded_bytes(QUESTION_NOTI));
-	let question_light_noti = Rc::new(Picture::from_encoded_bytes(QUESTION_LIGHT_NOTI));
-	let moon_img = Rc::new(Picture::from_encoded_bytes(MOON));
-	let light_img = Rc::new(Picture::from_encoded_bytes(LIGHT));
-
-	let theme_button = make_theme_button();
-	let help_button = make_help_button();
-	let slider = make_slider();
-
-	let bottom_container = make_bottom_container();
-	bottom_container.add_child(theme_button.clone());
-	bottom_container.add_child(slider.clone());
-	bottom_container.add_child(help_button.clone());
+	let bottom_bar = Rc::new(BottomBar::new());
 
 	let picture_widget =
-		make_picture_widget(&window, slider.clone(), bottom_container.clone(), config.clone());
+		make_picture_widget(&window, bottom_bar.slider(), bottom_bar.widget(), config.clone());
 
 	let picture_area_container = make_picture_area_container();
 	picture_area_container.add_child(picture_widget.clone());
@@ -147,68 +114,56 @@ fn main() {
 
 	let root_container = make_root_container();
 	root_container.add_child(picture_area_container);
-	root_container.add_child(bottom_container.clone());
+	root_container.add_child(bottom_bar.widget());
 
 	let update_available = Arc::new(AtomicBool::new(false));
 	let update_check_done = Arc::new(AtomicBool::new(false));
-	let light_theme = Rc::new(Cell::new(!cache.lock().unwrap().window.dark));
+	let theme = Rc::new(Cell::new(cache.lock().unwrap().theme()));
 
 	let set_theme = {
-		let theme_button = theme_button.clone();
-		let help_button = help_button.clone();
 		let update_label = update_label;
 		let picture_widget = picture_widget.clone();
-		let bottom_container = bottom_container;
 		let update_notification = update_notification.clone();
-		let slider = slider.clone();
 		let window = window.clone();
-		let light_theme = light_theme.clone();
+		let theme = theme.clone();
 		let update_available = update_available.clone();
+		let bottom_bar = bottom_bar.clone();
 
 		Rc::new(move || {
-			if light_theme.get() {
-				picture_widget.set_bright_shade(0.96);
-				bottom_container.set_bg_color([1.0, 1.0, 1.0, 1.0]);
-				slider.set_shadow_color([0.0, 0.0, 0.0]);
-				window.set_bg_color([0.85, 0.85, 0.85, 1.0]);
-				theme_button.set_icon(Some(moon_img.clone()));
-				update_notification.set_bg_color([0.06, 0.06, 0.06, 1.0]);
-				update_label.set_icon(Some(update_label_image_light.clone()));
-				if update_available.load(Ordering::SeqCst) {
-					help_button.set_icon(Some(question_noti.clone()));
-				} else {
-					help_button.set_icon(Some(question.clone()));
+			match theme.get() {
+				Theme::Light => {
+					picture_widget.set_bright_shade(0.96);
+					window.set_bg_color([0.85, 0.85, 0.85, 1.0]);
+					update_notification.set_bg_color([0.06, 0.06, 0.06, 1.0]);
+					update_label.set_icon(Some(update_label_image_light.clone()));
 				}
-			} else {
-				picture_widget.set_bright_shade(0.11);
-				bottom_container.set_bg_color([0.08, 0.08, 0.08, 1.0]);
-				slider.set_shadow_color([0.0, 0.0, 0.0]);
-				window.set_bg_color([0.03, 0.03, 0.03, 1.0]);
-				theme_button.set_icon(Some(light_img.clone()));
-				update_notification.set_bg_color([0.85, 0.85, 0.85, 1.0]);
-				update_label.set_icon(Some(update_label_image.clone()));
-				if update_available.load(Ordering::SeqCst) {
-					help_button.set_icon(Some(question_light_noti.clone()));
-				} else {
-					help_button.set_icon(Some(question_light.clone()));
+				Theme::Dark => {
+					picture_widget.set_bright_shade(0.11);
+					window.set_bg_color([0.03, 0.03, 0.03, 1.0]);
+					update_notification.set_bg_color([0.85, 0.85, 0.85, 1.0]);
+					update_label.set_icon(Some(update_label_image.clone()));
 				}
 			}
+			bottom_bar.set_theme(theme.get(), update_available.load(Ordering::SeqCst));
 		})
 	};
 	set_theme();
 	{
 		let cache = cache.clone();
 		let set_theme = set_theme.clone();
-		theme_button.set_on_click(move || {
-			light_theme.set(!light_theme.get());
-			cache.lock().unwrap().window.dark = !light_theme.get();
+
+		bottom_bar.set_on_theme_click(move || {
+			let new_theme = theme.get().switch_theme();
+			theme.set(new_theme);
+			cache.lock().unwrap().set_theme(new_theme);
 			set_theme();
 		});
 	}
 	{
-		let slider_clone = slider.clone();
-		slider.set_on_value_change(move || {
-			picture_widget.jump_to_index(slider_clone.value());
+		let slider = bottom_bar.slider();
+
+		bottom_bar.set_on_slider_value_change(move || {
+			picture_widget.jump_to_index(slider.value());
 		});
 	}
 	let help_visible = Cell::new(first_launch);
@@ -219,7 +174,7 @@ fn main() {
 		let help_screen = help_screen.clone();
 		let update_notification = update_notification.clone();
 
-		help_button.set_on_click(move || {
+		bottom_bar.set_on_help_click(move || {
 			help_visible.set(!help_visible.get());
 			help_screen.set_visible(help_visible.get());
 			update_notification
@@ -287,6 +242,22 @@ fn make_icon() -> Icon {
 	Icon::from_rgba(rgba.into_raw(), w, h).unwrap()
 }
 
+fn add_window_movement_listener(window: &Window, cache: Arc<Mutex<Cache>>) {
+	window.add_global_event_handler(move |event| match event {
+		WindowEvent::Resized(new_size) => {
+			let mut cache = cache.lock().unwrap();
+			cache.window.win_w = new_size.width;
+			cache.window.win_h = new_size.height;
+		}
+		WindowEvent::Moved(new_pos) => {
+			let mut cache = cache.lock().unwrap();
+			cache.window.win_x = new_pos.x;
+			cache.window.win_y = new_pos.y;
+		}
+		_ => (),
+	});
+}
+
 fn make_root_container() -> Rc<VerticalLayoutContainer> {
 	let container = Rc::new(VerticalLayoutContainer::new());
 	container.set_margin_all(0.0);
@@ -333,51 +304,6 @@ fn make_update_notification(update_label: Rc<Label>) -> Rc<HorizontalLayoutConta
 	container.add_child(update_label);
 	container.add_child(update_button);
 	container
-}
-
-fn make_theme_button() -> Rc<Button> {
-	let button = Rc::new(Button::new());
-	button.set_margin_top(5.0);
-	button.set_margin_left(28.0);
-	button.set_margin_right(4.0);
-	button.set_height(Length::Fixed(24.0));
-	button.set_width(Length::Fixed(24.0));
-	button.set_horizontal_align(Alignment::Center);
-	button
-}
-
-fn make_help_button() -> Rc<Button> {
-	let button = Rc::new(Button::new());
-	button.set_margin_top(5.0);
-	button.set_margin_left(4.0);
-	button.set_margin_right(28.0);
-	button.set_height(Length::Fixed(24.0));
-	button.set_width(Length::Fixed(24.0));
-	button.set_horizontal_align(Alignment::Center);
-	button
-}
-
-fn make_bottom_container() -> Rc<HorizontalLayoutContainer> {
-	let container = Rc::new(HorizontalLayoutContainer::new());
-	// container.set_margin_top(4.0);
-	// container.set_margin_bottom(4.0);
-	container.set_margin_left(0.0);
-	container.set_margin_right(0.0);
-	container.set_height(Length::Fixed(32.0));
-	container.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
-	container
-}
-
-fn make_slider() -> Rc<Slider> {
-	let slider = Rc::new(Slider::new());
-	slider.set_margin_top(5.0);
-	slider.set_margin_left(4.0);
-	slider.set_margin_right(4.0);
-	slider.set_height(Length::Fixed(24.0));
-	slider.set_width(Length::Stretch { min: 0.0, max: 600.0 });
-	slider.set_horizontal_align(Alignment::Center);
-	slider.set_steps(6, 1);
-	slider
 }
 
 fn make_picture_widget(

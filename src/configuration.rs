@@ -4,6 +4,21 @@ use std::fs;
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum Theme {
+	Light,
+	Dark,
+}
+
+impl Theme {
+	pub fn switch_theme(self) -> Self {
+		match self {
+			Theme::Dark => Theme::Light,
+			Theme::Light => Theme::Dark,
+		}
+	}
+}
+
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct WindowSection {
 	pub dark: bool,
@@ -62,6 +77,19 @@ impl CacheUpdateSection {
 pub struct Cache {
 	pub window: WindowSection,
 	pub updates: CacheUpdateSection,
+}
+
+impl Cache {
+	pub fn theme(&self) -> Theme {
+		match self.window.dark {
+			true => Theme::Dark,
+			false => Theme::Light,
+		}
+	}
+
+	pub fn set_theme(&mut self, theme: Theme) {
+		self.window.dark = theme == Theme::Dark;
+	}
 }
 
 #[derive(Deserialize)]
