@@ -15,7 +15,7 @@ members = [
 ]
 
 [features]
-default = ["networking"]
+default = []
 networking = ["reqwest"]
 
 [target.'cfg(windows)'.build-dependencies]
