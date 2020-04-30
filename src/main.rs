@@ -368,14 +368,13 @@ fn check_for_updates() -> bool {
 fn check_for_updates() -> bool {
 	use std::str::FromStr;
 
-	let client;
-	match reqwest::blocking::Client::builder().user_agent("emulsion").build() {
-		Ok(c) => client = c,
+	let client = match reqwest::blocking::Client::builder().user_agent("emulsion").build() {
+		Ok(c) => c,
 		Err(e) => {
 			println!("Could not build client for version request: {}", e);
 			return false;
 		}
-	}
+	};
 	let response =
 		client.get("https://api.github.com/repos/ArturKovacs/emulsion/releases/latest").send();
 	match response {
