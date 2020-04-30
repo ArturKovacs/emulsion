@@ -2,14 +2,13 @@ use std;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
 use gelatin::glium;
-use gelatin::image::{self, gif::GifDecoder, io::Reader, AnimationDecoder, ImageFormat};
+use gelatin::image::{self, gif::GifDecoder, AnimationDecoder, ImageFormat};
 
 use glium::texture::{MipmapsOption, RawImage2d, SrgbTexture2d};
 
@@ -188,17 +187,11 @@ impl ImageLoader {
 							}
 						}
 					}
-				} else {
-					if let Ok(image) = load_image(request.path.as_path()) {
-						loaded_img_tx
-							.send(LoadResult::Frame {
-								req_id: request.req_id,
-								image,
-								delay_nano: 0,
-							})
-							.unwrap();
-						load_succeeded = true;
-					}
+				} else if let Ok(image) = load_image(request.path.as_path()) {
+					loaded_img_tx
+						.send(LoadResult::Frame { req_id: request.req_id, image, delay_nano: 0 })
+						.unwrap();
+					load_succeeded = true;
 				}
 			}
 			if load_succeeded {

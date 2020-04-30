@@ -114,13 +114,13 @@ struct CachedTexture {
 /// semantically no difference between those and this keeps the code relatively simple.
 ///
 /// - ImageCache - Load request sent
-/// 	- An entry representing the request is created in `ImageCache::ongoing_requests`
+///     - An entry representing the request is created in `ImageCache::ongoing_requests`
 /// - Worker thread - Decodes an image from the byte stream into a CPU-side buffer. Send this back on a channel
-/// 	- Decoded pixel data on channel (CPU)
+///     - Decoded pixel data on channel (CPU)
 /// - ImageCache - Prefetched image received from worker thread
-/// 	- Decoded pixel data in `ImageCache::prefetched`
+///     - Decoded pixel data in `ImageCache::prefetched`
 /// - ImageCache - Prefetched image is uploaded to a GPU texture from the CPU
-/// 	- Pixel data is on the gpu referred to by `ImageCache::texture_cache`
+///     - Pixel data is on the gpu referred to by `ImageCache::texture_cache`
 ///
 pub struct ImageCache {
 	dir_path: PathBuf,
@@ -563,7 +563,7 @@ impl ImageCache {
 						}
 					}
 				}
-				return Ok(None);
+				Ok(None)
 			}
 			LoadResult::Frame { req_id, image, delay_nano } => {
 				let request;
@@ -584,7 +584,7 @@ impl ImageCache {
 					self.remaining_capacity -= size_estimate;
 					return Ok(Some(anim_frame));
 				}
-				return Ok(None);
+				Ok(None)
 			}
 			LoadResult::Done { req_id } => {
 				let request;
@@ -597,7 +597,7 @@ impl ImageCache {
 					tex.fully_loaded = true;
 				}
 				self.ongoing_requests.remove(&req_id);
-				return Ok(None);
+				Ok(None)
 			}
 			LoadResult::Failed { req_id } => {
 				let request;
@@ -611,7 +611,7 @@ impl ImageCache {
 				}
 				self.texture_cache.remove(&request.path);
 				self.ongoing_requests.remove(&req_id);
-				return Err(errors::Error::from_kind(errors::ErrorKind::FailedToLoadImage));
+				Err(errors::Error::from_kind(errors::ErrorKind::FailedToLoadImage))
 			}
 		}
 	}

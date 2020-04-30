@@ -7,6 +7,7 @@ use gelatin::{
 	picture::Picture,
 	slider::Slider,
 };
+use std::f32;
 use std::rc::Rc;
 
 static MOON: &[u8] = include_bytes!("../resource/moon.png");
