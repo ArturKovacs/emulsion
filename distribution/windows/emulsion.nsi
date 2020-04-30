@@ -92,15 +92,6 @@ FunctionEnd
 ;--------------------------------
 ;Installer Sections
 
-; These are the programs that are needed by Emulsion.
-Section -Prerequisites
-    SetOutPath "$INSTDIR\prerequisites"
-    File ".\prerequisites\vc_redist.x64.exe"
-    ExecWait "$INSTDIR\prerequisites\vc_redist.x64.exe"
-    Goto endVcRedist
-    endVcRedist:
-SectionEnd
-
 Section "Emulsion" SecEmulsion
     SectionIn RO
 
@@ -144,6 +135,17 @@ Section /o "Associate supported files" SecAssociate
     !insertmacro EmulsionRegisterExtension "pgm" "PGM Image"
 
     !insertmacro UPDATEFILEASSOC
+SectionEnd
+
+; These are the programs that are needed by Emulsion.
+Section -Prerequisites
+    IfFileExists $SYSDIR\vcruntime140.dll endVsRedist beginVsRedist
+    Goto endVsRedist
+    beginVsRedist:
+    SetOutPath "$INSTDIR\prerequisites"
+    File ".\prerequisites\vc_redist.x64.exe"
+    ExecWait "$INSTDIR\prerequisites\vc_redist.x64.exe"
+    endVsRedist:
 SectionEnd
 
 ;--------------------------------
