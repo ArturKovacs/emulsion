@@ -103,6 +103,10 @@ struct CachedTexture {
 	/// If it's not fully loaded yet a `WaitingOnLoader` error is returned.
 	fully_loaded: bool,
 
+	/// - `false` if loading is still in progress or if succeeded.
+	/// - `true` if this failed to load,
+	failed: bool,
+
 	/// If the target file is an image this vector will have a single texture once the
 	/// image uploaded to the GPU. If the target file is an animated image like a gif,
 	/// these the frames
@@ -441,7 +445,12 @@ impl ImageCache {
 		if let Some(first_key) = first_key {
 			if let Some(result_vec) = self.prefetched.remove(&first_key) {
 				for result in result_vec {
-					self.upload_to_texture(display, result)?;
+					match self.upload_to_texture(display, result) {
+						// it's okay to ignore if the image falied to load here, this is just pre-fetch.
+						Err(Error (ErrorKind::FailedToLoadImage, ..)) => {} 
+						Err(e) => return Err(e),
+						_ => {}
+					}
 				}
 			}
 		}
@@ -483,6 +492,9 @@ impl ImageCache {
 			if get_from_cache {
 				let count = tex.frames.len() as isize;
 				if tex.fully_loaded || (frame_id >= 0 && frame_id < count) {
+					if tex.failed {
+						return Err(Error::from_kind(ErrorKind::FailedToLoadImage));
+					}
 					let wrapped_id;
 					if frame_id < 0 {
 						wrapped_id = count + (frame_id % count);
@@ -540,6 +552,7 @@ impl ImageCache {
 							needs_update: false,
 							fully_loaded: false,
 							mod_time: curr_mod_time,
+							failed: false,
 							frames: Vec::new(),
 						});
 					}
@@ -609,7 +622,10 @@ impl ImageCache {
 					// that something they don't even care about failed to load.
 					return Ok(None);
 				}
-				self.texture_cache.remove(&request.path);
+				if let Some(tex) = self.texture_cache.get_mut(&request.path) {
+					tex.fully_loaded = true;
+					tex.failed = true;
+				}
 				self.ongoing_requests.remove(&req_id);
 				return Err(errors::Error::from_kind(errors::ErrorKind::FailedToLoadImage));
 			}
