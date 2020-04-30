@@ -43,7 +43,7 @@ For more on that please refer to the [Bindings.md](Bindings.md) file.
 
 When installing Emulsion through a perpared package like the Windows installer, Emulsion will have networking enabled and by default
 will check for updates. However the default feature-set for emulsion does not include networking. This means that Emulsion will
-not have networking related featureswhen invoking
+not have networking dependent capabilities when invoking
 ```
 cargo install emulsion
 ```
