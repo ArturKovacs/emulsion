@@ -18,7 +18,7 @@ use serde_derive::Deserialize;
 
 use gelatin::glium::glutin::{
 	dpi::{PhysicalPosition, PhysicalSize},
-	event::WindowEvent,
+	event::{KeyboardInput, VirtualKeyCode, WindowEvent},
 	window::Icon,
 };
 use gelatin::{
@@ -89,8 +89,11 @@ fn main() {
 			.unwrap();
 		window = Window::new(&mut application, window_desc);
 	}
+	let bottom_container = Rc::new(HorizontalLayoutContainer::new());
 	{
 		let cache = cache.clone();
+		let bottom_container = bottom_container.clone();
+
 		window.add_global_event_handler(move |event| match event {
 			WindowEvent::Resized(new_size) => {
 				let mut cache = cache.lock().unwrap();
@@ -101,6 +104,12 @@ fn main() {
 				let mut cache = cache.lock().unwrap();
 				cache.window.win_x = new_pos.x;
 				cache.window.win_y = new_pos.y;
+			}
+			WindowEvent::KeyboardInput {
+				input: KeyboardInput { virtual_keycode: Some(VirtualKeyCode::Escape), .. },
+				..
+			} => {
+				bottom_container.set_visible(true);
 			}
 			_ => (),
 		});
@@ -151,7 +160,6 @@ fn main() {
 	let usage_img = Picture::from_encoded_bytes(include_bytes!("../resource/usage.png"));
 	let help_screen = Rc::new(HelpScreen::new(usage_img));
 
-	let bottom_container = Rc::new(HorizontalLayoutContainer::new());
 	//bottom_container.set_margin_top(4.0);
 	//bottom_container.set_margin_bottom(4.0);
 	bottom_container.set_margin_left(0.0);
