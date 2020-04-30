@@ -447,7 +447,7 @@ impl ImageCache {
 				for result in result_vec {
 					match self.upload_to_texture(display, result) {
 						// it's okay to ignore if the image falied to load here, this is just pre-fetch.
-						Err(Error (ErrorKind::FailedToLoadImage, ..)) => {} 
+						Err(Error(ErrorKind::FailedToLoadImage, ..)) => {}
 						Err(e) => return Err(e),
 						_ => {}
 					}
