@@ -19,12 +19,14 @@ use gelatin::line_layout_container::HorizontalLayoutContainer;
 use gelatin::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
 use gelatin::window::Window;
 use gelatin::NextUpdate;
-use gelatin::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
+use gelatin::{
+	application::request_exit, DrawContext, Event, EventKind, Widget, WidgetData, WidgetError,
+};
 
 use std::time::{Duration, Instant};
 
 static TOGGLE_FULLSCREEN_NAME: &str = "toggle_fullscreen";
-static LEAVE_FULLSCREEN_NAME: &str = "leave_fullscreen";
+static ESCAPE_NAME: &str = "escape";
 static IMG_NEXT_NAME: &str = "img_next";
 static IMG_PREV_NAME: &str = "img_prev";
 static IMG_ORIG_NAME: &str = "img_orig";
@@ -39,7 +41,7 @@ lazy_static! {
 	static ref DEFAULT_BINDINGS: HashMap<&'static str, Vec<&'static str>> = {
 		let mut m = HashMap::new();
 		m.insert(TOGGLE_FULLSCREEN_NAME, vec!["F11"]);
-		m.insert(LEAVE_FULLSCREEN_NAME, vec!["Escape"]);
+		m.insert(ESCAPE_NAME, vec!["Escape"]);
 		m.insert(IMG_NEXT_NAME, vec!["D", "Right"]);
 		m.insert(IMG_PREV_NAME, vec!["A", "Left"]);
 		m.insert(IMG_ORIG_NAME, vec!["Q"]);
@@ -136,14 +138,25 @@ impl PictureWidgetData {
 		self.prev_draw_size = self.drawn_bounds.size;
 	}
 
-	fn set_window_title_filename<T: AsRef<str>>(window: &Window, name: T) {
-		let title = format!("{} : E M U L S I O N", name.as_ref());
+	fn set_window_title_filename<T: AsRef<str>>(
+		window: &Window,
+		playback_state: PlaybackState,
+		name: T,
+	) {
+		let playback;
+		match playback_state {
+			PlaybackState::Forward => playback = " : Playing",
+			PlaybackState::Present => playback = " : Presenting",
+			PlaybackState::RandomPresent => playback = " : Presenting Shuffled",
+			PlaybackState::Paused => playback = "",
+		}
+		let title = format!("{}{} : E M U L S I O N", name.as_ref(), playback);
 		let display = window.display_mut();
 		display.gl_window().window().set_title(title.as_ref());
 	}
 
 	fn get_texture(&self) -> Option<Rc<SrgbTexture2d>> {
-		self.playback_manager.image_texture().clone()
+		self.playback_manager.image_texture()
 	}
 }
 
@@ -285,10 +298,14 @@ impl PictureWidget {
 				borrowed.bottom_panel.set_visible(!fullscreen);
 			}
 		}
-		if triggered!(LEAVE_FULLSCREEN_NAME) {
+		if triggered!(ESCAPE_NAME) {
 			if let Some(window) = borrowed.window.upgrade() {
-				window.set_fullscreen(false);
-				borrowed.bottom_panel.set_visible(true);
+				if window.fullscreen() {
+					window.set_fullscreen(false);
+					borrowed.bottom_panel.set_visible(true);
+				} else {
+					request_exit();
+				}
 			}
 		}
 		if triggered!(PLAY_ANIM_NAME) {
@@ -365,12 +382,17 @@ impl Widget for PictureWidget {
 		let curr_dir_len = data.playback_manager.current_dir_len() as u32;
 		data.slider.set_steps(curr_dir_len, curr_file_index);
 		//data.slider.set_step_bg(data.playback_manager.cached_from_dir());
+		let playback_state = data.playback_manager.playback_state();
 		match data.playback_manager.filename() {
 			Some(name) => {
-				PictureWidgetData::set_window_title_filename(window, name.to_str().unwrap());
+				PictureWidgetData::set_window_title_filename(
+					window,
+					playback_state,
+					name.to_str().unwrap(),
+				);
 			}
 			None => {
-				PictureWidgetData::set_window_title_filename(window, "[ none ]");
+				PictureWidgetData::set_window_title_filename(window, playback_state, "[ none ]");
 			}
 		}
 	}
@@ -574,7 +596,9 @@ impl Widget for PictureWidget {
 			EventKind::HoveredFileCancelled => {
 				let mut borrowed = self.data.borrow_mut();
 				match borrowed.hover_state.clone() {
-					HoverState::None => unreachable!(),
+					HoverState::None => {
+						// Suprisingly this does happen sometimes, so let's just ignore this.
+					}
 					HoverState::ItemHovered { prev_path } => {
 						borrowed.playback_manager.request_load(LoadRequest::FilePath(prev_path));
 						borrowed.hover_state = HoverState::None;
