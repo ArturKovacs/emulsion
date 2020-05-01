@@ -203,6 +203,18 @@ impl ImageCache {
 		self.dir_files.len()
 	}
 
+	/// Returns tru if and only if the current image has been fully loaded and it has a single frame.
+	pub fn loaded_still_image(&self) -> bool {
+		if let Some(desc) = self.dir_files.get(self.current_file_idx) {
+			if let Some(img) = self.texture_cache.get(&desc.request_id) {
+				if img.fully_loaded && img.frames.len() == 1 {
+					return true;
+				}
+			}
+		}
+		false
+	}
+
 	/// Fetches the contents of the folder and stores the list of image filenames to know which
 	/// files will be the next and previous.
 	///
@@ -374,7 +386,8 @@ impl ImageCache {
 			// Here, it is possible that the current image was already
 			// requested but not yet loaded.
 			let target_frame = self.current_frame_idx as isize + frame_jump_count;
-			let requested = self.try_getting_requested_image(display, self.current_file_idx, target_frame);
+			let requested =
+				self.try_getting_requested_image(display, self.current_file_idx, target_frame);
 			return requested.map(|t| (t, self.current_filename()));
 		} else {
 			self.current_frame_idx = 0;
