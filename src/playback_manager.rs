@@ -154,7 +154,6 @@ impl PlaybackManager {
 				&anim_delay_nanos,
 			),
 		};
-		result.image_player.start_playback_forward();
 		result
 	}
 
@@ -230,29 +229,28 @@ impl PlaybackManager {
 	}
 
 	pub fn update_image(&mut self, window: &Window) -> gelatin::NextUpdate {
+		let load_requested = self.folder_player.load_request != LoadRequest::None;
 		let display = window.display_mut();
 		let prev_file = self.folder_player.image_texture();
 		let next_update = self.folder_player.update_image(&display, &mut self.image_cache);
 		let new_file = self.folder_player.image_texture();
+		let mut file_changed = prev_file.is_none() != new_file.is_none();
 		if let (Some(prev), Some(new)) = (prev_file, new_file) {
-			let file_changed = !Rc::ptr_eq(&prev, &new);
-			if file_changed {
-				self.image_player.pause_playback();
-				self.image_player.start_playback_forward();
-			}
+			file_changed = !Rc::ptr_eq(&prev, &new);
+		}
+		if file_changed {
+			self.image_player.start_playback_forward();
+			self.image_player.request_load(LoadRequest::Jump(0));
+		}
+		if self.image_cache.loaded_still_image() {
+			self.image_player.pause_playback();
 		}
 		next_update.aggregate(self.image_player.update_image(&display, &mut self.image_cache))
 	}
 }
 
 type FrameLoadResult = image_cache::Result<(AnimationFrameTexture, OsString)>;
-trait LoadHandler {
-	fn load_next(&mut self) -> FrameLoadResult;
-	fn load_prev(&mut self) -> FrameLoadResult;
-	fn load_jump(&mut self, steps: isize) -> FrameLoadResult;
-	fn load_path(&mut self, path: &Path) -> FrameLoadResult;
-	fn load_at_index(&mut self, index: usize) -> FrameLoadResult;
-}
+
 struct ImgSequencePlayer {
 	playback_state: PlaybackState,
 	present_remaining: Vec<usize>,
@@ -436,8 +434,8 @@ impl ImgSequencePlayer {
 				self.frametime_drift_offset = -nanos_til_next;
 			} else {
 				image_cache.process_prefetched(display).unwrap();
-				const BUISY_WAIT_TRESHOLD: f32 = 0.8;
-				if elapsed_nanos > (frame_delta_time_nanos as f32 * BUISY_WAIT_TRESHOLD) as i64 {
+				const BUISY_WAIT_THRESHOLD: f32 = 0.8;
+				if elapsed_nanos > (frame_delta_time_nanos as f32 * BUISY_WAIT_THRESHOLD) as i64 {
 					// Just buisy wait if we are getting very close to the next frame swap
 					next_update = gelatin::NextUpdate::Soonest;
 				} else {
