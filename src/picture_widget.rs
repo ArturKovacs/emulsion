@@ -24,6 +24,7 @@ use gelatin::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
 use std::time::{Duration, Instant};
 
 static TOGGLE_FULLSCREEN_NAME: &str = "toggle_fullscreen";
+static LEAVE_FULLSCREEN_NAME: &str = "leave_fullscreen";
 static IMG_NEXT_NAME: &str = "img_next";
 static IMG_PREV_NAME: &str = "img_prev";
 static IMG_ORIG_NAME: &str = "img_orig";
@@ -38,6 +39,7 @@ lazy_static! {
 	static ref DEFAULT_BINDINGS: HashMap<&'static str, Vec<&'static str>> = {
 		let mut m = HashMap::new();
 		m.insert(TOGGLE_FULLSCREEN_NAME, vec!["F11"]);
+		m.insert(LEAVE_FULLSCREEN_NAME, vec!["Escape"]);
 		m.insert(IMG_NEXT_NAME, vec!["D", "Right"]);
 		m.insert(IMG_PREV_NAME, vec!["A", "Left"]);
 		m.insert(IMG_ORIG_NAME, vec!["Q"]);
@@ -281,6 +283,12 @@ impl PictureWidget {
 				let fullscreen = !window.fullscreen();
 				window.set_fullscreen(fullscreen);
 				borrowed.bottom_panel.set_visible(!fullscreen);
+			}
+		}
+		if triggered!(LEAVE_FULLSCREEN_NAME) {
+			if let Some(window) = borrowed.window.upgrade() {
+				window.set_fullscreen(false);
+				borrowed.bottom_panel.set_visible(true);
 			}
 		}
 		if triggered!(PLAY_ANIM_NAME) {

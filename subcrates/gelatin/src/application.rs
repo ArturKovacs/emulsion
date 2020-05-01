@@ -101,7 +101,6 @@ impl Application {
 						..
 					} => match windows.get(&control_flow_source) {
 						Some(window) if window.fullscreen() => {
-							window.set_fullscreen(false);
 							window.process_event(event);
 						}
 						_ => close_requested = true,
