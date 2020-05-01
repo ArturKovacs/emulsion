@@ -1,5 +1,6 @@
 use std::collections::hash_map::HashMap;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use glium::glutin::{
 	self,
@@ -10,6 +11,12 @@ use glium::glutin::{
 
 use crate::window::Window;
 use crate::NextUpdate;
+
+static EXIT_REQUESTED: AtomicBool = AtomicBool::new(false);
+
+pub fn request_exit() {
+	EXIT_REQUESTED.store(true, Ordering::Relaxed);
+}
 
 /// Returns true of original was replaced by new
 fn update_control_flow(original: &mut ControlFlow, new: ControlFlow) -> bool {
@@ -78,7 +85,6 @@ impl Application {
 		let windows = self.windows;
 		let mut at_exit = self.at_exit;
 		let mut global_handlers = self.global_handlers;
-		let mut close_requested = false;
 		let mut control_flow_source = *windows.keys().next().unwrap();
 		self.event_loop.run(move |event, _event_loop, control_flow| {
 			for handler in global_handlers.iter_mut() {
@@ -87,7 +93,7 @@ impl Application {
 			match event {
 				Event::WindowEvent { event, window_id } => match event {
 					WindowEvent::CloseRequested => {
-						close_requested = true;
+						request_exit();
 					}
 					WindowEvent::KeyboardInput {
 						input:
@@ -98,7 +104,7 @@ impl Application {
 							},
 						..
 					} => {
-						close_requested = true;
+						request_exit();
 					}
 					event => {
 						if let WindowEvent::Resized { .. } = event {
@@ -108,15 +114,14 @@ impl Application {
 					}
 				},
 				Event::MainEventsCleared => {
-					if !close_requested {
+					if !EXIT_REQUESTED.load(Ordering::Relaxed) {
 						for (_, window) in windows.iter() {
 							window.main_events_cleared();
 							if window.redraw_needed() {
 								window.request_redraw();
 							}
 						}
-					}
-					if close_requested {
+					} else {
 						*control_flow = ControlFlow::Exit;
 					}
 				}
@@ -131,7 +136,7 @@ impl Application {
 					}
 				}
 				Event::RedrawEventsCleared => {
-					if close_requested {
+					if EXIT_REQUESTED.load(Ordering::Relaxed) {
 						*control_flow = ControlFlow::Exit;
 					}
 				}
