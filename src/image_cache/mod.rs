@@ -136,7 +136,6 @@ pub struct ImageCache {
 	remaining_capacity: isize,
 	total_capacity: isize,
 	curr_est_size: isize,
-	requested_images: i32,
 
 	/// A monotonically increasing integer used for identifying
 	/// each load request
@@ -146,7 +145,7 @@ pub struct ImageCache {
 	/// but for which no response has been received
 	ongoing_requests: HashMap<u32, OngoingRequest>,
 	prefetched: HashMap<PathBuf, Vec<LoadResult>>,
-	texture_cache: BTreeMap<PathBuf, CachedTexture>,
+	texture_cache: BTreeMap<u32, CachedTexture>,
 	loader: ImageLoader,
 }
 
@@ -154,7 +153,7 @@ pub struct ImageCache {
 ///
 /// The basic idea is to have a few images already in the memory while an image is shown on the screen
 impl ImageCache {
-	const MAX_PENDING_PREFETCH_REQUESTS: i32 = 5;
+	const MAX_PENDING_REQUESTS: usize = 5;
 
 	/// # Arguments
 	/// * `capacity` - Number of bytes. The last image loaded will be the one at which the allocated memory reaches or exceeds capacity
@@ -168,7 +167,6 @@ impl ImageCache {
 			remaining_capacity: capacity,
 			total_capacity: capacity,
 			curr_est_size: 1000, // 1 kb, an optimistic estimate for the image size before anything is loaded
-			requested_images: 0,
 
 			current_req_id: 0,
 			ongoing_requests: HashMap::new(),
@@ -180,9 +178,8 @@ impl ImageCache {
 
 	pub fn cached_from_dir(&self) -> Vec<bool> {
 		let mut result = Vec::with_capacity(self.dir_files.len());
-		for i in 0..self.dir_files.len() {
-			let file_path = self.dir_files[i].dir_entry.path();
-			result.push(self.texture_cache.contains_key(&file_path));
+		for desc in self.dir_files.iter() {
+			result.push(self.texture_cache.contains_key(&desc.request_id));
 		}
 		result
 	}
@@ -291,9 +288,6 @@ impl ImageCache {
 		let requested_frame_id;
 		self.receive_prefetched();
 		if self.dir_path != parent {
-			self.texture_cache.clear();
-			self.prefetched.clear();
-			self.remaining_capacity = self.total_capacity;
 			self.change_directory(&parent, &target_file_name)?;
 			self.send_request_for_index(self.current_file_idx);
 			return Err(errors::Error::from_kind(errors::ErrorKind::WaitingOnLoader));
@@ -353,7 +347,7 @@ impl ImageCache {
 			self.remaining_capacity = remaining_capacity;
 		}
 
-		self.try_getting_requested_image(display, &path, requested_frame_id)
+		self.try_getting_requested_image(display, self.current_file_idx, requested_frame_id)
 	}
 
 	pub fn load_next(
@@ -380,7 +374,7 @@ impl ImageCache {
 			// Here, it is possible that the current image was already
 			// requested but not yet loaded.
 			let target_frame = self.current_frame_idx as isize + frame_jump_count;
-			let requested = self.try_getting_requested_image(display, &path, target_frame);
+			let requested = self.try_getting_requested_image(display, self.current_file_idx, target_frame);
 			return requested.map(|t| (t, self.current_filename()));
 		} else {
 			self.current_frame_idx = 0;
@@ -409,12 +403,6 @@ impl ImageCache {
 		loop {
 			match self.loader.try_recv_prefetched() {
 				Ok(load_result) => {
-					match load_result {
-						LoadResult::Failed { .. } | LoadResult::Done { .. } => {
-							self.requested_images -= 1;
-						}
-						_ => {}
-					}
 					let request;
 					if let Some(req) = self.ongoing_requests.get(&load_result.req_id()) {
 						request = req;
@@ -465,11 +453,19 @@ impl ImageCache {
 	fn try_getting_requested_image(
 		&mut self,
 		display: &glium::Display,
-		path: &Path,
+		file_index: usize,
 		frame_id: isize,
 	) -> Result<AnimationFrameTexture> {
+		let path;
+		let req_id;
+		if let Some(desc) = self.dir_files.get(file_index) {
+			path = desc.dir_entry.path();
+			req_id = desc.request_id;
+		} else {
+			bail!("Was not in the folder.");
+		}
 		// Check if it's among the prefetched, and upload it, if it is
-		if let Some(result_vec) = self.prefetched.remove(path) {
+		if let Some(result_vec) = self.prefetched.remove(&path) {
 			for load_result in result_vec.into_iter() {
 				self.upload_to_texture(display, load_result)?;
 			}
@@ -477,7 +473,10 @@ impl ImageCache {
 		}
 
 		// Check if it is inside the texture cache first
-		if let Some(tex) = self.texture_cache.get(path) {
+		if let Some(tex) = self.texture_cache.get(&req_id) {
+			if tex.failed {
+				return Err(Error::from_kind(ErrorKind::FailedToLoadImage));
+			}
 			let modified = fs::metadata(&path).ok().and_then(|m| m.modified().ok());
 			let mut get_from_cache = false;
 			if let Some(curr_mod_time) = modified {
@@ -492,9 +491,6 @@ impl ImageCache {
 			if get_from_cache {
 				let count = tex.frames.len() as isize;
 				if tex.fully_loaded || (frame_id >= 0 && frame_id < count) {
-					if tex.failed {
-						return Err(Error::from_kind(ErrorKind::FailedToLoadImage));
-					}
 					let wrapped_id;
 					if frame_id < 0 {
 						wrapped_id = count + (frame_id % count);
@@ -535,17 +531,14 @@ impl ImageCache {
 		match load_result {
 			LoadResult::Start { req_id, metadata } => {
 				let curr_mod_time = metadata.modified().ok();
-				let request;
-				if let Some(req) = self.ongoing_requests.get(&req_id) {
-					request = req;
+				if let Some(request) = self.ongoing_requests.get(&req_id) {
+					if request.cancelled {
+						return Ok(None);
+					}
 				} else {
 					return Ok(None);
 				}
-				if request.cancelled {
-					return Ok(None);
-				}
-				//request.mod_time = curr_mod_time;
-				match self.texture_cache.entry(request.path.clone()) {
+				match self.texture_cache.entry(req_id) {
 					Entry::Vacant(entry) => {
 						entry.insert(CachedTexture {
 							req_id,
@@ -579,18 +572,16 @@ impl ImageCache {
 				return Ok(None);
 			}
 			LoadResult::Frame { req_id, image, delay_nano } => {
-				let request;
-				if let Some(req) = self.ongoing_requests.get(&req_id) {
-					request = req;
+				if let Some(request) = self.ongoing_requests.get(&req_id) {
+					if request.cancelled {
+						return Ok(None);
+					}
 				} else {
-					return Ok(None);
-				}
-				if request.cancelled {
 					return Ok(None);
 				}
 				let size_estimate =
 					get_image_size_estimate((image.width(), image.height())) as isize;
-				if let Some(entry) = self.texture_cache.get_mut(&request.path) {
+				if let Some(entry) = self.texture_cache.get_mut(&req_id) {
 					let texture = Rc::new(texture_from_image(display, image)?);
 					let anim_frame = AnimationFrameTexture { texture, delay_nano };
 					entry.frames.push(anim_frame.clone());
@@ -600,29 +591,14 @@ impl ImageCache {
 				return Ok(None);
 			}
 			LoadResult::Done { req_id } => {
-				let request;
-				if let Some(req) = self.ongoing_requests.get(&req_id) {
-					request = req;
-				} else {
-					return Ok(None);
-				}
-				if let Some(tex) = self.texture_cache.get_mut(&request.path) {
+				if let Some(tex) = self.texture_cache.get_mut(&req_id) {
 					tex.fully_loaded = true;
 				}
 				self.ongoing_requests.remove(&req_id);
 				return Ok(None);
 			}
 			LoadResult::Failed { req_id } => {
-				let request;
-				if let Some(req) = self.ongoing_requests.get(&req_id) {
-					request = req;
-				} else {
-					// If the request was cancelled, then it's OK that the image failed to load.
-					// We don't want to confuse the higher level components with telling them
-					// that something they don't even care about failed to load.
-					return Ok(None);
-				}
-				if let Some(tex) = self.texture_cache.get_mut(&request.path) {
+				if let Some(tex) = self.texture_cache.get_mut(&req_id) {
 					tex.fully_loaded = true;
 					tex.failed = true;
 				}
@@ -639,7 +615,7 @@ impl ImageCache {
 		let mut estimated_remaining_cap = self.remaining_capacity;
 
 		while estimated_remaining_cap > self.curr_est_size as isize {
-			if self.requested_images >= Self::MAX_PENDING_PREFETCH_REQUESTS {
+			if self.ongoing_requests.len() >= Self::MAX_PENDING_REQUESTS {
 				break;
 			}
 			// Send a load request for the closest file not in the cache or outdated
@@ -653,7 +629,7 @@ impl ImageCache {
 	}
 
 	pub fn prefetch_at_index(&mut self, index: usize) -> bool {
-		if self.requested_images >= Self::MAX_PENDING_PREFETCH_REQUESTS {
+		if self.ongoing_requests.len() >= Self::MAX_PENDING_REQUESTS {
 			return false;
 		}
 		if self.remaining_capacity > self.curr_est_size as isize {
@@ -670,6 +646,9 @@ impl ImageCache {
 	/// it does not care whether the new image will fit into the allowed
 	/// remaining capacity.
 	fn send_request_for_index(&mut self, index: usize) -> bool {
+		if self.ongoing_requests.len() >= Self::MAX_PENDING_REQUESTS {
+			return false;
+		}
 		if let Some(desc) = self.dir_files.get(index) {
 			let file = &desc.dir_entry;
 			let file_path = file.path();
@@ -677,7 +656,7 @@ impl ImageCache {
 				return false;
 			}
 			let mut cache_enty_invalid = false;
-			if let Some(texture) = self.texture_cache.get_mut(&file_path) {
+			if let Some(texture) = self.texture_cache.get_mut(&desc.request_id) {
 				if !texture.needs_update {
 					return false;
 				} else {
@@ -696,21 +675,24 @@ impl ImageCache {
 				}
 			}
 			if cache_enty_invalid {
-				self.texture_cache.remove(&file_path);
+				self.texture_cache.remove(&desc.request_id);
 			}
 			let req_id = desc.request_id;
 			self.ongoing_requests
 				.insert(req_id, OngoingRequest { path: file_path.clone(), cancelled: false });
 			self.loader.send_load_request(LoadRequest { req_id, path: file_path });
-			self.requested_images += 1;
 			return true;
 		}
 		false
 	}
 
 	fn change_directory(&mut self, dir_path: &Path, filename: &OsStr) -> Result<()> {
+		self.texture_cache.clear();
+		self.prefetched.clear();
+		self.remaining_capacity = self.total_capacity;
+
 		// Cancel all pending load requests
-		for (_, request) in self.ongoing_requests.iter_mut() {
+		for (id, request) in self.ongoing_requests.iter_mut() {
 			request.cancelled = true;
 		}
 

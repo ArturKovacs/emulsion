@@ -566,7 +566,9 @@ impl Widget for PictureWidget {
 			EventKind::HoveredFileCancelled => {
 				let mut borrowed = self.data.borrow_mut();
 				match borrowed.hover_state.clone() {
-					HoverState::None => unreachable!(),
+					HoverState::None => {
+						// Suprisingly this does happen sometimes, so let's just ignore this.
+					}
 					HoverState::ItemHovered { prev_path } => {
 						borrowed.playback_manager.request_load(LoadRequest::FilePath(prev_path));
 						borrowed.hover_state = HoverState::None;
