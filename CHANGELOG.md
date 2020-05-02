@@ -5,6 +5,7 @@
 - Animated gif support.
 - Custom key-bindings.
 - Config entry to disable update-checks.
+- The playback or presentation state is now displayed in the titlebar.
 
 ### Changed
 - Pressing escape in full-screen mode will go back to windowed mode instead of exiting.
