@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use glium::glutin::{
 	self,
-	event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
+	event::{Event, WindowEvent},
 	event_loop::ControlFlow,
 	window::WindowId,
 };
@@ -93,17 +93,6 @@ impl Application {
 			match event {
 				Event::WindowEvent { event, window_id } => match event {
 					WindowEvent::CloseRequested => {
-						request_exit();
-					}
-					WindowEvent::KeyboardInput {
-						input:
-							KeyboardInput {
-								virtual_keycode: Some(VirtualKeyCode::Escape),
-								state: ElementState::Pressed,
-								..
-							},
-						..
-					} => {
 						request_exit();
 					}
 					event => {

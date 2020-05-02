@@ -19,11 +19,14 @@ use gelatin::line_layout_container::HorizontalLayoutContainer;
 use gelatin::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
 use gelatin::window::Window;
 use gelatin::NextUpdate;
-use gelatin::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
+use gelatin::{
+	application::request_exit, DrawContext, Event, EventKind, Widget, WidgetData, WidgetError,
+};
 
 use std::time::{Duration, Instant};
 
 static TOGGLE_FULLSCREEN_NAME: &str = "toggle_fullscreen";
+static ESCAPE_NAME: &str = "escape";
 static IMG_NEXT_NAME: &str = "img_next";
 static IMG_PREV_NAME: &str = "img_prev";
 static IMG_ORIG_NAME: &str = "img_orig";
@@ -38,6 +41,7 @@ lazy_static! {
 	static ref DEFAULT_BINDINGS: HashMap<&'static str, Vec<&'static str>> = {
 		let mut m = HashMap::new();
 		m.insert(TOGGLE_FULLSCREEN_NAME, vec!["F11"]);
+		m.insert(ESCAPE_NAME, vec!["Escape"]);
 		m.insert(IMG_NEXT_NAME, vec!["D", "Right"]);
 		m.insert(IMG_PREV_NAME, vec!["A", "Left"]);
 		m.insert(IMG_ORIG_NAME, vec!["Q"]);
@@ -292,6 +296,16 @@ impl PictureWidget {
 				let fullscreen = !window.fullscreen();
 				window.set_fullscreen(fullscreen);
 				borrowed.bottom_panel.set_visible(!fullscreen);
+			}
+		}
+		if triggered!(ESCAPE_NAME) {
+			if let Some(window) = borrowed.window.upgrade() {
+				if window.fullscreen() {
+					window.set_fullscreen(false);
+					borrowed.bottom_panel.set_visible(true);
+				} else {
+					request_exit();
+				}
 			}
 		}
 		if triggered!(PLAY_ANIM_NAME) {

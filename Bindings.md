@@ -17,6 +17,7 @@ play_anim = ["alt+a", "alt+v"]
 play_present = ["p"]
 play_present_rnd = ["alt+p"]
 toggle_fullscreen = ["F11"]
+escape = ["Escape"]
 ```
 
 Note that all items in this section are optional so it's fully valid to only specify one of the actions. In this case all the rest will use the default bindings. For example
