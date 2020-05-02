@@ -4,6 +4,7 @@ use std::fs;
 use std::mem;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::atomic::Ordering;
 use std::time::SystemTime;
 
 use gelatin::glium;
@@ -301,7 +302,7 @@ impl ImageCache {
 		self.receive_prefetched();
 		if self.dir_path != parent {
 			self.change_directory(&parent, &target_file_name)?;
-			self.send_request_for_index(self.current_file_idx);
+			self.send_request_for_index(self.current_file_idx, true);
 			return Err(errors::Error::from_kind(errors::ErrorKind::WaitingOnLoader));
 		} else {
 			let mut image_found = false;
@@ -522,6 +523,7 @@ impl ImageCache {
 		if let Some(img_desc) = self.dir_files.get(self.current_file_idx) {
 			let req_id = img_desc.request_id;
 			if self.ongoing_requests.contains_key(&req_id) {
+				FOCUSED_REQUEST_ID.store(req_id, Ordering::Relaxed);
 				return Err(Error::from_kind(ErrorKind::WaitingOnLoader));
 			}
 		} else {
@@ -529,7 +531,7 @@ impl ImageCache {
 			// or some other error occured
 			bail!("Not found in directory.");
 		}
-		self.send_request_for_index(self.current_file_idx);
+		self.send_request_for_index(self.current_file_idx, true);
 		// If the texture is not in the cache just throw our hands in the air
 		// and tell the caller that we gotta wait for the loader to load this texture.
 		Err(Error::from_kind(ErrorKind::WaitingOnLoader))
@@ -607,6 +609,7 @@ impl ImageCache {
 				if let Some(tex) = self.texture_cache.get_mut(&req_id) {
 					tex.fully_loaded = true;
 				}
+				FOCUSED_REQUEST_ID.compare_and_swap(req_id, NO_FOCUSED_REQUEST, Ordering::Relaxed);
 				self.ongoing_requests.remove(&req_id);
 				return Ok(None);
 			}
@@ -615,6 +618,7 @@ impl ImageCache {
 					tex.fully_loaded = true;
 					tex.failed = true;
 				}
+				FOCUSED_REQUEST_ID.compare_and_swap(req_id, NO_FOCUSED_REQUEST, Ordering::Relaxed);
 				self.ongoing_requests.remove(&req_id);
 				return Err(errors::Error::from_kind(errors::ErrorKind::FailedToLoadImage));
 			}
@@ -646,19 +650,14 @@ impl ImageCache {
 			return false;
 		}
 		if self.remaining_capacity > self.curr_est_size as isize {
-			return self.send_request_for_index(index);
+			return self.send_request_for_index(index, false);
 		}
 		false
 	}
 
-	/// This is used for initiating a load when said load was directly
-	/// requested by a higher level component through one of the public
-	/// `load_...` fuctions.
-	///
-	/// This is almost identical to `prefetch_at_index` but different in that
-	/// it does not care whether the new image will fit into the allowed
-	/// remaining capacity.
-	fn send_request_for_index(&mut self, index: usize) -> bool {
+	/// This is almost identical to `prefetch_at_index` but this function
+	/// does not check the `remaining_capacity`.
+	fn send_request_for_index(&mut self, index: usize, important: bool) -> bool {
 		if self.ongoing_requests.len() >= Self::MAX_PENDING_REQUESTS {
 			return false;
 		}
@@ -691,6 +690,9 @@ impl ImageCache {
 				self.texture_cache.remove(&desc.request_id);
 			}
 			let req_id = desc.request_id;
+			if important {
+				FOCUSED_REQUEST_ID.store(req_id, Ordering::Relaxed);
+			}
 			self.ongoing_requests
 				.insert(req_id, OngoingRequest { path: file_path.clone(), cancelled: false });
 			self.loader.send_load_request(LoadRequest { req_id, path: file_path });
