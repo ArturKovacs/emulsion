@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 
 use directories::ProjectDirs;
 use lazy_static::lazy_static;
-use serde_derive::Deserialize;
+use serde::Deserialize;
 
 use gelatin::glium::glutin::{
 	dpi::{PhysicalPosition, PhysicalSize},
