@@ -3,7 +3,7 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -100,6 +100,10 @@ impl LoadResult {
 	}
 }
 
+const BEFORE_FIRST: usize = 0;
+const LOADING_FIRST: usize = 1;
+const FIRST_ENDED: usize = 2;
+
 pub struct ImageLoader {
 	running: Arc<AtomicBool>,
 	join_handles: Option<Vec<thread::JoinHandle<()>>>,
@@ -117,14 +121,16 @@ impl ImageLoader {
 
 		let (loaded_img_tx, loaded_img_rx) = channel();
 
+		let first_load_stage = Arc::new(AtomicUsize::new(BEFORE_FIRST));
+
 		let mut join_handles = Vec::new();
 		for _ in 0..threads {
 			let running = running.clone();
 			let load_request_rx = load_request_rx.clone();
-			let loaded_img_tx = loaded_img_tx.clone();
-
+			let img_sender = loaded_img_tx.clone();
+			let first_load_stage = first_load_stage.clone();
 			join_handles.push(thread::spawn(move || {
-				Self::thread_loop(running, load_request_rx, loaded_img_tx);
+				Self::thread_loop(running, load_request_rx, img_sender, first_load_stage);
 			}));
 		}
 
@@ -140,72 +146,31 @@ impl ImageLoader {
 	fn thread_loop(
 		running: Arc<AtomicBool>,
 		load_request_rx: Arc<Mutex<Receiver<LoadRequest>>>,
-		loaded_img_tx: Sender<LoadResult>,
+		img_sender: Sender<LoadResult>,
+		first_load_stage: Arc<AtomicUsize>,
 	) {
 		// The size was an arbitrary choice made with the argument that this should be
 		// enough to fit enough image file info to determine the format.
-		let mut file_start_bytes = [0; 512];
+
 		while running.load(Ordering::Acquire) {
-			let request = {
+			let request;
+			{
 				// It is very important that we release the mutex before starting to load the image
 				let load_request = load_request_rx.lock().unwrap();
-				load_request.recv().unwrap()
-			};
-			let mut load_succeeded = false;
-			if let Ok(metadata) = fs::metadata(&request.path) {
-				let mut is_gif = false;
-				if let Ok(mut file) = fs::File::open(&request.path) {
-					if file.read_exact(&mut file_start_bytes).is_ok() {
-						if let Ok(ImageFormat::Gif) = image::guess_format(&file_start_bytes) {
-							is_gif = true;
-						}
+				// Loading the atomic after the mutex is locked so that none else has access
+				// to it till the end of the block.
+				let load_stage = first_load_stage.load(Ordering::Relaxed);
+				if load_stage != LOADING_FIRST {
+					if load_stage == BEFORE_FIRST {
+						first_load_stage.store(LOADING_FIRST, Ordering::Relaxed);
 					}
-				}
-				loaded_img_tx.send(LoadResult::Start { req_id: request.req_id, metadata }).unwrap();
-				if is_gif {
-					if let Ok(file) = fs::File::open(&request.path) {
-						if let Ok(decoder) = GifDecoder::new(file) {
-							let frames = decoder.into_frames();
-							load_succeeded = true;
-							for frame in frames {
-								if let Ok(frame) = frame {
-									let (numerator_ms, denom_ms) = frame.delay().numer_denom_ms();
-									let numerator_nano = numerator_ms as u64 * 1_000_000;
-									let denom_nano = denom_ms as u64;
-									let delay_nano = numerator_nano / denom_nano;
-									let image = frame.into_buffer();
-									loaded_img_tx
-										.send(LoadResult::Frame {
-											req_id: request.req_id,
-											image,
-											delay_nano,
-										})
-										.unwrap();
-								} else {
-									load_succeeded = false;
-									break;
-								}
-							}
-						}
-					}
+					request = load_request.recv().unwrap();
 				} else {
-					if let Ok(image) = load_image(request.path.as_path()) {
-						loaded_img_tx
-							.send(LoadResult::Frame {
-								req_id: request.req_id,
-								image,
-								delay_nano: 0,
-							})
-							.unwrap();
-						load_succeeded = true;
-					}
+					continue;
 				}
-			}
-			if load_succeeded {
-				loaded_img_tx.send(LoadResult::Done { req_id: request.req_id }).unwrap();
-			} else {
-				loaded_img_tx.send(LoadResult::Failed { req_id: request.req_id }).unwrap();
-			}
+			};
+			Self::load_and_send(&img_sender, request);
+			first_load_stage.store(FIRST_ENDED, Ordering::Relaxed);
 		}
 	}
 
@@ -215,6 +180,61 @@ impl ImageLoader {
 
 	pub fn send_load_request(&mut self, request: LoadRequest) {
 		self.path_tx.send(request).unwrap();
+	}
+
+	fn load_and_send(img_sender: &Sender<LoadResult>, request: LoadRequest) {
+		let mut file_start_bytes = [0; 512];
+		let mut load_succeeded = false;
+		if let Ok(metadata) = fs::metadata(&request.path) {
+			let mut is_gif = false;
+			if let Ok(mut file) = fs::File::open(&request.path) {
+				if file.read_exact(&mut file_start_bytes).is_ok() {
+					if let Ok(ImageFormat::Gif) = image::guess_format(&file_start_bytes) {
+						is_gif = true;
+					}
+				}
+			}
+			img_sender.send(LoadResult::Start { req_id: request.req_id, metadata }).unwrap();
+			if is_gif {
+				if let Ok(file) = fs::File::open(&request.path) {
+					if let Ok(decoder) = GifDecoder::new(file) {
+						let frames = decoder.into_frames();
+						load_succeeded = true;
+						for frame in frames {
+							if let Ok(frame) = frame {
+								let (numerator_ms, denom_ms) = frame.delay().numer_denom_ms();
+								let numerator_nano = numerator_ms as u64 * 1_000_000;
+								let denom_nano = denom_ms as u64;
+								let delay_nano = numerator_nano / denom_nano;
+								let image = frame.into_buffer();
+								img_sender
+									.send(LoadResult::Frame {
+										req_id: request.req_id,
+										image,
+										delay_nano,
+									})
+									.unwrap();
+							} else {
+								load_succeeded = false;
+								break;
+							}
+						}
+					}
+				}
+			} else {
+				if let Ok(image) = load_image(request.path.as_path()) {
+					img_sender
+						.send(LoadResult::Frame { req_id: request.req_id, image, delay_nano: 0 })
+						.unwrap();
+					load_succeeded = true;
+				}
+			}
+		}
+		if load_succeeded {
+			img_sender.send(LoadResult::Done { req_id: request.req_id }).unwrap();
+		} else {
+			img_sender.send(LoadResult::Failed { req_id: request.req_id }).unwrap();
+		}
 	}
 }
 
