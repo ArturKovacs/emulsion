@@ -3,7 +3,7 @@
 
 Custom key-bindings can be specified in the `cfg.toml` file. Read about locating or creating the file [here](README.md#custom-configuration).
 
-This file may contain a `[bindings]` section. If there is no such section, the defaults are used. If we were to add all the default bindings to this file it would look somethings like the following
+This file may contain a `[bindings]` section. If there is no such section, the defaults are used. If we were to add all the default bindings to this file it would look something like the following
 
 ```toml
 [bindings]
