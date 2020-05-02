@@ -18,11 +18,20 @@ members = [
 default = []
 networking = ["reqwest"]
 
+[package.metadata.bundle]
+name = "Emulsion"
+identifier = "io.github.arturkovacs.emulsion"
+icon = ["resource_dev/emulsion.png"]
+resources = ["LICENSE.txt"]
+short_description = "A lightweight and minimalistic image viewer"
+copyright = "Copyright (c) 2020 The Emulsion Contributors"
+
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1"
 
 [dependencies]
-gelatin = { path = "./subcrates/gelatin" }
+#gelatin = { path = "./subcrates/gelatin" }
+gelatin = "0.3"
 reqwest = { version = "0.10", features = ["json", "blocking"], optional = true }
 lazy_static = "1.4.0"
 directories = "2.0.2"

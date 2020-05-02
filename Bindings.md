@@ -1,6 +1,33 @@
 
 ## General
 
+Custom key-bindings can be specified in the `cfg.toml` file. Read about locating or creating the file [here](README.md#custom-configuration).
+
+This file may contain a `[bindings]` section. If there is no such section, the defaults are used. If we were to add all the default bindings to this file it would look something like the following
+
+```toml
+[bindings]
+img_next = ["d", "right"]
+img_prev = ["a", "left"]
+img_orig = ["q"]
+img_fit = ["f"]
+img_del = ["delete"]
+pan = ["space"]
+play_anim = ["alt+a", "alt+v"]
+play_present = ["p"]
+play_present_rnd = ["alt+p"]
+toggle_fullscreen = ["F11"]
+escape = ["Escape"]
+```
+
+Note that all items in this section are optional so it's fully valid to only specify one of the actions. In this case all the rest will use the default bindings. For example
+
+```toml
+[bindings]
+img_next = ["space", "right"]
+pan = []
+```
+
 The names of the actions _are_ case sensitive but the input strings are _not_.
 
 It is valid to specify an empty array like `img_del = []` in which case the action will never be triggered.
@@ -8,12 +35,6 @@ It is valid to specify an empty array like `img_del = []` in which case the acti
 A config file with bindings will look like the following.
 
 ```toml
-dark = false
-win_w = 835
-win_h = 759
-win_x = 109
-win_y = 70
-
 [bindings]
 img_next = ["d", "right"]
 img_prev = ["a", "left"]
