@@ -127,7 +127,7 @@ Section /o "Associate supported files" SecAssociate
     !insertmacro EmulsionRegisterExtension "webp" "WEBP Image"
     !insertmacro EmulsionRegisterExtension "tif" "TIF Image"
     !insertmacro EmulsionRegisterExtension "tiff" "TIFF Image"
-    !insertmacro EmulsionRegisterExtension "ico" "ICO Image"
+    ;!insertmacro EmulsionRegisterExtension "ico" "ICO Image" ; Associating ico files with Emulsion seems to cause Adobe Reader's icon to be replaced by the Emulsion icon.
     !insertmacro EmulsionRegisterExtension "hdr" "HDR Image"
     !insertmacro EmulsionRegisterExtension "pbm" "PBM Image"
     !insertmacro EmulsionRegisterExtension "pam" "PAM Image"
@@ -164,41 +164,16 @@ SectionEnd
 ; Uninstaller
 ;--------------------------------
 Section Uninstall
-
-    Delete "$INSTDIR\cfg.bin" ; Created by the program
     
     Delete "$INSTDIR\emulsion.exe"
-    
-    Delete "$INSTDIR\resource\cogs.png"
-    Delete "$INSTDIR\resource\emulsion48.png"
-    Delete "$INSTDIR\resource\light.png"
-    Delete "$INSTDIR\resource\moon.png"
-    Delete "$INSTDIR\resource\question_button.png"
-    Delete "$INSTDIR\resource\question_button_light.png"
-    Delete "$INSTDIR\resource\usage.png"
-    
-    RMDir "$INSTDIR\resource"
-    
     Delete "$INSTDIR\Uninstall.exe"
-    RMDir "$INSTDIR"
+    RMDir "$INSTDIR" ; This is okay, rmdir fails if the directory is not empty.
     
     ;Remove registry keys
     DeleteRegKey SHCTX "${REG_PROG_PATH}"
     DeleteRegKey SHCTX "${REG_UNINST_PATH}"
     
-    !insertmacro EmulsionUnregisterExtension "jpg" "JPG Image"
-    !insertmacro EmulsionUnregisterExtension "jpeg" "JPEG Image"
-    !insertmacro EmulsionUnregisterExtension "png" "PNG Image"
-    !insertmacro EmulsionUnregisterExtension "bmp" "BMP Image"
-    !insertmacro EmulsionUnregisterExtension "tga" "TGA Image"
-    !insertmacro EmulsionUnregisterExtension "webp" "WEBP Image"
-    !insertmacro EmulsionUnregisterExtension "tif" "TIF Image"
-    !insertmacro EmulsionUnregisterExtension "tiff" "TIFF Image"
-    !insertmacro EmulsionUnregisterExtension "ico" "ICO Image"
-    !insertmacro EmulsionUnregisterExtension "hdr" "HDR Image"
-    !insertmacro EmulsionUnregisterExtension "pbm" "PBM Image"
-    !insertmacro EmulsionUnregisterExtension "pam" "PAM Image"
-    !insertmacro EmulsionUnregisterExtension "ppm" "PPM Image"
-    !insertmacro EmulsionUnregisterExtension "pgm" "PGM Image"
+    ; Extensions mustn't be unregistered here. They might be associated
+    ; with a program other than Emulsion and removing those would be wrong.
     
 SectionEnd
