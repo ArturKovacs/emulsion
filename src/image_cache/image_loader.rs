@@ -157,8 +157,6 @@ impl ImageLoader {
 			{
 				// It is very important that we release the mutex before starting to load the image
 				let load_request = request_recv.lock().unwrap();
-				// Loading the atomic after the mutex is locked so that none else has access
-				// to it till the end of the block.
 				let focused = FOCUSED_REQUEST_ID.load(Ordering::Relaxed);
 				request = load_request.recv().unwrap();
 				let focus_test_passed = focused == request.req_id || focused == NO_FOCUSED_REQUEST;
