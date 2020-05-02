@@ -2,14 +2,13 @@ use std;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
 use gelatin::glium;
-use gelatin::image::{self, gif::GifDecoder, io::Reader, AnimationDecoder, ImageFormat};
+use gelatin::image::{self, gif::GifDecoder, AnimationDecoder, ImageFormat};
 
 use glium::texture::{MipmapsOption, RawImage2d, SrgbTexture2d};
 
@@ -28,6 +27,13 @@ pub mod errors {
 }
 
 use self::errors::*;
+
+/// We want to prevent prefetch operations taking place when the target image is not yet loaded.
+/// To implement this we define a variable that is read by the loader threads and
+/// which will only carry out the request if the focused request id matches their request or
+/// if the focused is set to `NO_FOCUSED_REQUEST`
+pub static FOCUSED_REQUEST_ID: AtomicU32 = AtomicU32::new(0); // The first request usually
+pub const NO_FOCUSED_REQUEST: u32 = std::u32::MAX;
 
 pub fn load_image(image_path: &Path) -> Result<image::RgbaImage> {
 	Ok(image::open(image_path)?.to_rgba())
@@ -100,10 +106,6 @@ impl LoadResult {
 	}
 }
 
-const BEFORE_FIRST: usize = 0;
-const LOADING_FIRST: usize = 1;
-const FIRST_ENDED: usize = 2;
-
 pub struct ImageLoader {
 	running: Arc<AtomicBool>,
 	join_handles: Option<Vec<thread::JoinHandle<()>>>,
@@ -121,16 +123,14 @@ impl ImageLoader {
 
 		let (loaded_img_tx, loaded_img_rx) = channel();
 
-		let first_load_stage = Arc::new(AtomicUsize::new(BEFORE_FIRST));
-
 		let mut join_handles = Vec::new();
 		for _ in 0..threads {
 			let running = running.clone();
-			let load_request_rx = load_request_rx.clone();
+			let request_recv = load_request_rx.clone();
+			let request_send = load_request_tx.clone();
 			let img_sender = loaded_img_tx.clone();
-			let first_load_stage = first_load_stage.clone();
 			join_handles.push(thread::spawn(move || {
-				Self::thread_loop(running, load_request_rx, img_sender, first_load_stage);
+				Self::thread_loop(running, request_recv, request_send, img_sender);
 			}));
 		}
 
@@ -145,9 +145,9 @@ impl ImageLoader {
 
 	fn thread_loop(
 		running: Arc<AtomicBool>,
-		load_request_rx: Arc<Mutex<Receiver<LoadRequest>>>,
+		request_recv: Arc<Mutex<Receiver<LoadRequest>>>,
+		request_send: Sender<LoadRequest>,
 		img_sender: Sender<LoadResult>,
-		first_load_stage: Arc<AtomicUsize>,
 	) {
 		// The size was an arbitrary choice made with the argument that this should be
 		// enough to fit enough image file info to determine the format.
@@ -156,21 +156,19 @@ impl ImageLoader {
 			let request;
 			{
 				// It is very important that we release the mutex before starting to load the image
-				let load_request = load_request_rx.lock().unwrap();
+				let load_request = request_recv.lock().unwrap();
 				// Loading the atomic after the mutex is locked so that none else has access
 				// to it till the end of the block.
-				let load_stage = first_load_stage.load(Ordering::Relaxed);
-				if load_stage != LOADING_FIRST {
-					if load_stage == BEFORE_FIRST {
-						first_load_stage.store(LOADING_FIRST, Ordering::Relaxed);
-					}
-					request = load_request.recv().unwrap();
-				} else {
+				let focused = FOCUSED_REQUEST_ID.load(Ordering::Relaxed);
+				request = load_request.recv().unwrap();
+				let focus_test_passed = focused == request.req_id || focused == NO_FOCUSED_REQUEST;
+				if !focus_test_passed {
+					// Just place the request neatly back to the request queue.
+					request_send.send(request).unwrap();
 					continue;
 				}
 			};
 			Self::load_and_send(&img_sender, request);
-			first_load_stage.store(FIRST_ENDED, Ordering::Relaxed);
 		}
 	}
 
