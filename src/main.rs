@@ -13,8 +13,6 @@ use std::time::{Duration, Instant};
 
 use directories::ProjectDirs;
 use lazy_static::lazy_static;
-#[cfg(feature = "networking")]
-use serde::Deserialize;
 
 use gelatin::glium::glutin::{
 	dpi::{PhysicalPosition, PhysicalSize},
@@ -37,8 +35,6 @@ use gelatin::{
 use crate::configuration::{Cache, Configuration};
 use crate::help_screen::*;
 use crate::picture_widget::*;
-#[cfg(feature = "networking")]
-use crate::version::Version;
 use bottom_bar::BottomBar;
 use configuration::Theme;
 
@@ -328,12 +324,6 @@ fn make_picture_widget(
 	picture_widget
 }
 
-#[cfg(feature = "networking")]
-#[derive(Deserialize)]
-struct ReleaseInfoJson {
-	tag_name: String,
-}
-
 fn get_config_and_cache_paths() -> (PathBuf, PathBuf) {
 	let config_folder;
 	let cache_folder;
@@ -366,7 +356,15 @@ fn check_for_updates() -> bool {
 #[cfg(feature = "networking")]
 /// Returns true if updates are available.
 fn check_for_updates() -> bool {
+	use crate::version::Version;
 	use std::str::FromStr;
+
+	use serde::Deserialize;
+
+	#[derive(Deserialize)]
+	struct ReleaseInfoJson {
+		tag_name: String,
+	}
 
 	let client = match reqwest::blocking::Client::builder().user_agent("emulsion").build() {
 		Ok(c) => c,
