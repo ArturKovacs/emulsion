@@ -134,7 +134,7 @@ impl PlaybackManager {
 			_ => 4,
 		};
 
-		let mut result = PlaybackManager {
+		let result = PlaybackManager {
 			//playback_state: PlaybackState::Paused,
 			image_cache: ImageCache::new(cache_capaxity, thread_count),
 			folder_player: ImgSequencePlayer::new(
@@ -188,7 +188,7 @@ impl PlaybackManager {
 		// self.playback_state = PlaybackState::Present;
 	}
 
-	pub fn current_filename(&self) -> OsString {
+	pub fn _current_filename(&self) -> OsString {
 		self.image_cache.current_filename()
 	}
 
@@ -211,8 +211,8 @@ impl PlaybackManager {
 		Ok(())
 	}
 
-	pub fn cached_from_dir(&self) -> Vec<bool> {
-		self.image_cache.cached_from_dir()
+	pub fn _cached_from_dir(&self) -> Vec<bool> {
+		self.image_cache._cached_from_dir()
 	}
 
 	pub fn request_load(&mut self, request: LoadRequest) {
@@ -345,7 +345,7 @@ impl ImgSequencePlayer {
 		self.image_texture.clone().map(|t| t.texture)
 	}
 
-	pub fn filename(&self) -> &Option<OsString> {
+	pub fn _filename(&self) -> &Option<OsString> {
 		&self.filename
 	}
 
