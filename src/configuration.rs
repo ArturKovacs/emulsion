@@ -128,8 +128,23 @@ impl Cache {
 }
 
 #[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
+pub struct EnvVar {
+	pub name: String,
+	pub value: String,
+}
+
+#[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
+pub struct Command {
+	pub input: Vec<String>,
+	pub program: String,
+	pub args: Option<Vec<String>>,
+	pub envs: Option<Vec<EnvVar>>,
+}
+
+#[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Configuration {
 	pub bindings: Option<BTreeMap<String, Vec<String>>>,
+	pub commands: Option<Vec<Command>>,
 	pub updates: Option<ConfigUpdateSection>,
 }
 

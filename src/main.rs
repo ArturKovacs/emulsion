@@ -32,17 +32,20 @@ use gelatin::{
 	NextUpdate, Widget,
 };
 
-use crate::configuration::{Cache, Configuration};
-use crate::help_screen::*;
-use crate::picture_widget::*;
 use bottom_bar::BottomBar;
 use configuration::Theme;
+use configuration::{Cache, Configuration};
+use help_screen::*;
+use input_handling::{char_to_input_key, execute_triggered_commands};
+use picture_widget::*;
+use utils::virtual_keycode_to_string;
 
 mod bottom_bar;
 mod configuration;
 mod handle_panic;
 mod help_screen;
 mod image_cache;
+mod input_handling;
 mod picture_widget;
 mod playback_manager;
 mod shaders;
