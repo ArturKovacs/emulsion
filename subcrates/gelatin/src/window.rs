@@ -309,7 +309,7 @@ impl Window {
 		}
 	}
 
-	pub fn display_mut<'a>(&'a self) -> WindowDisplayRefMut<'a> {
+	pub fn display_mut(&self) -> WindowDisplayRefMut<'_> {
 		WindowDisplayRefMut { window_ref: self.data.borrow_mut() }
 	}
 

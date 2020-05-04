@@ -7,14 +7,12 @@ use std::cell::{Cell, RefCell};
 use std::f32;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use directories::ProjectDirs;
 use lazy_static::lazy_static;
-use serde::Deserialize;
 
 use gelatin::glium::glutin::{
 	dpi::{PhysicalPosition, PhysicalSize},
@@ -37,9 +35,10 @@ use gelatin::{
 use crate::configuration::{Cache, Configuration};
 use crate::help_screen::*;
 use crate::picture_widget::*;
-#[cfg(feature = "networking")]
-use crate::version::Version;
+use bottom_bar::BottomBar;
+use configuration::Theme;
 
+mod bottom_bar;
 mod configuration;
 mod handle_panic;
 mod help_screen;
@@ -55,16 +54,16 @@ lazy_static! {
 	pub static ref PROJECT_DIRS: Option<ProjectDirs> = ProjectDirs::from("", "", "emulsion");
 }
 
+static NEW_VERSION: &[u8] = include_bytes!("../resource/new-version-available.png");
+static NEW_VERSION_LIGHT: &[u8] = include_bytes!("../resource/new-version-available-light.png");
+static VISIT_SITE: &[u8] = include_bytes!("../resource/visit-site.png");
+static USAGE: &[u8] = include_bytes!("../resource/usage.png");
+
 // ========================================================
 // Not-so glorious main function
 // ========================================================
 fn main() {
 	std::panic::set_hook(Box::new(handle_panic::handle_panic));
-
-	let img = image::load_from_memory(include_bytes!("../resource/emulsion48.png")).unwrap();
-	let rgba = img.into_rgba();
-	let (w, h) = rgba.dimensions();
-	let icon = Icon::from_rgba(rgba.into_raw(), w, h).unwrap();
 
 	// Load configuration and cache files
 	let (config_path, cache_path) = get_config_and_cache_paths();
@@ -77,222 +76,109 @@ fn main() {
 	let config = Rc::new(RefCell::new(config.unwrap_or_default()));
 
 	let mut application = Application::new();
-	let window: Rc<Window>;
-	{
-		let cache = cache.lock().unwrap();
+	let window: Rc<Window> = {
+		let window = &cache.lock().unwrap().window;
 
 		let window_desc = WindowDescriptorBuilder::default()
-			.icon(Some(icon))
-			.size(PhysicalSize::new(cache.window.win_w, cache.window.win_h))
-			.position(Some(PhysicalPosition::new(cache.window.win_x, cache.window.win_y)))
+			.icon(Some(make_icon()))
+			.size(PhysicalSize::new(window.win_w, window.win_h))
+			.position(Some(PhysicalPosition::new(window.win_x, window.win_y)))
 			.build()
 			.unwrap();
-		window = Window::new(&mut application, window_desc);
-	}
-	{
-		let cache = cache.clone();
-		window.add_global_event_handler(move |event| match event {
-			WindowEvent::Resized(new_size) => {
-				let mut cache = cache.lock().unwrap();
-				cache.window.win_w = new_size.width;
-				cache.window.win_h = new_size.height;
-			}
-			WindowEvent::Moved(new_pos) => {
-				let mut cache = cache.lock().unwrap();
-				cache.window.win_x = new_pos.x;
-				cache.window.win_y = new_pos.y;
-			}
-			_ => (),
-		});
-	}
-	let vertical_container = Rc::new(VerticalLayoutContainer::new());
-	vertical_container.set_margin_all(0.0);
-	vertical_container.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
-	vertical_container.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
+		Window::new(&mut application, window_desc)
+	};
+	add_window_movement_listener(&window, cache.clone());
 
-	let picture_area_container = Rc::new(VerticalLayoutContainer::new());
-	picture_area_container.set_margin_all(0.0);
-	picture_area_container.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
-	picture_area_container.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
+	let update_label_image = Rc::new(Picture::from_encoded_bytes(NEW_VERSION));
+	let update_label_image_light = Rc::new(Picture::from_encoded_bytes(NEW_VERSION_LIGHT));
+	let update_label = make_update_label();
 
-	let update_notification = Rc::new(HorizontalLayoutContainer::new());
-	let update_label = Rc::new(Label::new());
-	let update_label_image = Rc::new(Picture::from_encoded_bytes(include_bytes!(
-		"../resource/new-version-available.png"
-	)));
-	let update_label_image_light = Rc::new(Picture::from_encoded_bytes(include_bytes!(
-		"../resource/new-version-available-light.png"
-	)));
-	{
-		update_notification.set_vertical_align(Alignment::End);
-		update_notification.set_horizontal_align(Alignment::Start);
-		update_notification.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
-		update_notification.set_height(Length::Fixed(32.0));
-		update_label.set_icon(Some(update_label_image.clone()));
-		update_label.set_margin_top(4.0);
-		update_label.set_margin_bottom(4.0);
-		update_label.set_fixed_size(LogicalVector::new(200.0, 24.0));
-		update_label.set_horizontal_align(Alignment::Center);
-		let update_button = Rc::new(Button::new());
-		let button_image =
-			Rc::new(Picture::from_encoded_bytes(include_bytes!("../resource/visit-site.png")));
-		update_button.set_icon(Some(button_image));
-		update_button.set_margin_top(4.0);
-		update_button.set_margin_bottom(4.0);
-		update_button.set_fixed_size(LogicalVector::new(100.0, 24.0));
-		update_button.set_horizontal_align(Alignment::Center);
-		update_button.set_on_click(|| {
-			open::that("https://arturkovacs.github.io/emulsion-website/").unwrap();
-		});
-		update_notification.add_child(update_label.clone());
-		update_notification.add_child(update_button);
-	}
+	let update_notification = make_update_notification(update_label.clone());
 
-	let usage_img = Picture::from_encoded_bytes(include_bytes!("../resource/usage.png"));
+	let usage_img = Picture::from_encoded_bytes(USAGE);
 	let help_screen = Rc::new(HelpScreen::new(usage_img));
 
-	let bottom_container = Rc::new(HorizontalLayoutContainer::new());
-	//bottom_container.set_margin_top(4.0);
-	//bottom_container.set_margin_bottom(4.0);
-	bottom_container.set_margin_left(0.0);
-	bottom_container.set_margin_right(0.0);
-	bottom_container.set_height(Length::Fixed(32.0));
-	bottom_container.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
+	let bottom_bar = Rc::new(BottomBar::new());
 
-	let moon_img = Rc::new(Picture::from_encoded_bytes(include_bytes!("../resource/moon.png")));
-	let light_img = Rc::new(Picture::from_encoded_bytes(include_bytes!("../resource/light.png")));
-	let theme_button = Rc::new(Button::new());
-	theme_button.set_margin_top(5.0);
-	theme_button.set_margin_left(28.0);
-	theme_button.set_margin_right(4.0);
-	theme_button.set_height(Length::Fixed(24.0));
-	theme_button.set_width(Length::Fixed(24.0));
-	theme_button.set_horizontal_align(Alignment::Center);
-	theme_button.set_icon(Some(moon_img.clone()));
+	let picture_widget =
+		make_picture_widget(&window, bottom_bar.slider(), bottom_bar.widget(), config.clone());
 
-	let question =
-		Rc::new(Picture::from_encoded_bytes(include_bytes!("../resource/question_button.png")));
-	let question_light = Rc::new(Picture::from_encoded_bytes(include_bytes!(
-		"../resource/question_button_light.png"
-	)));
-	let question_noti =
-		Rc::new(Picture::from_encoded_bytes(include_bytes!("../resource/question-noti.png")));
-	let question_light_noti =
-		Rc::new(Picture::from_encoded_bytes(include_bytes!("../resource/question-light-noti.png")));
-	let help_button = Rc::new(Button::new());
-	help_button.set_margin_top(5.0);
-	help_button.set_margin_left(4.0);
-	help_button.set_margin_right(28.0);
-	help_button.set_height(Length::Fixed(24.0));
-	help_button.set_width(Length::Fixed(24.0));
-	help_button.set_horizontal_align(Alignment::Center);
-	help_button.set_icon(Some(question.clone()));
-
-	let slider = Rc::new(Slider::new());
-	slider.set_margin_top(5.0);
-	slider.set_margin_left(4.0);
-	slider.set_margin_right(4.0);
-	slider.set_height(Length::Fixed(24.0));
-	slider.set_width(Length::Stretch { min: 0.0, max: 600.0 });
-	slider.set_horizontal_align(Alignment::Center);
-	slider.set_steps(6, 1);
-
-	let picture_widget = Rc::new(PictureWidget::new(
-		&window.display_mut(),
-		&window,
-		slider.clone(),
-		bottom_container.clone(),
-		config.clone(),
-	));
-	picture_widget.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
-	picture_widget.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
-	if let Some(file_path) = std::env::args().nth(1) {
-		picture_widget.jump_to_path(file_path);
-	}
-
-	bottom_container.add_child(theme_button.clone());
-	bottom_container.add_child(slider.clone());
-	bottom_container.add_child(help_button.clone());
-
+	let picture_area_container = make_picture_area_container();
 	picture_area_container.add_child(picture_widget.clone());
 	picture_area_container.add_child(help_screen.clone());
 	picture_area_container.add_child(update_notification.clone());
 
-	vertical_container.add_child(picture_area_container);
-	vertical_container.add_child(bottom_container.clone());
+	let root_container = make_root_container();
+	root_container.add_child(picture_area_container);
+	root_container.add_child(bottom_bar.widget());
 
 	let update_available = Arc::new(AtomicBool::new(false));
 	let update_check_done = Arc::new(AtomicBool::new(false));
-	let light_theme = Rc::new(Cell::new(!cache.lock().unwrap().window.dark));
-	let theme_button_clone = theme_button.clone();
-	let help_button_clone = help_button.clone();
-	let update_label_clone = update_label;
-	let picture_widget_clone = picture_widget.clone();
-	let bottom_container_clone = bottom_container;
-	let update_notification_clone = update_notification.clone();
-	let slider_clone = slider.clone();
-	let window_clone = window.clone();
-	let light_theme_clone = light_theme.clone();
-	let update_available_clone = update_available.clone();
-	let set_theme = Rc::new(move || {
-		if light_theme_clone.get() {
-			picture_widget_clone.set_bright_shade(0.96);
-			bottom_container_clone.set_bg_color([1.0, 1.0, 1.0, 1.0]);
-			slider_clone.set_shadow_color([0.0, 0.0, 0.0]);
-			window_clone.set_bg_color([0.85, 0.85, 0.85, 1.0]);
-			theme_button_clone.set_icon(Some(moon_img.clone()));
-			update_notification_clone.set_bg_color([0.06, 0.06, 0.06, 1.0]);
-			update_label_clone.set_icon(Some(update_label_image_light.clone()));
-			if update_available_clone.load(Ordering::SeqCst) {
-				help_button_clone.set_icon(Some(question_noti.clone()));
-			} else {
-				help_button_clone.set_icon(Some(question.clone()));
+	let theme = Rc::new(Cell::new(cache.lock().unwrap().theme()));
+
+	let set_theme = {
+		let update_label = update_label;
+		let picture_widget = picture_widget.clone();
+		let update_notification = update_notification.clone();
+		let window = window.clone();
+		let theme = theme.clone();
+		let update_available = update_available.clone();
+		let bottom_bar = bottom_bar.clone();
+
+		Rc::new(move || {
+			match theme.get() {
+				Theme::Light => {
+					picture_widget.set_bright_shade(0.96);
+					window.set_bg_color([0.85, 0.85, 0.85, 1.0]);
+					update_notification.set_bg_color([0.06, 0.06, 0.06, 1.0]);
+					update_label.set_icon(Some(update_label_image_light.clone()));
+				}
+				Theme::Dark => {
+					picture_widget.set_bright_shade(0.11);
+					window.set_bg_color([0.03, 0.03, 0.03, 1.0]);
+					update_notification.set_bg_color([0.85, 0.85, 0.85, 1.0]);
+					update_label.set_icon(Some(update_label_image.clone()));
+				}
 			}
-		} else {
-			picture_widget_clone.set_bright_shade(0.11);
-			bottom_container_clone.set_bg_color([0.08, 0.08, 0.08, 1.0]);
-			slider_clone.set_shadow_color([0.0, 0.0, 0.0]);
-			window_clone.set_bg_color([0.03, 0.03, 0.03, 1.0]);
-			theme_button_clone.set_icon(Some(light_img.clone()));
-			update_notification_clone.set_bg_color([0.85, 0.85, 0.85, 1.0]);
-			update_label_clone.set_icon(Some(update_label_image.clone()));
-			if update_available_clone.load(Ordering::SeqCst) {
-				help_button_clone.set_icon(Some(question_light_noti.clone()));
-			} else {
-				help_button_clone.set_icon(Some(question_light.clone()));
-			}
-		}
-	});
+			bottom_bar.set_theme(theme.get(), update_available.load(Ordering::SeqCst));
+		})
+	};
 	set_theme();
 	{
 		let cache = cache.clone();
 		let set_theme = set_theme.clone();
-		theme_button.set_on_click(move || {
-			light_theme.set(!light_theme.get());
-			cache.lock().unwrap().window.dark = !light_theme.get();
+
+		bottom_bar.set_on_theme_click(move || {
+			let new_theme = theme.get().switch_theme();
+			theme.set(new_theme);
+			cache.lock().unwrap().set_theme(new_theme);
 			set_theme();
 		});
 	}
-	let slider_clone2 = slider.clone();
-	let image_widget_clone = picture_widget;
-	slider.set_on_value_change(move || {
-		image_widget_clone.jump_to_index(slider_clone2.value());
-	});
+	{
+		let slider = bottom_bar.slider();
+
+		bottom_bar.set_on_slider_value_change(move || {
+			picture_widget.jump_to_index(slider.value());
+		});
+	}
 	let help_visible = Cell::new(first_launch);
 	help_screen.set_visible(help_visible.get());
-	let update_available_clone = update_available.clone();
-	let help_screen_clone = help_screen.clone();
-	let update_notification_clone = update_notification.clone();
-	update_notification
-		.set_visible(help_visible.get() && update_available_clone.load(Ordering::SeqCst));
-	help_button.set_on_click(move || {
-		help_visible.set(!help_visible.get());
-		help_screen_clone.set_visible(help_visible.get());
-		update_notification_clone
-			.set_visible(help_visible.get() && update_available_clone.load(Ordering::SeqCst));
-	});
+	update_notification.set_visible(help_visible.get() && update_available.load(Ordering::SeqCst));
+	{
+		let update_available = update_available.clone();
+		let help_screen = help_screen.clone();
+		let update_notification = update_notification.clone();
 
-	window.set_root(vertical_container);
+		bottom_bar.set_on_help_click(move || {
+			help_visible.set(!help_visible.get());
+			help_screen.set_visible(help_visible.get());
+			update_notification
+				.set_visible(help_visible.get() && update_available.load(Ordering::SeqCst));
+		});
+	}
+
+	window.set_root(root_container);
 
 	let check_updates_enabled = match &config.borrow().updates {
 		Some(u) if !u.check_updates => false,
@@ -345,9 +231,97 @@ fn main() {
 }
 // ========================================================
 
-#[derive(Deserialize)]
-struct ReleaseInfoJson {
-	tag_name: String,
+fn make_icon() -> Icon {
+	let img = image::load_from_memory(include_bytes!("../resource/emulsion48.png")).unwrap();
+	let rgba = img.into_rgba();
+	let (w, h) = rgba.dimensions();
+	Icon::from_rgba(rgba.into_raw(), w, h).unwrap()
+}
+
+fn add_window_movement_listener(window: &Window, cache: Arc<Mutex<Cache>>) {
+	window.add_global_event_handler(move |event| match event {
+		WindowEvent::Resized(new_size) => {
+			let mut cache = cache.lock().unwrap();
+			cache.window.win_w = new_size.width;
+			cache.window.win_h = new_size.height;
+		}
+		WindowEvent::Moved(new_pos) => {
+			let mut cache = cache.lock().unwrap();
+			cache.window.win_x = new_pos.x;
+			cache.window.win_y = new_pos.y;
+		}
+		_ => (),
+	});
+}
+
+fn make_root_container() -> Rc<VerticalLayoutContainer> {
+	let container = Rc::new(VerticalLayoutContainer::new());
+	container.set_margin_all(0.0);
+	container.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
+	container.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
+	container
+}
+
+fn make_picture_area_container() -> Rc<VerticalLayoutContainer> {
+	let picture_area_container = Rc::new(VerticalLayoutContainer::new());
+	picture_area_container.set_margin_all(0.0);
+	picture_area_container.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
+	picture_area_container.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
+	picture_area_container
+}
+
+fn make_update_label() -> Rc<Label> {
+	let update_label = Rc::new(Label::new());
+	update_label.set_margin_top(4.0);
+	update_label.set_margin_bottom(4.0);
+	update_label.set_fixed_size(LogicalVector::new(200.0, 24.0));
+	update_label.set_horizontal_align(Alignment::Center);
+	update_label
+}
+
+fn make_update_notification(update_label: Rc<Label>) -> Rc<HorizontalLayoutContainer> {
+	let container = Rc::new(HorizontalLayoutContainer::new());
+	container.set_vertical_align(Alignment::End);
+	container.set_horizontal_align(Alignment::Start);
+	container.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
+	container.set_height(Length::Fixed(32.0));
+
+	let update_button = Rc::new(Button::new());
+	let button_image = Rc::new(Picture::from_encoded_bytes(VISIT_SITE));
+	update_button.set_icon(Some(button_image));
+	update_button.set_margin_top(4.0);
+	update_button.set_margin_bottom(4.0);
+	update_button.set_fixed_size(LogicalVector::new(100.0, 24.0));
+	update_button.set_horizontal_align(Alignment::Center);
+	update_button.set_on_click(|| {
+		open::that("https://arturkovacs.github.io/emulsion-website/").unwrap();
+	});
+
+	container.add_child(update_label);
+	container.add_child(update_button);
+	container
+}
+
+fn make_picture_widget(
+	window: &Rc<Window>,
+	slider: Rc<Slider>,
+	bottom_container: Rc<HorizontalLayoutContainer>,
+	config: Rc<RefCell<Configuration>>,
+) -> Rc<PictureWidget> {
+	let picture_widget = Rc::new(PictureWidget::new(
+		&window.display_mut(),
+		window,
+		slider,
+		bottom_container.clone(),
+		config.clone(),
+	));
+	picture_widget.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
+	picture_widget.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
+
+	if let Some(file_path) = std::env::args().nth(1) {
+		picture_widget.jump_to_path(file_path);
+	}
+	picture_widget
 }
 
 fn get_config_and_cache_paths() -> (PathBuf, PathBuf) {
@@ -382,14 +356,23 @@ fn check_for_updates() -> bool {
 #[cfg(feature = "networking")]
 /// Returns true if updates are available.
 fn check_for_updates() -> bool {
-	let client;
-	match reqwest::blocking::Client::builder().user_agent("emulsion").build() {
-		Ok(c) => client = c,
+	use crate::version::Version;
+	use std::str::FromStr;
+
+	use serde::Deserialize;
+
+	#[derive(Deserialize)]
+	struct ReleaseInfoJson {
+		tag_name: String,
+	}
+
+	let client = match reqwest::blocking::Client::builder().user_agent("emulsion").build() {
+		Ok(c) => c,
 		Err(e) => {
 			println!("Could not build client for version request: {}", e);
 			return false;
 		}
-	}
+	};
 	let response =
 		client.get("https://api.github.com/repos/ArturKovacs/emulsion/releases/latest").send();
 	match response {

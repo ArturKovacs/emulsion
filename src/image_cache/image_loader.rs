@@ -97,13 +97,6 @@ impl LoadResult {
 			LoadResult::Failed { req_id, .. } => *req_id,
 		}
 	}
-	pub fn is_failed(&self) -> bool {
-		if let LoadResult::Failed { .. } = *self {
-			true
-		} else {
-			false
-		}
-	}
 }
 
 pub struct ImageLoader {
