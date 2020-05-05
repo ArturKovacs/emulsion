@@ -16,12 +16,23 @@ fn print_help() {
 	print_version();
 	println!("A fast and minimalistic image viewer");
 	println!("Artur Barnabas <kovacs.artur.barnabas@gmail.com>");
+	println!("https://arturkovacs.github.io/emulsion-website/");
 	println!("\n{}", USAGE);
 	println!("\n{}", OPTIONS);
+	print_cfg_paths();
 }
 
 fn print_version() {
 	println!("emulsion {}", Version::cargo_pkg_version());
+}
+
+fn print_cfg_paths() {
+	let (config_path, cache_path) = crate::get_config_and_cache_paths();
+	println!(
+		"\nCONFIGURATION:\n    config file: {}\n    cache file:  {}",
+		config_path.to_string_lossy(),
+		cache_path.to_string_lossy(),
+	);
 }
 
 /// Contains the command-line arguments

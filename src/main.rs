@@ -328,7 +328,7 @@ fn make_picture_widget(
 	picture_widget
 }
 
-fn get_config_and_cache_paths() -> (PathBuf, PathBuf) {
+pub fn get_config_and_cache_paths() -> (PathBuf, PathBuf) {
 	let config_folder;
 	let cache_folder;
 
