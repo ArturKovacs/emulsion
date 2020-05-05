@@ -389,7 +389,7 @@ fn check_for_updates() -> bool {
 					}
 				}
 				Err(error) => {
-					eprintln!("Error parsing version: {}", error.to_string());
+					eprintln!("Error parsing version: {}", error);
 				}
 			},
 			Err(e) => eprintln!("Failed to create json from response: {}", e),
