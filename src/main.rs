@@ -67,13 +67,10 @@ static USAGE: &[u8] = include_bytes!("../resource/usage.png");
 fn main() {
 	std::panic::set_hook(Box::new(handle_panic::handle_panic));
 
-	let file_path = match cmd_line::get_file_path() {
-		Some(args) => args,
-		None => return,
-	};
-
 	// Load configuration and cache files
 	let (config_path, cache_path) = get_config_and_cache_paths();
+
+	let file_path = cmd_line::parse_args(&config_path, &cache_path);
 
 	let cache = Cache::load(&cache_path);
 	let config = Configuration::load(&config_path);

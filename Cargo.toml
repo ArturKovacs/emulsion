@@ -45,3 +45,4 @@ toml = "0.5"
 rand = "0.7"
 alphanumeric-sort = "1.0"
 trash = "1.0"
+clap = { version = "2.33", default-features = false }
