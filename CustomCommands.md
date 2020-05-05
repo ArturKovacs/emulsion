@@ -52,10 +52,10 @@ args = ["status"]
 ```
 
 There are two more parameters for each command.
-- `args`: an array of arguments to passed on to the program
+- `args`: an array of arguments passed on to the program
 - `envs`: an array of environment variable definitions
 
-Within the `args`, one may use `${img}` and `${folder}` for the currently open image file path and its parent folder path respectively. Note that these are substituted with a simple find and replace so there's no need to escape dollar signs ($) and they have to be typed in the exact format specified earlier.
+Within the `args`, one may use `${img}` and `${folder}` for the currently open image file path and its parent folder path respectively. Note that these are substituted with a simple find and replace so there's no need to escape dollar signs ($) and they have to be typed in the exact format specified here.
 
 The following example specifies a single environment variable and invokes cmd with three command line arguments.
 
