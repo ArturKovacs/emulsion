@@ -50,8 +50,6 @@ mod picture_widget;
 mod playback_manager;
 mod shaders;
 mod utils;
-#[cfg(feature = "networking")]
-mod version;
 
 lazy_static! {
 	pub static ref PROJECT_DIRS: Option<ProjectDirs> = ProjectDirs::from("", "", "emulsion");
@@ -197,7 +195,7 @@ fn main() {
 		if check_updates_enabled && updates.update_check_needed() {
 			// kick off a thread that will check for an update in the background
 			Some(std::thread::spawn(move || {
-				let has_update = check_for_updates();
+				let has_update = update::check_for_updates();
 				update_available.store(has_update, Ordering::SeqCst);
 				update_check_done.store(true, Ordering::SeqCst);
 				if !has_update {
@@ -351,17 +349,17 @@ fn get_config_and_cache_paths() -> (PathBuf, PathBuf) {
 }
 
 #[cfg(not(feature = "networking"))]
-/// Always returns false without the `networking` feature.
-fn check_for_updates() -> bool {
-	false
+mod update {
+	/// Always returns false without the `networking` feature.
+	pub fn check_for_updates() -> bool {
+		false
+	}
 }
 
 #[cfg(feature = "networking")]
-/// Returns true if updates are available.
-fn check_for_updates() -> bool {
-	use crate::version::Version;
-	use std::str::FromStr;
-
+mod version;
+#[cfg(feature = "networking")]
+mod update {
 	use serde::Deserialize;
 
 	#[derive(Deserialize)]
@@ -369,39 +367,58 @@ fn check_for_updates() -> bool {
 		tag_name: String,
 	}
 
-	let client = match reqwest::blocking::Client::builder().user_agent("emulsion").build() {
-		Ok(c) => c,
-		Err(e) => {
-			println!("Could not build client for version request: {}", e);
-			return false;
-		}
-	};
-	let response =
-		client.get("https://api.github.com/repos/ArturKovacs/emulsion/releases/latest").send();
-	match response {
-		Ok(response) => match response.json::<ReleaseInfoJson>() {
-			Ok(info) => {
-				println!("Found latest version tag {}", info.tag_name);
-
-				let current = Version::cargo_pkg_version();
-				println!("Current version is '{}'", current);
-
-				match Version::from_str(&info.tag_name) {
-					Ok(latest) => {
-						println!("Parsed latest version is '{}'", latest);
-
-						if latest > current {
-							return true;
-						}
-					}
-					Err(error) => {
-						println!("Error parsing version: {}", error.to_string());
-					}
-				}
+	mod errors {
+		error_chain! {
+			foreign_links {
+				Io(std::io::Error);
+				JsonError(serde_json::error::Error);
+				ParseIntError(std::num::ParseIntError);
 			}
-			Err(e) => println!("Failed to create json from response: {}", e),
-		},
-		Err(e) => println!("Failed to get latest version info: {}", e),
+		}
 	}
-	false
+
+	/// Tries to fetch latest release tag
+	fn latest_release() -> errors::Result<ReleaseInfoJson> {
+		let url = "https://api.github.com/repos/ArturKovacs/emulsion/releases/latest";
+		let req = ureq::get(&url).set("User-Agent", "emulsion").call();
+		if req.ok() {
+			let json = req.into_json()?;
+			let release_info = serde_json::from_value::<ReleaseInfoJson>(json)?;
+			Ok(release_info)
+		} else {
+			Err(req.status_line().into())
+		}
+	}
+
+	/// Tries to parse version tag and compare against current version
+	fn compare_release(info: &ReleaseInfoJson) -> errors::Result<bool> {
+		use crate::version::Version;
+		use std::str::FromStr;
+
+		println!("Found latest version tag {}", info.tag_name);
+
+		let current = Version::cargo_pkg_version();
+		println!("Current version is '{}'", current);
+
+		let latest = Version::from_str(&info.tag_name)?;
+		println!("Parsed latest version is '{}'", latest);
+		Ok(latest > current)
+	}
+
+	/// Returns true if updates are available.
+	pub fn check_for_updates() -> bool {
+		match latest_release() {
+			Ok(info) => match compare_release(&info) {
+				Ok(is_newer) => is_newer,
+				Err(err) => {
+					eprintln!("Error parsing release tag: {}", err);
+					false
+				}
+			},
+			Err(err) => {
+				eprintln!("Error checking latest release: {}", err);
+				false
+			}
+		}
+	}
 }

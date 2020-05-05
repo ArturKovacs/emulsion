@@ -16,7 +16,7 @@ members = [
 
 [features]
 default = []
-networking = ["reqwest"]
+networking = ["ureq", "serde_json"]
 
 [package.metadata.bundle]
 name = "Emulsion"
@@ -30,9 +30,9 @@ copyright = "Copyright (c) 2020 The Emulsion Contributors"
 winres = "0.1"
 
 [dependencies]
-gelatin = { path = "./subcrates/gelatin" }
-#gelatin = "0.3"
-reqwest = { version = "0.10", features = ["json", "blocking"], optional = true }
+#gelatin = { path = "./subcrates/gelatin" }
+gelatin = "0.3"
+ureq = { version = "0.12", features = ["json"], optional = true }
 lazy_static = "1.4.0"
 directories = "2.0.2"
 open = "1.4.0"
@@ -40,6 +40,7 @@ sys-info = "=0.5.8"
 error-chain = "0.12"
 backtrace = "0.3"
 serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", optional = true }
 toml = "0.5"
 rand = "0.7"
 alphanumeric-sort = "1.0"
