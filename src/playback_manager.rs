@@ -123,7 +123,7 @@ impl PlaybackManager {
 				((value.total / 8) * 1024) as isize
 			}
 			_ => {
-				println!("Could not get system memory size, using default value");
+				eprintln!("Could not get system memory size, using default value");
 				// bytes
 				500_000_000
 			}

@@ -32,13 +32,15 @@ use gelatin::{
 	NextUpdate, Widget,
 };
 
+use crate::bottom_bar::BottomBar;
+use crate::configuration::Theme;
 use crate::configuration::{Cache, Configuration};
 use crate::help_screen::*;
 use crate::picture_widget::*;
-use bottom_bar::BottomBar;
-use configuration::Theme;
+pub use crate::version::Version;
 
 mod bottom_bar;
+mod cmd_line;
 mod configuration;
 mod handle_panic;
 mod help_screen;
@@ -47,7 +49,6 @@ mod picture_widget;
 mod playback_manager;
 mod shaders;
 mod utils;
-#[cfg(feature = "networking")]
 mod version;
 
 lazy_static! {
@@ -64,6 +65,11 @@ static USAGE: &[u8] = include_bytes!("../resource/usage.png");
 // ========================================================
 fn main() {
 	std::panic::set_hook(Box::new(handle_panic::handle_panic));
+
+	let file_path = match cmd_line::get_file_path() {
+		Some(args) => args,
+		None => return,
+	};
 
 	// Load configuration and cache files
 	let (config_path, cache_path) = get_config_and_cache_paths();
@@ -102,6 +108,8 @@ fn main() {
 
 	let picture_widget =
 		make_picture_widget(&window, bottom_bar.slider(), bottom_bar.widget(), config.clone());
+
+	picture_widget.jump_to_path(file_path);
 
 	let picture_area_container = make_picture_area_container();
 	picture_area_container.add_child(picture_widget.clone());
@@ -317,10 +325,6 @@ fn make_picture_widget(
 	));
 	picture_widget.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
 	picture_widget.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
-
-	if let Some(file_path) = std::env::args().nth(1) {
-		picture_widget.jump_to_path(file_path);
-	}
 	picture_widget
 }
 
@@ -356,7 +360,6 @@ fn check_for_updates() -> bool {
 #[cfg(feature = "networking")]
 /// Returns true if updates are available.
 fn check_for_updates() -> bool {
-	use crate::version::Version;
 	use std::str::FromStr;
 
 	use serde::Deserialize;
@@ -369,7 +372,7 @@ fn check_for_updates() -> bool {
 	let client = match reqwest::blocking::Client::builder().user_agent("emulsion").build() {
 		Ok(c) => c,
 		Err(e) => {
-			println!("Could not build client for version request: {}", e);
+			eprintln!("Could not build client for version request: {}", e);
 			return false;
 		}
 	};
@@ -377,28 +380,21 @@ fn check_for_updates() -> bool {
 		client.get("https://api.github.com/repos/ArturKovacs/emulsion/releases/latest").send();
 	match response {
 		Ok(response) => match response.json::<ReleaseInfoJson>() {
-			Ok(info) => {
-				println!("Found latest version tag {}", info.tag_name);
-
-				let current = Version::cargo_pkg_version();
-				println!("Current version is '{}'", current);
-
-				match Version::from_str(&info.tag_name) {
-					Ok(latest) => {
-						println!("Parsed latest version is '{}'", latest);
-
-						if latest > current {
-							return true;
-						}
-					}
-					Err(error) => {
-						println!("Error parsing version: {}", error.to_string());
+			Ok(info) => match Version::from_str(&info.tag_name) {
+				Ok(latest) => {
+					let current = Version::cargo_pkg_version();
+					if latest > current {
+						println!("Current version is {}, latest version is {}", current, latest);
+						return true;
 					}
 				}
-			}
-			Err(e) => println!("Failed to create json from response: {}", e),
+				Err(error) => {
+					eprintln!("Error parsing version: {}", error.to_string());
+				}
+			},
+			Err(e) => eprintln!("Failed to create json from response: {}", e),
 		},
-		Err(e) => println!("Failed to get latest version info: {}", e),
+		Err(e) => eprintln!("Failed to get latest version info: {}", e),
 	}
 	false
 }
