@@ -1,14 +1,7 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
-
-use lazy_static::lazy_static;
-
-use crate::shaders;
-use crate::utils::{virtual_keycode_is_char, virtual_keycode_to_string};
-
-use crate::{configuration::Configuration, playback_manager::*};
+use std::time::{Duration, Instant};
 
 use gelatin::cgmath::{Matrix4, Vector3};
 use gelatin::glium::glutin::event::{ElementState, ModifiersState, MouseButton};
@@ -23,37 +16,10 @@ use gelatin::{
 	application::request_exit, DrawContext, Event, EventKind, Widget, WidgetData, WidgetError,
 };
 
-use std::time::{Duration, Instant};
-
-static TOGGLE_FULLSCREEN_NAME: &str = "toggle_fullscreen";
-static ESCAPE_NAME: &str = "escape";
-static IMG_NEXT_NAME: &str = "img_next";
-static IMG_PREV_NAME: &str = "img_prev";
-static IMG_ORIG_NAME: &str = "img_orig";
-static IMG_FIT_NAME: &str = "img_fit";
-static IMG_DEL_NAME: &str = "img_del";
-static PAN_NAME: &str = "pan";
-static PLAY_ANIM_NAME: &str = "play_anim";
-static PLAY_PRESENT_NAME: &str = "play_present";
-static PLAY_PRESENT_RND_NAME: &str = "play_present_rnd";
-
-lazy_static! {
-	static ref DEFAULT_BINDINGS: HashMap<&'static str, Vec<&'static str>> = {
-		let mut m = HashMap::new();
-		m.insert(TOGGLE_FULLSCREEN_NAME, vec!["F11"]);
-		m.insert(ESCAPE_NAME, vec!["Escape"]);
-		m.insert(IMG_NEXT_NAME, vec!["D", "Right"]);
-		m.insert(IMG_PREV_NAME, vec!["A", "Left"]);
-		m.insert(IMG_ORIG_NAME, vec!["Q"]);
-		m.insert(IMG_FIT_NAME, vec!["F"]);
-		m.insert(IMG_DEL_NAME, vec!["Delete"]);
-		m.insert(PAN_NAME, vec!["Space"]);
-		m.insert(PLAY_ANIM_NAME, vec!["Alt+A", "Alt+V"]);
-		m.insert(PLAY_PRESENT_NAME, vec!["P"]);
-		m.insert(PLAY_PRESENT_RND_NAME, vec!["Alt+P"]);
-		m
-	};
-}
+use crate::input_handling::*;
+use crate::shaders;
+use crate::utils::{virtual_keycode_is_char, virtual_keycode_to_string};
+use crate::{configuration::Configuration, playback_manager::*};
 
 #[derive(Debug, Clone)]
 enum HoverState {
@@ -232,63 +198,11 @@ impl PictureWidget {
 		borrowed.rendered_valid = false;
 	}
 
-	fn keys_triggered<S: AsRef<str>>(
-		keys: &[S],
-		input_key: &str,
-		modifiers: ModifiersState,
-	) -> bool {
-		for key in keys {
-			let complex_key = key.as_ref();
-			let parts = complex_key.split('+').map(|s| s.trim().to_lowercase()).collect::<Vec<_>>();
-			if parts.is_empty() {
-				continue;
-			}
-			let key = parts.last().unwrap();
-			if input_key != *key {
-				continue;
-			}
-			let mut has_alt = false;
-			let mut has_ctrl = false;
-			let mut has_logo = false;
-			for mod_str in parts.iter().take(parts.len() - 1) {
-				match mod_str.as_ref() {
-					"alt" => has_alt = true,
-					"ctrl" => has_ctrl = true,
-					"logo" => has_logo = true,
-					_ => (),
-				}
-			}
-			if has_alt == modifiers.alt()
-				&& has_ctrl == modifiers.ctrl()
-				&& has_logo == modifiers.logo()
-			{
-				return true;
-			}
-		}
-		false
-	}
-
-	fn triggered(
-		config: &Rc<RefCell<Configuration>>,
-		action_name: &str,
-		input_key: &str,
-		modifiers: ModifiersState,
-	) -> bool {
-		let config = config.borrow();
-		let bindings = config.bindings.as_ref();
-		if let Some(Some(keys)) = bindings.map(|b| b.get(action_name)) {
-			Self::keys_triggered(keys.as_slice(), input_key, modifiers)
-		} else {
-			let keys = DEFAULT_BINDINGS.get(action_name).unwrap();
-			Self::keys_triggered(keys.as_slice(), input_key, modifiers)
-		}
-	}
-
 	fn handle_key_input(&self, input_key: &str, modifiers: ModifiersState) {
 		let mut borrowed = self.data.borrow_mut();
 		macro_rules! triggered {
 			($action_name:ident) => {
-				Self::triggered(&borrowed.configuration, $action_name, input_key, modifiers)
+				action_triggered(&borrowed.configuration, $action_name, input_key, modifiers)
 			};
 		}
 		if triggered!(TOGGLE_FULLSCREEN_NAME) {
@@ -354,6 +268,23 @@ impl PictureWidget {
 				eprintln!("Error while updating directory {:?}", e);
 			}
 			borrowed.rendered_valid = false;
+		}
+		let img_path = borrowed.playback_manager.current_file_path();
+		if let Some(folder_path) = img_path.parent() {
+			let img_and_folder = (img_path.to_str(), folder_path.to_str());
+			if let (Some(img_path), Some(folder_path)) = img_and_folder {
+				execute_triggered_commands(
+					borrowed.configuration.clone(),
+					input_key,
+					modifiers,
+					img_path,
+					folder_path,
+				);
+			} else {
+				eprintln!("Could not convert the image path to utf8. Path: '{:?}'", img_path);
+			}
+		} else {
+			eprintln!("Could not get parent folder for the image path {:?}", img_path);
 		}
 	}
 }
@@ -546,25 +477,18 @@ impl Widget for PictureWidget {
 				borrowed.image_fit = false;
 			}
 			EventKind::ReceivedCharacter(ch) => {
-				let mut input_key = String::with_capacity(5);
-				if ch == ' ' {
-					input_key.push_str("space");
-				} else if ch == '+' {
-					input_key.push_str("add");
-				} else {
-					input_key.push(ch);
-				}
+				let input_key = char_to_input_key(ch);
 				self.handle_key_input(input_key.as_str(), event.modifiers);
 			}
 			EventKind::KeyInput { input } => {
 				if let Some(key) = input.virtual_keycode {
 					let input_key_str = virtual_keycode_to_string(key).to_lowercase();
 					if !virtual_keycode_is_char(key) && input.state == ElementState::Pressed {
-						self.handle_key_input(input_key_str.as_str(), event.modifiers)
+						self.handle_key_input(input_key_str.as_str(), event.modifiers);
 					}
 					// Panning is a special snowflake
 					let mut borrowed = self.data.borrow_mut();
-					if Self::triggered(
+					if action_triggered(
 						&borrowed.configuration,
 						PAN_NAME,
 						input_key_str.as_str(),

@@ -39,6 +39,8 @@ The default value is `true`. (Note that this field has no effect when emulsion i
 This file may contain a `[bindings]` section which allows defining custom key-bindings.
 For more on that please refer to the [Bindings.md](Bindings.md) file.
 
+This file may also specify commands that get executed on a given input. For more on those, take a look at the [CustomCommands.md](CustomCommands.md) file.
+
 ## Notes on Networking
 
 When installing Emulsion through a perpared package like the Windows installer, Emulsion will have networking enabled and by default
