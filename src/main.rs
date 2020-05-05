@@ -406,7 +406,7 @@ mod update {
 	pub fn check_for_updates() -> bool {
 		match latest_release() {
 			Ok(info) => match compare_release(&info) {
-				Ok(maybe_newer) => maybe_newer,
+				Ok(is_newer) => is_newer,
 				Err(err) => {
 					eprintln!("Error parsing release tag: {}", err);
 					false
