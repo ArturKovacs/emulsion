@@ -369,10 +369,12 @@ mod update {
 			foreign_links {
 				Io(std::io::Error);
 				JsonError(serde_json::error::Error);
+				ParseIntError(std::num::ParseIntError);
 			}
 		}
 	}
 
+	/// Tries to fetch latest release tag
 	fn latest_release() -> errors::Result<ReleaseInfoJson> {
 		let url = "https://api.github.com/repos/ArturKovacs/emulsion/releases/latest";
 		let req = ureq::get(&url).set("User-Agent", "emulsion").call();
@@ -381,35 +383,39 @@ mod update {
 			let release_info = serde_json::from_value::<ReleaseInfoJson>(json)?;
 			Ok(release_info)
 		} else {
-			eprintln!("Error checking latest release: {}", req.status_line());
 			Err(req.status_line().into())
 		}
 	}
 
-	/// Returns true if updates are available.
-	pub fn check_for_updates() -> bool {
+	/// Tries to parse version tag and compare against current version
+	fn compare_release(info: &ReleaseInfoJson) -> errors::Result<bool> {
 		use crate::version::Version;
 		use std::str::FromStr;
 
-		if let Ok(info) = latest_release() {
-			println!("Found latest version tag {}", info.tag_name);
+		println!("Found latest version tag {}", info.tag_name);
 
-			let current = Version::cargo_pkg_version();
-			println!("Current version is '{}'", current);
+		let current = Version::cargo_pkg_version();
+		println!("Current version is '{}'", current);
 
-			match Version::from_str(&info.tag_name) {
-				Ok(latest) => {
-					println!("Parsed latest version is '{}'", latest);
+		let latest = Version::from_str(&info.tag_name)?;
+		println!("Parsed latest version is '{}'", latest);
+		Ok(latest > current)
+	}
 
-					if latest > current {
-						return true;
-					}
+	/// Returns true if updates are available.
+	pub fn check_for_updates() -> bool {
+		match latest_release() {
+			Ok(info) => match compare_release(&info) {
+				Ok(maybe_newer) => maybe_newer,
+				Err(err) => {
+					eprintln!("Error parsing release tag: {}", err);
+					false
 				}
-				Err(error) => {
-					println!("Error parsing version: {}", error.to_string());
-				}
+			},
+			Err(err) => {
+				eprintln!("Error checking latest release: {}", err);
+				false
 			}
 		}
-		false
 	}
 }
