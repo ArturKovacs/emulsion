@@ -380,6 +380,7 @@ impl Widget for PictureWidget {
 
 				let sampler = texture
 					.sampled()
+					.minify_filter(gelatin::glium::uniforms::MinifySamplerFilter::NearestMipmapLinear)
 					.wrap_function(gelatin::glium::uniforms::SamplerWrapFunction::Clamp);
 				let sampler = if data.img_texel_size >= 4f32 {
 					sampler.magnify_filter(gelatin::glium::uniforms::MagnifySamplerFilter::Nearest)
