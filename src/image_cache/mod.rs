@@ -93,7 +93,7 @@ pub struct AnimationFrameTexture {
 
 struct CachedTexture {
 	/// Contains the load request id
-	req_id: u32,
+	_req_id: u32,
 	needs_update: bool,
 	mod_time: Option<SystemTime>,
 
@@ -177,7 +177,7 @@ impl ImageCache {
 		}
 	}
 
-	pub fn cached_from_dir(&self) -> Vec<bool> {
+	pub fn _cached_from_dir(&self) -> Vec<bool> {
 		let mut result = Vec::with_capacity(self.dir_files.len());
 		for desc in self.dir_files.iter() {
 			result.push(self.texture_cache.contains_key(&desc.request_id));
@@ -383,7 +383,7 @@ impl ImageCache {
 		frame_jump_count: isize,
 	) -> Result<(AnimationFrameTexture, OsString)> {
 		if file_jump_count == 0 {
-			let path = self.current_file_path();
+			let _path = self.current_file_path();
 			// Here, it is possible that the current image was already
 			// requested but not yet loaded.
 			let target_frame = self.current_frame_idx as isize + frame_jump_count;
@@ -556,7 +556,7 @@ impl ImageCache {
 				match self.texture_cache.entry(req_id) {
 					Entry::Vacant(entry) => {
 						entry.insert(CachedTexture {
-							req_id,
+							_req_id: req_id,
 							needs_update: false,
 							fully_loaded: false,
 							mod_time: curr_mod_time,
@@ -707,7 +707,7 @@ impl ImageCache {
 		self.remaining_capacity = self.total_capacity;
 
 		// Cancel all pending load requests
-		for (id, request) in self.ongoing_requests.iter_mut() {
+		for (_id, request) in self.ongoing_requests.iter_mut() {
 			request.cancelled = true;
 		}
 
