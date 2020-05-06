@@ -381,7 +381,7 @@ impl Widget for PictureWidget {
 				let sampler = texture
 					.sampled()
 					.minify_filter(
-						gelatin::glium::uniforms::MinifySamplerFilter::NearestMipmapLinear,
+						gelatin::glium::uniforms::MinifySamplerFilter::LinearMipmapLinear,
 					)
 					.wrap_function(gelatin::glium::uniforms::SamplerWrapFunction::Clamp);
 				let sampler = if data.img_texel_size >= 4f32 {
@@ -390,10 +390,13 @@ impl Widget for PictureWidget {
 					sampler.magnify_filter(gelatin::glium::uniforms::MagnifySamplerFilter::Linear)
 				};
 				// building the uniforms
+				let lod_level = ((1.0/data.img_texel_size).log2().max(0.0) + 0.125).floor();
+				//let lod_level = (1.0/data.img_texel_size).log2().max(0.0);
 				let uniforms = uniform! {
 					matrix: Into::<[[f32; 4]; 4]>::into(transform),
 					bright_shade: data.bright_shade,
-					tex: sampler
+					tex: sampler,
+					lod_level: lod_level,
 				};
 				target
 					.draw(

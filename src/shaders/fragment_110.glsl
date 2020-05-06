@@ -1,6 +1,7 @@
 #version 110
 uniform sampler2D tex;
 uniform float bright_shade;
+uniform float lod_level; // textureLod is not available in 1.10
 varying vec2 v_tex_coords;
 void main() {
     vec4 color = texture2D(tex, v_tex_coords);
