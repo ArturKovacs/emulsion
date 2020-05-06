@@ -107,7 +107,9 @@ fn main() {
 	let picture_widget =
 		make_picture_widget(&window, bottom_bar.slider(), bottom_bar.widget(), config.clone());
 
-	picture_widget.jump_to_path(file_path);
+	if let Some(file_path) = file_path {
+		picture_widget.jump_to_path(file_path);
+	}
 
 	let picture_area_container = make_picture_area_container();
 	picture_area_container.add_child(picture_widget.clone());
@@ -391,6 +393,7 @@ mod update {
 
 	/// Tries to parse version tag and compare against current version
 	fn compare_release(info: &ReleaseInfoJson) -> errors::Result<bool> {
+		use crate::version::Version;
 		use std::str::FromStr;
 
 		let current = Version::cargo_pkg_version();

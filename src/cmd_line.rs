@@ -3,7 +3,7 @@ use clap::{App, Arg};
 use std::path::PathBuf;
 
 /// Parses the command-line arguments and returns the file path
-pub fn parse_args(config_path: &PathBuf, cache_path: &PathBuf) -> String {
+pub fn parse_args(config_path: &PathBuf, cache_path: &PathBuf) -> Option<String> {
 	let config = format!(
 		"CONFIGURATION:\n    config file: {}\n    cache file:  {}",
 		config_path.to_string_lossy(),
@@ -18,8 +18,8 @@ pub fn parse_args(config_path: &PathBuf, cache_path: &PathBuf) -> String {
 			https://arturkovacs.github.io/emulsion-website/",
 		)
 		.after_help(config.as_str())
-		.arg(Arg::with_name("PATH").help("The file path of the image").index(1).required(true))
+		.arg(Arg::with_name("PATH").help("The file path of the image").index(1))
 		.get_matches();
 
-	matches.value_of("PATH").unwrap().to_owned()
+	matches.value_of("PATH").map(ToString::to_string)
 }
