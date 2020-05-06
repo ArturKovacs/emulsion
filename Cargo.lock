@@ -476,7 +476,6 @@ dependencies = [
  "open",
  "rand 0.7.3",
  "serde",
- "serde_json",
  "sys-info",
  "toml",
  "trash",
@@ -1791,9 +1790,9 @@ checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
 
 [[package]]
 name = "ureq"
-version = "0.12.1"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd754afd5f60388b4188210c3795392c5f2fd69a1cc947ec4505dbfee955b902"
+checksum = "46083c7583f798dbd460f08677fdb9708a74fde2c02ef1010882d13e69dd5590"
 dependencies = [
  "base64 0.12.0",
  "chunked_transfer",
@@ -1801,6 +1800,7 @@ dependencies = [
  "lazy_static",
  "qstring",
  "rustls",
+ "serde",
  "serde_json",
  "url",
  "webpki",

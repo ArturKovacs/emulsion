@@ -371,7 +371,6 @@ mod update {
 		error_chain! {
 			foreign_links {
 				Io(std::io::Error);
-				JsonError(serde_json::error::Error);
 				ParseIntError(std::num::ParseIntError);
 			}
 		}
@@ -380,13 +379,12 @@ mod update {
 	/// Tries to fetch latest release tag
 	fn latest_release() -> errors::Result<ReleaseInfoJson> {
 		let url = "https://api.github.com/repos/ArturKovacs/emulsion/releases/latest";
-		let req = ureq::get(&url).set("User-Agent", "emulsion").call();
-		if req.ok() {
-			let json = req.into_json()?;
-			let release_info = serde_json::from_value::<ReleaseInfoJson>(json)?;
+		let res = ureq::get(&url).set("User-Agent", "emulsion").call();
+		if res.ok() {
+			let release_info = res.into_json_deserialize()?;
 			Ok(release_info)
 		} else {
-			Err(req.status_line().into())
+			Err(res.status_line().into())
 		}
 	}
 
