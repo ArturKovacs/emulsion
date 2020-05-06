@@ -1,4 +1,10 @@
 
+## Current
+
+### Changed
+- Better display quality for certain large images.
+
+
 ## 2.0 on 2020-05-02
 
 ### Added
