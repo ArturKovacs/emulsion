@@ -390,8 +390,7 @@ impl Widget for PictureWidget {
 					sampler.magnify_filter(gelatin::glium::uniforms::MagnifySamplerFilter::Linear)
 				};
 				// building the uniforms
-				let lod_level = ((1.0/data.img_texel_size).log2().max(0.0) + 0.125).floor();
-				//let lod_level = (1.0/data.img_texel_size).log2().max(0.0);
+				let lod_level = ((1.0 / data.img_texel_size).log2().max(0.0) + 0.125).floor();
 				let uniforms = uniform! {
 					matrix: Into::<[[f32; 4]; 4]>::into(transform),
 					bright_shade: data.bright_shade,
