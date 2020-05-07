@@ -1,5 +1,6 @@
 ;NSIS Modern User Interface
 
+Unicode True
 
 ;--------------------------------
 ;Includes and related defines
