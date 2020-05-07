@@ -7,8 +7,8 @@ This file may contain a `[bindings]` section. If there is no such section, the d
 
 ```toml
 [bindings]
-img_next = ["d", "right"]
-img_prev = ["a", "left"]
+img_next = ["d", "right", "pagedown"]
+img_prev = ["a", "left", "pageup"]
 img_orig = ["q"]
 img_fit = ["f"]
 img_del = ["delete"]

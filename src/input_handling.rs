@@ -24,8 +24,8 @@ lazy_static! {
 		let mut m = HashMap::new();
 		m.insert(TOGGLE_FULLSCREEN_NAME, vec!["F11"]);
 		m.insert(ESCAPE_NAME, vec!["Escape"]);
-		m.insert(IMG_NEXT_NAME, vec!["D", "Right"]);
-		m.insert(IMG_PREV_NAME, vec!["A", "Left"]);
+		m.insert(IMG_NEXT_NAME, vec!["D", "Right", "PageDown"]);
+		m.insert(IMG_PREV_NAME, vec!["A", "Left", "PageUp"]);
 		m.insert(IMG_ORIG_NAME, vec!["Q"]);
 		m.insert(IMG_FIT_NAME, vec!["F"]);
 		m.insert(IMG_DEL_NAME, vec!["Delete"]);
