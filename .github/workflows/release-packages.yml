@@ -1,0 +1,60 @@
+on:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+    - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+
+name: Draft New Release with Distributables
+
+jobs:
+  create_release:
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: true
+          prerelease: false
+
+  windows:
+    needs: create_release
+    runs-on: windows-latest
+    env:
+      INSTALLER_NAME: Emulsion-Windows-$GITHUB_REF.exe
+    steps:
+      - name: Install NSIS
+        run: |
+          Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
+          scoop bucket add extras
+          scoop install nsis
+      - name: Print NSIS version
+        run: makensis -VERSION
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Fetch Prerequisites
+        working-directory: ./distribution/windows/prerequisites
+        run: (New-Object System.Net.WebClient).DownloadFile('https://aka.ms/vs/16/release/vc_redist.x64.exe', 'vc_redist.x64.exe')
+      - name: Build executable
+        working-directory: ./distribution/windows/
+        run: ./update_files.bat
+      - name: Create installer
+        working-directory: ./distribution/windows/
+        run: |
+          makensis emulsion.nsi
+          Rename-Item -Path "Emulsion-Installer.exe" -NewName "$INSTALLER_NAME"
+      - name: Upload Release Asset
+        id: upload-release-asset 
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }} 
+          asset_path: ./distribution/windows/$INSTALLER_NAME
+          asset_name: $INSTALLER_NAME
+          asset_content_type: application/octet-stream
