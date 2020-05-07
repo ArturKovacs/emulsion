@@ -3,7 +3,7 @@
 
 Custom commands can be specified in the `cfg.toml` file. Read about locating or creating the file [here](README.md#custom-configuration).
 
-This file may contain any number of `[[commands]]` sections. To add a shortcut for opening the current image with Gimp on Windows one may can add the following to the `cfg.toml` file.
+This file may contain any number of `[[commands]]` sections. The default is no commands. To add a shortcut for opening the current image with Gimp on Windows one may can add the following to the `cfg.toml` file.
 
 ```toml
 # Note the double brackets!

@@ -29,8 +29,7 @@ img_prev = ["j"]
 check_updates = true   # set to false to disable checking for updates
 ```
 
-Currently the only valid sections are: `[bindings]` and `[updates]`. All sections in this file are optional, meaning
-that if for example only `[updates]` is specified then the default key-bindings will be used.
+All sections in this file are optional, meaning that if for example only `[updates]` is specified then every other section will be using its default values.
 
 The `[updates]` section can contain only one field, namely `check_updates` which may be set to either `true` or `false`.
 Emulsion fetches the latest version number and provides a notification only if `check_updates` is set to `true`.

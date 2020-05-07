@@ -1,9 +1,12 @@
 
 ## Current
 
+### Added
+- Custom commands to execute on the current image.
+- Command line arguments to print the current version.
+
 ### Changed
 - Better display quality for certain large images.
-
 
 ## 2.0 on 2020-05-02
 
