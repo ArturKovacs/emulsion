@@ -11,7 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.VERSION }}
     steps:
+    - name: Get the version
+      id: get_version
+      run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
@@ -27,11 +31,8 @@ jobs:
     needs: create_release
     runs-on: windows-latest
     env:
-      INSTALLER_NAME: ${{ format('Emulsion-Windows-{0}.exe', steps.get_version.outputs.VERSION) }}
+      INSTALLER_NAME: ${{ format('Emulsion-Windows-{0}.exe', needs.create_release.outputs.version) }}
     steps:
-    - name: Get the version
-      id: get_version
-      run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
     - name: Print installer name
       run: |
         echo $INSTALLER_NAME
