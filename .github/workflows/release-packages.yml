@@ -27,8 +27,11 @@ jobs:
     needs: create_release
     runs-on: windows-latest
     env:
-      INSTALLER_NAME: ${{ format('Emulsion-Windows-{0}.exe', github.ref) }}
+      INSTALLER_NAME: ${{ format('Emulsion-Windows-{0}.exe', steps.get_version.outputs.VERSION) }}
     steps:
+    - name: Get the version
+      id: get_version
+      run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
     - name: Print installer name
       run: |
         echo $INSTALLER_NAME
