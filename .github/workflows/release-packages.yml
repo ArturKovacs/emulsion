@@ -27,8 +27,11 @@ jobs:
     needs: create_release
     runs-on: windows-latest
     env:
-      INSTALLER_NAME: Emulsion-Windows-$GITHUB_REF.exe
+      INSTALLER_NAME: ${{ format('Emulsion-Windows-{0}.exe', github.ref) }}
     steps:
+    - name: Print installer name
+      run: |
+        echo $INSTALLER_NAME
     - name: Install NSIS
       run: |
         Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
