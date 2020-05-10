@@ -224,8 +224,8 @@ impl PlaybackManager {
 		self.image_player.image_texture()
 	}
 
-	pub fn filename(&self) -> &Option<OsString> {
-		&self.folder_player.filename
+	pub fn file_path(&self) -> &Option<PathBuf> {
+		&self.folder_player.file_path
 	}
 
 	pub fn update_image(&mut self, window: &Window) -> gelatin::NextUpdate {
@@ -248,7 +248,7 @@ impl PlaybackManager {
 	}
 }
 
-type FrameLoadResult = image_cache::Result<(AnimationFrameTexture, OsString)>;
+type FrameLoadResult = image_cache::Result<(AnimationFrameTexture, PathBuf)>;
 
 struct ImgSequencePlayer {
 	playback_state: PlaybackState,
@@ -260,7 +260,7 @@ struct ImgSequencePlayer {
 	load_request: LoadRequest,
 
 	image_texture: Option<AnimationFrameTexture>,
-	filename: Option<OsString>,
+	file_path: Option<PathBuf>,
 
 	load_next: &'static dyn Fn(&mut ImageCache, &glium::Display) -> FrameLoadResult,
 	load_prev: &'static dyn Fn(&mut ImageCache, &glium::Display) -> FrameLoadResult,
@@ -297,7 +297,7 @@ impl ImgSequencePlayer {
 			load_request: LoadRequest::None,
 			//should_sleep: true,
 			image_texture: None,
-			filename: None,
+			file_path: None,
 			load_next,
 			load_prev,
 			load_jump,
@@ -343,10 +343,6 @@ impl ImgSequencePlayer {
 
 	pub fn image_texture(&self) -> Option<Rc<glium::texture::SrgbTexture2d>> {
 		self.image_texture.clone().map(|t| t.texture)
-	}
-
-	pub fn _filename(&self) -> &Option<OsString> {
-		&self.filename
 	}
 
 	pub fn update_image(
@@ -462,14 +458,9 @@ impl ImgSequencePlayer {
 		let load_result = match load_request {
 			LoadRequest::LoadNext => Some((self.load_next)(image_cache, display)),
 			LoadRequest::LoadPrevious => Some((self.load_prev)(image_cache, display)),
-			LoadRequest::FilePath(ref file_path) => {
-				Some(if let Some(file_name) = file_path.file_name() {
-					let load_path = self.load_path;
-					load_path(image_cache, display, file_path.as_ref())
-						.map(|x| (x, OsString::from(file_name)))
-				} else {
-					Err(String::from("Could not extract filename").into())
-				})
+			LoadRequest::FilePath(file_path) => {
+				let load_path = self.load_path;
+				Some(load_path(image_cache, display, &file_path).map(|x| (x, file_path)))
 			}
 			LoadRequest::LoadAtIndex(index) => {
 				Some((self.load_at_index)(image_cache, display, index))
@@ -481,9 +472,9 @@ impl ImgSequencePlayer {
 		};
 		if let Some(result) = load_result {
 			match result {
-				Ok((frame, filename)) => {
+				Ok((frame, file_path)) => {
 					self.image_texture = Some(frame);
-					self.filename = Some(filename);
+					self.file_path = Some(file_path);
 				}
 				Err(image_cache::errors::Error(
 					image_cache::errors::ErrorKind::WaitingOnLoader,
@@ -496,7 +487,7 @@ impl ImgSequencePlayer {
 				}
 				Err(err) => {
 					self.image_texture = None;
-					self.filename = None;
+					self.file_path = None;
 					let stderr = &mut ::std::io::stderr();
 					let stderr_errmsg = "Error writing to stderr";
 					writeln!(stderr, "Error occured while loading image: {}", err)

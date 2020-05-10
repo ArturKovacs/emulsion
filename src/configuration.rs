@@ -1,6 +1,7 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -142,10 +143,36 @@ pub struct Command {
 }
 
 #[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
+pub struct TitleSection {
+	pub displayed_folders: Option<u32>,
+	pub show_program_name: Option<bool>,
+}
+
+impl TitleSection {
+	pub fn format_file_path<'a>(&self, file_path: &'a PathBuf) -> Cow<'a, str> {
+		match self.displayed_folders {
+			Some(0) | None => file_path.file_name().unwrap().to_string_lossy(),
+			Some(n) => {
+				let ancestor = file_path.ancestors().take(2 + n as usize).last().unwrap();
+				file_path.strip_prefix(ancestor).unwrap().to_string_lossy()
+			}
+		}
+	}
+
+	pub fn format_program_name(&self) -> &'static str {
+		match self.show_program_name {
+			Some(false) => "",
+			_ => " : E M U L S I O N",
+		}
+	}
+}
+
+#[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Configuration {
 	pub bindings: Option<BTreeMap<String, Vec<String>>>,
 	pub commands: Option<Vec<Command>>,
 	pub updates: Option<ConfigUpdateSection>,
+	pub title: Option<TitleSection>,
 }
 
 impl Configuration {

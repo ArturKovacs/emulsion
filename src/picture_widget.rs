@@ -104,21 +104,29 @@ impl PictureWidgetData {
 		self.prev_draw_size = self.drawn_bounds.size;
 	}
 
-	fn set_window_title_filename<T: AsRef<str>>(
+	fn set_window_title_filename(
+		&self,
 		window: &Window,
 		playback_state: PlaybackState,
-		name: T,
+		file_path: &Option<PathBuf>,
 	) {
-		let playback;
-		match playback_state {
-			PlaybackState::Forward => playback = " : Playing",
-			PlaybackState::Present => playback = " : Presenting",
-			PlaybackState::RandomPresent => playback = " : Presenting Shuffled",
-			PlaybackState::Paused => playback = "",
-		}
-		let title = format!("{}{} : E M U L S I O N", name.as_ref(), playback);
+		let playback = match playback_state {
+			PlaybackState::Forward => " : Playing",
+			PlaybackState::Present => " : Presenting",
+			PlaybackState::RandomPresent => " : Presenting Shuffled",
+			PlaybackState::Paused => "",
+		};
+
+		let config = self.configuration.borrow();
+		let title_config = config.title.clone().unwrap_or_default();
+
+		let name = match file_path {
+			Some(file_path) => title_config.format_file_path(file_path),
+			None => "[ none ]".into(),
+		};
+		let title = format!("{}{}{}", name, playback, title_config.format_program_name());
 		let display = window.display_mut();
-		display.gl_window().window().set_title(title.as_ref());
+		display.gl_window().window().set_title(title.as_str());
 	}
 
 	fn get_texture(&self) -> Option<Rc<SrgbTexture2d>> {
@@ -314,18 +322,7 @@ impl Widget for PictureWidget {
 		data.slider.set_steps(curr_dir_len, curr_file_index);
 		//data.slider.set_step_bg(data.playback_manager.cached_from_dir());
 		let playback_state = data.playback_manager.playback_state();
-		match data.playback_manager.filename() {
-			Some(name) => {
-				PictureWidgetData::set_window_title_filename(
-					window,
-					playback_state,
-					name.to_str().unwrap(),
-				);
-			}
-			None => {
-				PictureWidgetData::set_window_title_filename(window, playback_state, "[ none ]");
-			}
-		}
+		data.set_window_title_filename(window, playback_state, data.playback_manager.file_path());
 	}
 
 	fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<NextUpdate, WidgetError> {
