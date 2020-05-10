@@ -2,8 +2,13 @@ use crate::Version;
 use clap::{App, Arg};
 use std::path::PathBuf;
 
+pub struct Args {
+	pub file_path: Option<String>,
+	pub absolute: bool,
+}
+
 /// Parses the command-line arguments and returns the file path
-pub fn parse_args(config_path: &PathBuf, cache_path: &PathBuf) -> Option<String> {
+pub fn parse_args(config_path: &PathBuf, cache_path: &PathBuf) -> Args {
 	let config = format!(
 		"CONFIGURATION:\n    config file: {}\n    cache file:  {}",
 		config_path.to_string_lossy(),
@@ -18,8 +23,18 @@ pub fn parse_args(config_path: &PathBuf, cache_path: &PathBuf) -> Option<String>
 			https://arturkovacs.github.io/emulsion-website/",
 		)
 		.after_help(config.as_str())
+		.arg(
+			Arg::with_name("absolute")
+				.long("absolute")
+				.short("a")
+				.help("Show absolute file path")
+				.takes_value(false),
+		)
 		.arg(Arg::with_name("PATH").help("The file path of the image").index(1))
 		.get_matches();
 
-	matches.value_of("PATH").map(ToString::to_string)
+	Args {
+		file_path: matches.value_of("PATH").map(ToString::to_string),
+		absolute: matches.is_present("absolute"),
+	}
 }

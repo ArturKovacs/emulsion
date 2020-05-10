@@ -154,7 +154,8 @@ impl TitleSection {
 			Some(0) | None => file_path.file_name().unwrap().to_string_lossy(),
 			Some(n) => {
 				let ancestor = file_path.ancestors().take(2 + n as usize).last().unwrap();
-				let path = if ancestor.as_os_str().len() <= 1 {
+				let root = file_path.components().next().unwrap();
+				let path = if ancestor.as_os_str() == root.as_os_str() {
 					&file_path
 				} else {
 					file_path.strip_prefix(ancestor).unwrap()
