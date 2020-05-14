@@ -88,6 +88,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ needs.create_release.outputs.upload_url }} 
-        asset_path: ${{ format('Emulsion-OSX.dmg', env.INSTALLER_NAME) }} 
+        asset_path: 'Emulsion-OSX.dmg'
         asset_name: ${{ env.INSTALLER_NAME }}
         asset_content_type: application/octet-stream
