@@ -1,0 +1,2 @@
+The text in background.svg uses the Fira Sans font.
+It has to be installed on the system for the svg to show properly.
