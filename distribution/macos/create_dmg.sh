@@ -2,8 +2,8 @@
 test -f Emulsion-OSX.dmg && rm Emulsion-OSX.dmg
 create-dmg \
   --volname "Emulsion Installer" \
-  --volicon "resource_dev/emulsion.icns" \
-  --background "distribution/macos/background.png" \
+  --volicon "./resource_dev/emulsion.icns" \
+  --background "./distribution/macos/background.png" \
   --window-pos 200 120 \
   --window-size 750 600 \
   --icon-size 100 \
@@ -12,4 +12,4 @@ create-dmg \
   --app-drop-link 560 260 \
   --no-internet-enable \
   "Emulsion-OSX.dmg" \
-  "target/release/bundle/osx/"
+  "./target/release/bundle/osx/"
