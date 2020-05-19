@@ -77,11 +77,11 @@ jobs:
       uses: actions/checkout@v2
     - name: Install cargo bundle
       run: cargo install cargo-bundle
-    - name: create osx app
+    - name: Create osx app
       run: cargo bundle --release
-    - name: install create-dmg
+    - name: Install create-dmg
       run: brew install create-dmg
-    - name: create .dmg file
+    - name: Create .dmg file
       run: ./distribution/macos/create_dmg.sh
     - name: Upload Release Asset
       id: upload-release-asset

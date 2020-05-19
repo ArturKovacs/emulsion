@@ -10,5 +10,6 @@ create-dmg \
   --icon "Emulsion.app" 200 260 \
   --hide-extension "Emulsion.app" \
   --app-drop-link 560 260 \
+  --no-internet-enable \
   "Emulsion-Installer.dmg" \
   "target/release/bundle/osx/"
