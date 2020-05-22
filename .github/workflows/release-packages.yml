@@ -80,16 +80,18 @@ jobs:
     - name: Create osx app
       run: cargo bundle --release
     - name: Install create-dmg
-      run: brew install create-dmg
+      run: npm install --global create-dmg
     - name: Create .dmg file
       run: ./distribution/macos/create_dmg.sh
+    - name: Rename .dmg
+      run: mv Emulsion*.dmg Emulsion.dmg
     - name: Upload Release Asset
       id: upload-release-asset
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ needs.create_release.outputs.upload_url }} 
-        asset_path: 'Emulsion-OSX.dmg'
+        upload_url: ${{ needs.create_release.outputs.upload_url }}
+        asset_path: Emulsion.dmg
         asset_name: ${{ env.INSTALLER_NAME }}
         asset_content_type: application/octet-stream
