@@ -79,9 +79,9 @@ fn main() {
 	let cache = Arc::new(Mutex::new(cache.unwrap_or_default()));
 	let config = Rc::new(RefCell::new(config.unwrap_or_default()));
 
-	if args.absolute {
-		config.borrow_mut().title.get_or_insert_with(|| Default::default()).displayed_folders =
-			Some(100_000);
+	if args.displayed_folders.is_some() {
+		config.borrow_mut().title.get_or_insert_with(Default::default).displayed_folders =
+			args.displayed_folders;
 	}
 
 	let mut application = Application::new();
