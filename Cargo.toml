@@ -41,7 +41,7 @@ winres = "0.1"
 gelatin = "0.3"
 ureq = { version = "1", features = ["json"], optional = true }
 lazy_static = "1.4.0"
-directories = "2.0.2"
+directories-next = "1.0"
 open = "1.4.0"
 sys-info = "=0.5.8"
 error-chain = "0.12"
