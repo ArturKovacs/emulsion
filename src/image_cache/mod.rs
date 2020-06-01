@@ -287,14 +287,18 @@ impl ImageCache {
 		path: &Path,
 		frame_id: Option<isize>,
 	) -> Result<AnimationFrameTexture> {
-		let path = path.canonicalize()?;
-
+		let maybe_parent = path.parent();
 		let target_file_name = match path.file_name() {
 			Some(filename) => filename.to_owned(),
 			None => bail!(format!("Could not get filename from path '{}'", path.to_str().unwrap())),
 		};
+		let path = path.canonicalize()?;
 
-		let parent = path.parent().ok_or("Could not get parent directory")?.to_owned();
+		let parent;
+		match maybe_parent {
+			Some(p) => parent = p.canonicalize()?,
+			None => parent = path.parent().ok_or("Could not get parent directory")?.to_owned(),
+		}
 
 		// Lets just process incoming images
 		//self.process_prefetched(display)?;
@@ -735,7 +739,7 @@ impl ImageCache {
 			.filter_map(|x| match x {
 				Ok(entry) => match entry.file_type() {
 					Ok(file_type) => {
-						if file_type.is_file() {
+						if file_type.is_file() || file_type.is_symlink() {
 							if is_file_supported(entry.path().as_path()) {
 								self.current_req_id += 1;
 								Some(ImageDescriptor::from_entry(entry, self.current_req_id))

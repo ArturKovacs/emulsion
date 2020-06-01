@@ -3,7 +3,7 @@
 
 ### Added
 - Custom commands to execute on the current image.
-- Command line arguments to print the current version.
+- Command line arguments on Linux/macOS to print the current version and the search location of the config file.
 
 ### Changed
 - Better display quality for certain large images.
