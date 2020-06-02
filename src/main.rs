@@ -70,7 +70,7 @@ fn main() {
 	// Load configuration and cache files
 	let (config_path, cache_path) = get_config_and_cache_paths();
 
-	let file_path = cmd_line::parse_args(&config_path, &cache_path);
+	let args = cmd_line::parse_args(&config_path, &cache_path);
 
 	let cache = Cache::load(&cache_path);
 	let config = Configuration::load(&config_path);
@@ -78,6 +78,11 @@ fn main() {
 	let first_launch = cache.is_err();
 	let cache = Arc::new(Mutex::new(cache.unwrap_or_default()));
 	let config = Rc::new(RefCell::new(config.unwrap_or_default()));
+
+	if args.displayed_folders.is_some() {
+		config.borrow_mut().title.get_or_insert_with(Default::default).displayed_folders =
+			args.displayed_folders;
+	}
 
 	let mut application = Application::new();
 	let window: Rc<Window> = {
@@ -107,7 +112,7 @@ fn main() {
 	let picture_widget =
 		make_picture_widget(&window, bottom_bar.slider(), bottom_bar.widget(), config.clone());
 
-	if let Some(file_path) = file_path {
+	if let Some(file_path) = args.file_path {
 		picture_widget.jump_to_path(file_path);
 	}
 

@@ -260,7 +260,7 @@ impl ImageCache {
 		display: &glium::Display,
 		index: usize,
 		frame_id: Option<isize>,
-	) -> Result<(AnimationFrameTexture, OsString)> {
+	) -> Result<(AnimationFrameTexture, PathBuf)> {
 		let path = self
 			.dir_files
 			.get(index)
@@ -276,7 +276,7 @@ impl ImageCache {
 
 		let result = self.load_specific(display, &path, frame_id)?;
 		self.current_file_idx = index;
-		Ok((result, path.file_name().unwrap_or_else(|| OsStr::new("")).to_owned()))
+		Ok((result, path))
 	}
 
 	/// Returns `Err(errors::Error::from_kind(errors::ErrorKind::WaitingOnLoader))`
@@ -370,13 +370,13 @@ impl ImageCache {
 	pub fn load_next(
 		&mut self,
 		display: &glium::Display,
-	) -> Result<(AnimationFrameTexture, OsString)> {
+	) -> Result<(AnimationFrameTexture, PathBuf)> {
 		self.load_jump(display, 1, 0)
 	}
 	pub fn load_prev(
 		&mut self,
 		display: &glium::Display,
-	) -> Result<(AnimationFrameTexture, OsString)> {
+	) -> Result<(AnimationFrameTexture, PathBuf)> {
 		self.load_jump(display, -1, 0)
 	}
 
@@ -385,7 +385,7 @@ impl ImageCache {
 		display: &glium::Display,
 		file_jump_count: i32,
 		frame_jump_count: isize,
-	) -> Result<(AnimationFrameTexture, OsString)> {
+	) -> Result<(AnimationFrameTexture, PathBuf)> {
 		if file_jump_count == 0 {
 			let _path = self.current_file_path();
 			// Here, it is possible that the current image was already
@@ -393,7 +393,7 @@ impl ImageCache {
 			let target_frame = self.current_frame_idx as isize + frame_jump_count;
 			let requested =
 				self.try_getting_requested_image(display, self.current_file_idx, target_frame);
-			return requested.map(|t| (t, self.current_filename()));
+			return requested.map(|t| (t, self.current_file_path()));
 		} else {
 			self.current_frame_idx = 0;
 		}
@@ -412,7 +412,7 @@ impl ImageCache {
 		let result = self.load_specific(display, &target_path, None)?;
 		self.current_file_idx = target_index as usize;
 
-		Ok((result, target_path.file_name().unwrap_or_else(|| OsStr::new("")).to_owned()))
+		Ok((result, target_path))
 	}
 
 	fn receive_prefetched(&mut self) {
