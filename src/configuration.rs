@@ -153,14 +153,22 @@ impl TitleSection {
 		match self.displayed_folders {
 			Some(0) | None => file_path.file_name().unwrap().to_string_lossy(),
 			Some(n) => {
-				let ancestor = file_path.ancestors().take(2 + n as usize).last().unwrap();
-				let root = file_path.components().next().unwrap();
-				let path = if ancestor.as_os_str() == root.as_os_str() {
-					&file_path
+				let mut component_count = 0;
+				// On Windows the root can be the second component, when a `Prefix` is the first.
+				let mut root_index = 0;
+				for (idx, c) in file_path.components().enumerate() {
+					component_count += 1;
+					if c == std::path::Component::RootDir {
+						root_index = idx as u32;
+					}
+				}
+				let path = if (component_count - root_index) <= (1 + n) {
+					file_path.to_string_lossy().trim_start_matches("\\\\?\\").to_owned().into()
 				} else {
-					file_path.strip_prefix(ancestor).unwrap()
+					let ancestor = file_path.ancestors().take(2 + n as usize).last().unwrap();
+					file_path.strip_prefix(ancestor).unwrap().to_string_lossy()
 				};
-				path.to_string_lossy()
+				path
 			}
 		}
 	}
