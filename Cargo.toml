@@ -37,8 +37,8 @@ copyright = "Copyright (c) 2020 The Emulsion Contributors"
 winres = "0.1"
 
 [dependencies]
-#gelatin = { path = "./subcrates/gelatin" }
-gelatin = "0.3"
+gelatin = { path = "./subcrates/gelatin" }
+#gelatin = "0.3"
 ureq = { version = "1", features = ["json"], optional = true }
 lazy_static = "1.4.0"
 directories = "2.0.2"

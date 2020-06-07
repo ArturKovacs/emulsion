@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::iter::Iterator;
 use std::rc::Rc;
 
 use glium::Frame;
@@ -159,21 +160,22 @@ impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
 		Ok(next_update)
 	}
 
-	fn layout(&self, mut available_space: LogicalRect) {
+	fn layout(&self, mut total_available_space: LogicalRect) {
 		let mut borrowed = self.data.borrow_mut();
-		borrowed.default_layout(available_space);
+		borrowed.default_layout(total_available_space);
 		if !borrowed.visible {
 			return;
 		}
-		available_space = borrowed.drawn_bounds;
+		total_available_space = borrowed.drawn_bounds;
 
 		borrowed.start_children.clear();
 		borrowed.center_children.clear();
 		borrowed.end_children.clear();
 
-		let mut max_stretch_space = Dim::rect_size(&available_space);
+		let mut max_stretch_space = Dim::rect_size(&total_available_space);
 		let mut stretch_widget_count = 0.0;
 		let mut center_max_size = 0.0;
+		let mut end_max_size = 0.0;
 
 		let children_clone = borrowed.children.clone();
 		for child in children_clone.iter() {
@@ -182,30 +184,29 @@ impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
 			}
 			let placement: WidgetPlacement = child.placement();
 			if placement.ignore_layout {
-				child.layout(available_space);
+				child.layout(total_available_space);
 			} else {
-				let center;
+				//let center;
+				let margins = Dim::margin_start(&placement) + Dim::margin_end(&placement);
 				match Dim::alignment(&placement) {
 					Alignment::Start => {
 						borrowed.start_children.push(child.clone());
-						center = false;
 					}
 					Alignment::Center => {
 						borrowed.center_children.push(child.clone());
-						center = true;
 					}
 					Alignment::End => {
 						borrowed.end_children.push(child.clone());
-						center = false;
 					}
 				}
-				let margins = Dim::margin_start(&placement) + Dim::margin_end(&placement);
 				match Dim::extent(&placement) {
 					Length::Fixed(extent) => {
 						// Margin only taken away from stertch space
 						max_stretch_space -= extent + margins;
-						if center {
-							center_max_size += extent + margins;
+						match Dim::alignment(&placement) {
+							Alignment::Start => (),
+							Alignment::Center => center_max_size += extent + margins,
+							Alignment::End => end_max_size += extent + margins,
 						}
 					}
 					Length::Stretch { min, max } => {
@@ -213,8 +214,10 @@ impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
 						// therefore the margins of stretch widgets should not be taken
 						// from the available stretch space (i.e. `max_stretch_space`).
 						max_stretch_space -= min;
-						if center {
-							center_max_size += max + margins;
+						match Dim::alignment(&placement) {
+							Alignment::Start => (),
+							Alignment::Center => center_max_size += max + margins,
+							Alignment::End => end_max_size += max + margins,
 						}
 						stretch_widget_count += 1.0;
 					}
@@ -222,14 +225,14 @@ impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
 			}
 		}
 		let stretch_space_per_widget = max_stretch_space / stretch_widget_count;
-		let mut widget_available_space = available_space;
+		let mut widget_available_space = total_available_space;
 		// Now let's start to place the elements
 		Self::layout_aligned_children(
 			&borrowed.start_children,
 			stretch_space_per_widget,
 			&mut widget_available_space,
 		);
-		let center_pos = Dim::vec(available_space.center());
+		let center_pos = Dim::vec(total_available_space.center());
 		let center_start_pos =
 			(center_pos - center_max_size * 0.5).max(Dim::rect_pos(&widget_available_space));
 		*Dim::rect_pos_mut(&mut widget_available_space) = center_start_pos;
@@ -238,6 +241,13 @@ impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
 			stretch_space_per_widget,
 			&mut widget_available_space,
 		);
+		let pos = Dim::rect_pos(&total_available_space);
+		let size = Dim::rect_size(&total_available_space);
+		let end_end_pos = pos + size;
+		let end_start_pos =
+			(end_end_pos - end_max_size).max(Dim::rect_pos(&widget_available_space));
+		//println!("end_end_pos: {:?}, end_max_size: {:?}", end_end_pos, end_max_size);
+		*Dim::rect_pos_mut(&mut widget_available_space) = end_start_pos;
 		Self::layout_aligned_children(
 			&borrowed.end_children,
 			stretch_space_per_widget,

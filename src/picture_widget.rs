@@ -19,7 +19,10 @@ use gelatin::{
 use crate::input_handling::*;
 use crate::shaders;
 use crate::utils::{virtual_keycode_is_char, virtual_keycode_to_string};
-use crate::{configuration::Configuration, playback_manager::*};
+use crate::{
+	configuration::{Configuration, ScalingMode},
+	playback_manager::*,
+};
 
 #[derive(Debug, Clone)]
 enum HoverState {
@@ -44,7 +47,8 @@ struct PictureWidgetData {
 	bright_shade: f32,
 	img_texel_size: f32,
 	/// Size of an image texel in physical display pixels
-	image_fit: bool,
+	//image_fit: bool,
+	scaling: ScalingMode,
 	img_pos: LogicalVector,
 
 	last_click_time: Instant,
@@ -70,11 +74,13 @@ impl WidgetData for PictureWidgetData {
 	}
 }
 impl PictureWidgetData {
-	fn fit_image_to_panel(&mut self, _display: &Display, dpi_scale: f32) {
+	fn fit_image_to_panel(&mut self, _display: &Display, dpi_scale: f32, stretch: bool) {
 		let size = self.drawn_bounds.size.vec;
 		if let Some(texture) = self.get_texture() {
 			let panel_aspect = size.x / size.y;
-			let img_aspect = texture.width() as f32 / texture.height() as f32;
+			let img_phys_w = texture.width() as f32;
+			let img_pyhs_h = texture.height() as f32;
+			let img_aspect = img_phys_w / img_pyhs_h;
 
 			let texel_size_to_fit_width = size.x / texture.width() as f32;
 			let img_texel_size = if img_aspect > panel_aspect {
@@ -83,9 +89,20 @@ impl PictureWidgetData {
 			} else {
 				texel_size_to_fit_width * (img_aspect / panel_aspect)
 			};
+			let widget_phys_size = size * dpi_scale;
+			let fits_in_widget =
+				widget_phys_size.x >= img_phys_w && widget_phys_size.y >= img_pyhs_h;
 			self.img_pos = LogicalVector::new(size.x as f32 * 0.5, size.y as f32 * 0.5);
-			self.img_texel_size = img_texel_size * dpi_scale;
-			self.image_fit = true;
+			if fits_in_widget && !stretch {
+				self.img_texel_size = 1.0;
+			} else {
+				self.img_texel_size = img_texel_size * dpi_scale;
+			}
+			if stretch {
+				self.scaling = ScalingMode::FitStretch;
+			} else {
+				self.scaling = ScalingMode::FitMin;
+			}
 		}
 	}
 
@@ -95,11 +112,17 @@ impl PictureWidgetData {
 	}
 
 	fn update_image_transform(&mut self, display: &Display, dpi_scale: f32) {
-		if self.image_fit {
-			self.fit_image_to_panel(display, dpi_scale);
-		} else {
-			let center_offset = (self.drawn_bounds.size - self.prev_draw_size) * 0.5f32;
-			self.img_pos += center_offset;
+		match self.scaling {
+			ScalingMode::Fixed => {
+				let center_offset = (self.drawn_bounds.size - self.prev_draw_size) * 0.5f32;
+				self.img_pos += center_offset;
+			}
+			ScalingMode::FitStretch => {
+				self.fit_image_to_panel(display, dpi_scale, true);
+			}
+			ScalingMode::FitMin => {
+				self.fit_image_to_panel(display, dpi_scale, false);
+			}
 		}
 		self.prev_draw_size = self.drawn_bounds.size;
 	}
@@ -171,7 +194,8 @@ impl PictureWidget {
 				program,
 				bright_shade: 0.95,
 				img_texel_size: 0.0,
-				image_fit: true,
+				//image_fit: true,
+				scaling: ScalingMode::FitMin,
 				img_pos: Default::default(),
 				last_click_time: Instant::now() - Duration::from_secs(10),
 				last_mouse_pos: Default::default(),
@@ -191,6 +215,24 @@ impl PictureWidget {
 	pub fn set_bright_shade(&self, shade: f32) {
 		let mut borrowed = self.data.borrow_mut();
 		borrowed.bright_shade = shade;
+		borrowed.rendered_valid = false;
+	}
+
+	pub fn set_img_size_to_orig(&self) {
+		// TODO use this function from the keyboard input trigger code. Set the
+		// `bg_color` for the associated button to grey and set the same for all other
+		// scaling buttons to black and transparent. Whenever zooming happens, set the bg to
+		// black and transparent for every scaling button. But remember the last scaling setting
+		// and use that when opening emulsion the next time.
+		let mut borrowed = self.data.borrow_mut();
+		borrowed.img_texel_size = 1.0;
+		borrowed.scaling = ScalingMode::Fixed;
+		borrowed.rendered_valid = false;
+	}
+
+	pub fn set_img_size_to_fit(&self, stretch: bool) {
+		let mut borrowed = self.data.borrow_mut();
+		borrowed.scaling = if stretch { ScalingMode::FitStretch } else { ScalingMode::FitMin };
 		borrowed.rendered_valid = false;
 	}
 
@@ -245,11 +287,11 @@ impl PictureWidget {
 			borrowed.rendered_valid = false;
 		}
 		if triggered!(IMG_FIT_NAME) {
-			borrowed.image_fit = true;
+			borrowed.scaling = ScalingMode::FitStretch;
 			borrowed.rendered_valid = false;
 		}
 		if triggered!(IMG_ORIG_NAME) {
-			borrowed.image_fit = false;
+			borrowed.scaling = ScalingMode::Fixed;
 			borrowed.img_texel_size = 1.0;
 			borrowed.rendered_valid = false;
 		}
@@ -426,7 +468,7 @@ impl Widget for PictureWidget {
 				borrowed.hover = borrowed.drawn_bounds.contains(event.cursor_pos);
 				if borrowed.panning {
 					let delta = event.cursor_pos - borrowed.last_mouse_pos;
-					borrowed.image_fit = false;
+					borrowed.scaling = ScalingMode::Fixed;
 					borrowed.img_pos += delta;
 					borrowed.rendered_valid = false;
 				}
@@ -441,8 +483,6 @@ impl Widget for PictureWidget {
 							now.duration_since(borrowed.last_click_time);
 						borrowed.last_click_time = now;
 						if duration_since_last_click < Duration::from_millis(250) {
-							// TODO
-							//borrowed.toggle_fullscreen(window, bottom_panel);
 							match borrowed.window.upgrade() {
 								Some(window) => {
 									let fullscreen = !window.fullscreen();
@@ -476,7 +516,7 @@ impl Widget for PictureWidget {
 				let new_image_texel_size = (borrowed.img_texel_size * delta).max(0.0);
 
 				borrowed.zoom_image(event.cursor_pos, new_image_texel_size);
-				borrowed.image_fit = false;
+				borrowed.scaling = ScalingMode::Fixed;
 			}
 			EventKind::ReceivedCharacter(ch) => {
 				let input_key = char_to_input_key(ch);

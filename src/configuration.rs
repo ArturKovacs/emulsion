@@ -21,6 +21,24 @@ impl Theme {
 	}
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ScalingMode {
+	Fixed,
+	FitStretch,
+	FitMin,
+}
+
+impl Default for ScalingMode {
+	fn default() -> ScalingMode {
+		ScalingMode::FitMin
+	}
+}
+
+#[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
+pub struct CacheImageSection {
+	scaling: ScalingMode,
+}
+
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct WindowSection {
 	pub dark: bool,
@@ -79,6 +97,7 @@ impl CacheUpdateSection {
 pub struct Cache {
 	pub window: WindowSection,
 	pub updates: CacheUpdateSection,
+	pub image: CacheImageSection,
 }
 
 impl Cache {
@@ -98,6 +117,7 @@ impl Cache {
 struct IncompleteCache {
 	pub window: Option<WindowSection>,
 	pub updates: Option<CacheUpdateSection>,
+	pub image: Option<CacheImageSection>,
 }
 
 impl From<IncompleteCache> for Cache {
@@ -105,6 +125,7 @@ impl From<IncompleteCache> for Cache {
 		Self {
 			window: cache.window.unwrap_or_default(),
 			updates: cache.updates.unwrap_or_default(),
+			image: cache.image.unwrap_or_default(),
 		}
 	}
 }

@@ -160,7 +160,6 @@ fn main() {
 	{
 		let cache = cache.clone();
 		let set_theme = set_theme.clone();
-
 		bottom_bar.set_on_theme_click(move || {
 			let new_theme = theme.get().switch_theme();
 			theme.set(new_theme);
@@ -170,9 +169,27 @@ fn main() {
 	}
 	{
 		let slider = bottom_bar.slider();
-
+		let picture_widget = picture_widget.clone();
 		bottom_bar.set_on_slider_value_change(move || {
 			picture_widget.jump_to_index(slider.value());
+		});
+	}
+	{
+		let picture_widget = picture_widget.clone();
+		bottom_bar.set_on_orig_scale_click(move || {
+			picture_widget.set_img_size_to_orig();
+		});
+	}
+	{
+		let picture_widget = picture_widget.clone();
+		bottom_bar.set_on_fit_min_click(move || {
+			picture_widget.set_img_size_to_fit(false);
+		});
+	}
+	{
+		let picture_widget = picture_widget.clone();
+		bottom_bar.set_on_fit_stretch_click(move || {
+			picture_widget.set_img_size_to_fit(true);
 		});
 	}
 	let help_visible = Cell::new(first_launch);
