@@ -194,10 +194,10 @@ impl PictureWidgetData {
 		self.rendered_valid = false;
 	}
 
+	#[allow(clippy::float_cmp)]
 	fn update_scaling_buttons(&mut self) {
 		match self.scaling {
 			ScalingMode::Fixed => {
-				#[allow(clippy::float_cmp)]
 				if self.img_texel_size == 1.0 {
 					self.orig_scale_button.set_bg_color(ACTIVE_BG_COLOR);
 				} else {
