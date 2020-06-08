@@ -8,7 +8,10 @@ use crate::misc::{
 };
 use crate::window::Window;
 use crate::NextUpdate;
-use crate::{add_common_widget_functions, widget_data_ptr, DrawContext, Event, Widget, WidgetData, WidgetError};
+use crate::{
+	add_common_widget_functions, widget_data_ptr, DrawContext, Event, Widget, WidgetData,
+	WidgetError,
+};
 
 pub type HorizontalLayoutContainer = LineLayoutContainer<HorDim>;
 pub type VerticalLayoutContainer = LineLayoutContainer<VerDim>;
