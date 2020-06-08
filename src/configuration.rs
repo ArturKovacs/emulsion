@@ -89,10 +89,8 @@ pub struct Cache {
 
 impl Cache {
 	pub fn theme(&self) -> Theme {
-		match self.window.dark {
-			true => Theme::Dark,
-			false => Theme::Light,
-		}
+		if self.window.dark { Theme::Dark }
+		else { Theme::Light }
 	}
 
 	pub fn set_theme(&mut self, theme: Theme) {

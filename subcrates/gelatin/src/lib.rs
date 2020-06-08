@@ -234,6 +234,15 @@ pub trait Widget: Any {
 	fn visible(&self) -> bool;
 }
 
+/// This function can be used to avoid comparing fat trait pointers as those can be
+/// different even when they point to the same object.
+/// For more see: https://doc.rust-lang.org/std/ptr/fn.eq.html#examples
+/// and https://github.com/rust-lang/rust-clippy/pull/5294
+#[inline]
+pub fn widget_data_ptr(rc: &Rc<dyn Widget>) -> *const u8 {
+	rc.as_ref() as *const dyn Widget as *const u8
+}
+
 #[macro_export]
 macro_rules! add_common_widget_functions {
 	($data_field:ident) => {

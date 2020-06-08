@@ -8,8 +8,6 @@ use std::time::{Duration, Instant};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
-use sys_info;
-
 use gelatin::glium;
 
 use gelatin::window::Window;

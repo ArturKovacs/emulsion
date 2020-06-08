@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::iter::Iterator;
 use std::rc::Rc;
 
 use glium::Frame;
@@ -9,7 +8,7 @@ use crate::misc::{
 };
 use crate::window::Window;
 use crate::NextUpdate;
-use crate::{add_common_widget_functions, DrawContext, Event, Widget, WidgetData, WidgetError};
+use crate::{add_common_widget_functions, widget_data_ptr, DrawContext, Event, Widget, WidgetData, WidgetError};
 
 pub type HorizontalLayoutContainer = LineLayoutContainer<HorDim>;
 pub type VerticalLayoutContainer = LineLayoutContainer<VerDim>;
@@ -88,8 +87,10 @@ impl<Dim: PickDimension + 'static> LineLayoutContainer<Dim> {
 
 	pub fn add_child(&self, new_child: Rc<dyn Widget>) {
 		let mut borrowed = self.data.borrow_mut();
+		let new_child_ptr = widget_data_ptr(&new_child);
 		for child in borrowed.children.iter() {
-			if Rc::ptr_eq(&child, &new_child) {
+			let child_ptr = widget_data_ptr(&child);
+			if new_child_ptr == child_ptr {
 				return;
 			}
 		}
@@ -99,7 +100,8 @@ impl<Dim: PickDimension + 'static> LineLayoutContainer<Dim> {
 
 	pub fn remove_child(&self, target: Rc<dyn Widget>) {
 		let mut borrowed = self.data.borrow_mut();
-		borrowed.children.retain(|child| !Rc::ptr_eq(&child, &target));
+		let target_ptr = widget_data_ptr(&target);
+		borrowed.children.retain(|child| target_ptr != widget_data_ptr(child));
 		borrowed.rendered_valid = false;
 	}
 
