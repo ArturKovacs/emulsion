@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use gelatin::cgmath::{Matrix4, Vector3};
@@ -8,8 +9,10 @@ use gelatin::glium::glutin::event::{ElementState, ModifiersState, MouseButton};
 use gelatin::glium::{program, texture::SrgbTexture2d, uniform, Display, Frame, Program, Surface};
 
 use gelatin::add_common_widget_functions;
+use gelatin::button::Button;
 use gelatin::line_layout_container::HorizontalLayoutContainer;
 use gelatin::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
+use gelatin::slider::Slider;
 use gelatin::window::Window;
 use gelatin::NextUpdate;
 use gelatin::{
@@ -20,15 +23,25 @@ use crate::input_handling::*;
 use crate::shaders;
 use crate::utils::{virtual_keycode_is_char, virtual_keycode_to_string};
 use crate::{
-	configuration::{Configuration, ScalingMode},
+	configuration::{Cache, Configuration},
 	playback_manager::*,
 };
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum ScalingMode {
+	Fixed,
+	FitStretch,
+	FitMin,
+}
 
 #[derive(Debug, Clone)]
 enum HoverState {
 	None,
 	ItemHovered { prev_path: PathBuf },
 }
+
+static NO_BG_COLOR: [f32; 4] = [0.0, 0.0, 0.0, 0.0];
+static ACTIVE_BG_COLOR: [f32; 4] = [0.3, 0.3, 0.3, 0.5];
 
 struct PictureWidgetData {
 	placement: WidgetPlacement,
@@ -41,13 +54,13 @@ struct PictureWidgetData {
 	hover: bool,
 
 	configuration: Rc<RefCell<Configuration>>,
+	cache: Arc<Mutex<Cache>>,
 	playback_manager: PlaybackManager,
 
 	program: Program,
 	bright_shade: f32,
-	img_texel_size: f32,
 	/// Size of an image texel in physical display pixels
-	//image_fit: bool,
+	img_texel_size: f32,
 	scaling: ScalingMode,
 	img_pos: LogicalVector,
 
@@ -58,7 +71,10 @@ struct PictureWidgetData {
 
 	first_draw: bool,
 	next_update: NextUpdate,
-	slider: Rc<gelatin::slider::Slider>,
+	slider: Rc<Slider>,
+	orig_scale_button: Rc<Button>,
+	fit_min_button: Rc<Button>,
+	fit_stretch_button: Rc<Button>,
 	bottom_panel: Rc<HorizontalLayoutContainer>,
 	window: Weak<Window>,
 }
@@ -106,9 +122,14 @@ impl PictureWidgetData {
 		}
 	}
 
-	fn zoom_image(&mut self, anchor: LogicalVector, image_texel_size: f32) {
+	fn zoom_image(&mut self, anchor: LogicalVector, mut image_texel_size: f32) {
+		if (image_texel_size - 1.0).abs() < 0.01 {
+			image_texel_size = 1.0;
+		}
 		self.img_pos = (image_texel_size / self.img_texel_size) * (self.img_pos - anchor) + anchor;
 		self.img_texel_size = image_texel_size;
+		self.scaling = ScalingMode::Fixed;
+		self.update_scaling_buttons();
 	}
 
 	fn update_image_transform(&mut self, display: &Display, dpi_scale: f32) {
@@ -155,6 +176,47 @@ impl PictureWidgetData {
 	fn get_texture(&self) -> Option<Rc<SrgbTexture2d>> {
 		self.playback_manager.image_texture()
 	}
+
+	pub fn set_img_size_to_orig(&mut self) {
+		self.img_texel_size = 1.0;
+		self.scaling = ScalingMode::Fixed;
+		self.update_scaling_buttons();
+		self.rendered_valid = false;
+	}
+
+	pub fn set_img_size_to_fit(&mut self, stretch: bool) {
+		{
+			let mut cache = self.cache.lock().unwrap();
+			cache.image.fit_stretches = stretch;
+		}
+		self.scaling = if stretch { ScalingMode::FitStretch } else { ScalingMode::FitMin };
+		self.update_scaling_buttons();
+		self.rendered_valid = false;
+	}
+
+	fn update_scaling_buttons(&mut self) {
+		match self.scaling {
+			ScalingMode::Fixed => {
+				if self.img_texel_size == 1.0 {
+					self.orig_scale_button.set_bg_color(ACTIVE_BG_COLOR);
+				} else {
+					self.orig_scale_button.set_bg_color(NO_BG_COLOR);
+				}
+				self.fit_min_button.set_bg_color(NO_BG_COLOR);
+				self.fit_stretch_button.set_bg_color(NO_BG_COLOR);
+			}
+			ScalingMode::FitMin => {
+				self.orig_scale_button.set_bg_color(NO_BG_COLOR);
+				self.fit_min_button.set_bg_color(ACTIVE_BG_COLOR);
+				self.fit_stretch_button.set_bg_color(NO_BG_COLOR);
+			}
+			ScalingMode::FitStretch => {
+				self.orig_scale_button.set_bg_color(NO_BG_COLOR);
+				self.fit_min_button.set_bg_color(NO_BG_COLOR);
+				self.fit_stretch_button.set_bg_color(ACTIVE_BG_COLOR);
+			}
+		}
+	}
 }
 
 pub struct PictureWidget {
@@ -164,9 +226,13 @@ impl PictureWidget {
 	pub fn new(
 		display: &Display,
 		window: &Rc<Window>,
-		slider: Rc<gelatin::slider::Slider>,
+		slider: Rc<Slider>,
+		orig_scale_button: Rc<Button>,
+		fit_min_button: Rc<Button>,
+		fit_stretch_button: Rc<Button>,
 		bottom_panel: Rc<HorizontalLayoutContainer>,
 		configuration: Rc<RefCell<Configuration>>,
+		cache: Arc<Mutex<Cache>>,
 	) -> PictureWidget {
 		let program = program!(display,
 			140 => {
@@ -179,35 +245,49 @@ impl PictureWidget {
 			},
 		)
 		.unwrap();
-		PictureWidget {
-			data: RefCell::new(PictureWidgetData {
-				placement: Default::default(),
-				drawn_bounds: Default::default(),
-				visible: true,
-				prev_draw_size: Default::default(),
-				click: false,
-				hover: false,
-				configuration,
-				playback_manager: PlaybackManager::new(),
-				rendered_valid: false,
 
-				program,
-				bright_shade: 0.95,
-				img_texel_size: 0.0,
-				//image_fit: true,
-				scaling: ScalingMode::FitMin,
-				img_pos: Default::default(),
-				last_click_time: Instant::now() - Duration::from_secs(10),
-				last_mouse_pos: Default::default(),
-				panning: false,
-				hover_state: HoverState::None,
-				first_draw: true,
-				next_update: NextUpdate::Latest,
-				slider,
-				bottom_panel,
-				window: Rc::downgrade(window),
-			}),
+		let scaling;
+		{
+			let cache = cache.lock().unwrap();
+			if cache.image.fit_stretches {
+				scaling = ScalingMode::FitStretch;
+			} else {
+				scaling = ScalingMode::FitMin;
+			}
 		}
+
+		let mut data = PictureWidgetData {
+			placement: Default::default(),
+			drawn_bounds: Default::default(),
+			visible: true,
+			prev_draw_size: Default::default(),
+			click: false,
+			hover: false,
+			configuration,
+			cache,
+			playback_manager: PlaybackManager::new(),
+			rendered_valid: false,
+
+			program,
+			bright_shade: 0.95,
+			img_texel_size: 0.0,
+			scaling,
+			img_pos: Default::default(),
+			last_click_time: Instant::now() - Duration::from_secs(10),
+			last_mouse_pos: Default::default(),
+			panning: false,
+			hover_state: HoverState::None,
+			first_draw: true,
+			next_update: NextUpdate::Latest,
+			slider,
+			orig_scale_button,
+			fit_min_button,
+			fit_stretch_button,
+			bottom_panel,
+			window: Rc::downgrade(window),
+		};
+		data.update_scaling_buttons();
+		PictureWidget { data: RefCell::new(data) }
 	}
 
 	add_common_widget_functions!(data);
@@ -219,21 +299,13 @@ impl PictureWidget {
 	}
 
 	pub fn set_img_size_to_orig(&self) {
-		// TODO use this function from the keyboard input trigger code. Set the
-		// `bg_color` for the associated button to grey and set the same for all other
-		// scaling buttons to black and transparent. Whenever zooming happens, set the bg to
-		// black and transparent for every scaling button. But remember the last scaling setting
-		// and use that when opening emulsion the next time.
 		let mut borrowed = self.data.borrow_mut();
-		borrowed.img_texel_size = 1.0;
-		borrowed.scaling = ScalingMode::Fixed;
-		borrowed.rendered_valid = false;
+		borrowed.set_img_size_to_orig();
 	}
 
 	pub fn set_img_size_to_fit(&self, stretch: bool) {
 		let mut borrowed = self.data.borrow_mut();
-		borrowed.scaling = if stretch { ScalingMode::FitStretch } else { ScalingMode::FitMin };
-		borrowed.rendered_valid = false;
+		borrowed.set_img_size_to_fit(stretch);
 	}
 
 	pub fn jump_to_index(&self, index: u32) {
@@ -287,13 +359,13 @@ impl PictureWidget {
 			borrowed.rendered_valid = false;
 		}
 		if triggered!(IMG_FIT_NAME) {
-			borrowed.scaling = ScalingMode::FitStretch;
-			borrowed.rendered_valid = false;
+			borrowed.set_img_size_to_fit(true);
+		}
+		if triggered!(IMG_FIT_MIN_NAME) {
+			borrowed.set_img_size_to_fit(false);
 		}
 		if triggered!(IMG_ORIG_NAME) {
-			borrowed.scaling = ScalingMode::Fixed;
-			borrowed.img_texel_size = 1.0;
-			borrowed.rendered_valid = false;
+			borrowed.set_img_size_to_orig();
 		}
 		if triggered!(PLAY_PRESENT_NAME) {
 			match borrowed.playback_manager.playback_state() {
@@ -469,6 +541,7 @@ impl Widget for PictureWidget {
 				if borrowed.panning {
 					let delta = event.cursor_pos - borrowed.last_mouse_pos;
 					borrowed.scaling = ScalingMode::Fixed;
+					borrowed.update_scaling_buttons();
 					borrowed.img_pos += delta;
 					borrowed.rendered_valid = false;
 				}
@@ -516,7 +589,6 @@ impl Widget for PictureWidget {
 				let new_image_texel_size = (borrowed.img_texel_size * delta).max(0.0);
 
 				borrowed.zoom_image(event.cursor_pos, new_image_texel_size);
-				borrowed.scaling = ScalingMode::Fixed;
 			}
 			EventKind::ReceivedCharacter(ch) => {
 				let input_key = char_to_input_key(ch);

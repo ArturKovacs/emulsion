@@ -21,22 +21,9 @@ impl Theme {
 	}
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
-pub enum ScalingMode {
-	Fixed,
-	FitStretch,
-	FitMin,
-}
-
-impl Default for ScalingMode {
-	fn default() -> ScalingMode {
-		ScalingMode::FitMin
-	}
-}
-
 #[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
 pub struct CacheImageSection {
-	scaling: ScalingMode,
+	pub fit_stretches: bool,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]

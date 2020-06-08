@@ -24,13 +24,13 @@ static FIT_MIN: &[u8] = include_bytes!("../resource/fit-min.png");
 static FIT_MIN_LIGHT: &[u8] = include_bytes!("../resource/fit-min-light.png");
 
 pub struct BottomBar {
-	widget: Rc<HorizontalLayoutContainer>,
-	orig_scale_button: Rc<Button>,
-	fit_stretch_button: Rc<Button>,
-	fit_min_button: Rc<Button>,
-	slider: Rc<Slider>,
-	theme_button: Rc<Button>,
-	help_button: Rc<Button>,
+	pub widget: Rc<HorizontalLayoutContainer>,
+	pub orig_scale_button: Rc<Button>,
+	pub fit_stretch_button: Rc<Button>,
+	pub fit_min_button: Rc<Button>,
+	pub slider: Rc<Slider>,
+	pub theme_button: Rc<Button>,
+	pub help_button: Rc<Button>,
 
 	question: Rc<Picture>,
 	question_light: Rc<Picture>,
@@ -107,38 +107,6 @@ impl BottomBar {
 			fit_min,
 			fit_min_light,
 		}
-	}
-
-	pub fn widget(&self) -> Rc<HorizontalLayoutContainer> {
-		self.widget.clone()
-	}
-
-	pub fn slider(&self) -> Rc<Slider> {
-		self.slider.clone()
-	}
-
-	pub fn set_on_slider_value_change<T: Fn() + 'static>(&self, callback: T) {
-		self.slider.set_on_value_change(callback);
-	}
-
-	pub fn set_on_help_click<T: Fn() + 'static>(&self, callback: T) {
-		self.help_button.set_on_click(callback);
-	}
-
-	pub fn set_on_theme_click<T: Fn() + 'static>(&self, callback: T) {
-		self.theme_button.set_on_click(callback);
-	}
-
-	pub fn set_on_orig_scale_click<T: Fn() + 'static>(&self, callback: T) {
-		self.orig_scale_button.set_on_click(callback);
-	}
-
-	pub fn set_on_fit_min_click<T: Fn() + 'static>(&self, callback: T) {
-		self.fit_min_button.set_on_click(callback);
-	}
-
-	pub fn set_on_fit_stretch_click<T: Fn() + 'static>(&self, callback: T) {
-		self.fit_stretch_button.set_on_click(callback);
 	}
 
 	pub fn set_theme(&self, theme: Theme, update_available: bool) {
@@ -237,7 +205,7 @@ fn make_slider() -> Rc<Slider> {
 	slider.set_margin_left(4.0);
 	slider.set_margin_right(4.0);
 	slider.set_height(Length::Fixed(24.0));
-	slider.set_width(Length::Stretch { min: 0.0, max: 600.0 });
+	slider.set_width(Length::Stretch { min: 0.0, max: std::f32::INFINITY });
 	slider.set_horizontal_align(Alignment::Center);
 	slider.set_steps(6, 1);
 	slider

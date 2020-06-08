@@ -108,9 +108,16 @@ fn main() {
 	let help_screen = Rc::new(HelpScreen::new(usage_img));
 
 	let bottom_bar = Rc::new(BottomBar::new());
-
-	let picture_widget =
-		make_picture_widget(&window, bottom_bar.slider(), bottom_bar.widget(), config.clone());
+	let picture_widget = make_picture_widget(
+		&window,
+		bottom_bar.slider.clone(),
+		bottom_bar.orig_scale_button.clone(),
+		bottom_bar.fit_min_button.clone(),
+		bottom_bar.fit_stretch_button.clone(),
+		bottom_bar.widget.clone(),
+		config.clone(),
+		cache.clone(),
+	);
 
 	if let Some(file_path) = args.file_path {
 		picture_widget.jump_to_path(file_path);
@@ -123,7 +130,7 @@ fn main() {
 
 	let root_container = make_root_container();
 	root_container.add_child(picture_area_container);
-	root_container.add_child(bottom_bar.widget());
+	root_container.add_child(bottom_bar.widget.clone());
 
 	let update_available = Arc::new(AtomicBool::new(false));
 	let update_check_done = Arc::new(AtomicBool::new(false));
@@ -160,7 +167,7 @@ fn main() {
 	{
 		let cache = cache.clone();
 		let set_theme = set_theme.clone();
-		bottom_bar.set_on_theme_click(move || {
+		bottom_bar.theme_button.set_on_click(move || {
 			let new_theme = theme.get().switch_theme();
 			theme.set(new_theme);
 			cache.lock().unwrap().set_theme(new_theme);
@@ -168,27 +175,27 @@ fn main() {
 		});
 	}
 	{
-		let slider = bottom_bar.slider();
+		let slider = bottom_bar.slider.clone();
 		let picture_widget = picture_widget.clone();
-		bottom_bar.set_on_slider_value_change(move || {
+		bottom_bar.slider.set_on_value_change(move || {
 			picture_widget.jump_to_index(slider.value());
 		});
 	}
 	{
 		let picture_widget = picture_widget.clone();
-		bottom_bar.set_on_orig_scale_click(move || {
+		bottom_bar.orig_scale_button.set_on_click(move || {
 			picture_widget.set_img_size_to_orig();
 		});
 	}
 	{
 		let picture_widget = picture_widget.clone();
-		bottom_bar.set_on_fit_min_click(move || {
+		bottom_bar.fit_min_button.set_on_click(move || {
 			picture_widget.set_img_size_to_fit(false);
 		});
 	}
 	{
 		let picture_widget = picture_widget.clone();
-		bottom_bar.set_on_fit_stretch_click(move || {
+		bottom_bar.fit_stretch_button.set_on_click(move || {
 			picture_widget.set_img_size_to_fit(true);
 		});
 	}
@@ -200,7 +207,7 @@ fn main() {
 		let help_screen = help_screen.clone();
 		let update_notification = update_notification.clone();
 
-		bottom_bar.set_on_help_click(move || {
+		bottom_bar.help_button.set_on_click(move || {
 			help_visible.set(!help_visible.get());
 			help_screen.set_visible(help_visible.get());
 			update_notification
@@ -335,15 +342,23 @@ fn make_update_notification(update_label: Rc<Label>) -> Rc<HorizontalLayoutConta
 fn make_picture_widget(
 	window: &Rc<Window>,
 	slider: Rc<Slider>,
+	orig_scale_button: Rc<Button>,
+	fit_min_button: Rc<Button>,
+	fit_stretch_button: Rc<Button>,
 	bottom_container: Rc<HorizontalLayoutContainer>,
 	config: Rc<RefCell<Configuration>>,
+	cache: Arc<Mutex<Cache>>,
 ) -> Rc<PictureWidget> {
 	let picture_widget = Rc::new(PictureWidget::new(
 		&window.display_mut(),
 		window,
 		slider,
+		orig_scale_button,
+		fit_min_button,
+		fit_stretch_button,
 		bottom_container.clone(),
 		config.clone(),
+		cache.clone(),
 	));
 	picture_widget.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
 	picture_widget.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
