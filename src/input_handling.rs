@@ -23,7 +23,7 @@ pub static PLAY_PRESENT_RND_NAME: &str = "play_present_rnd";
 lazy_static! {
 	pub static ref DEFAULT_BINDINGS: HashMap<&'static str, Vec<&'static str>> = {
 		let mut m = HashMap::new();
-		m.insert(TOGGLE_FULLSCREEN_NAME, vec!["F11"]);
+		m.insert(TOGGLE_FULLSCREEN_NAME, vec!["F11", "Return"]);
 		m.insert(ESCAPE_NAME, vec!["Escape"]);
 		m.insert(IMG_NEXT_NAME, vec!["D", "Right", "PageDown"]);
 		m.insert(IMG_PREV_NAME, vec!["A", "Left", "PageUp"]);
