@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use directories::ProjectDirs;
+use directories_next::ProjectDirs;
 use lazy_static::lazy_static;
 
 use gelatin::glium::glutin::{
