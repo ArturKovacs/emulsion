@@ -86,8 +86,17 @@ fn main() {
 
 	let mut application = Application::new();
 	let window: Rc<Window> = {
-		let window = &cache.lock().unwrap().window;
+		let window = &mut cache.lock().unwrap().window;
 
+		let window_defaults = configuration::WindowSection::default();
+		let right = window.win_x as i64 + window.win_w as i64;
+		if right < 20 {
+			window.win_w = window_defaults.win_w;
+			window.win_x = window_defaults.win_x;
+		}
+		if window.win_y < 20 {
+			window.win_y = window_defaults.win_y;
+		}
 		let window_desc = WindowDescriptorBuilder::default()
 			.icon(Some(make_icon()))
 			.size(PhysicalSize::new(window.win_w, window.win_h))
