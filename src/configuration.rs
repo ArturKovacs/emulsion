@@ -21,6 +21,11 @@ impl Theme {
 	}
 }
 
+#[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
+pub struct CacheImageSection {
+	pub fit_stretches: bool,
+}
+
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct WindowSection {
 	pub dark: bool,
@@ -79,13 +84,15 @@ impl CacheUpdateSection {
 pub struct Cache {
 	pub window: WindowSection,
 	pub updates: CacheUpdateSection,
+	pub image: CacheImageSection,
 }
 
 impl Cache {
 	pub fn theme(&self) -> Theme {
-		match self.window.dark {
-			true => Theme::Dark,
-			false => Theme::Light,
+		if self.window.dark {
+			Theme::Dark
+		} else {
+			Theme::Light
 		}
 	}
 
@@ -98,6 +105,7 @@ impl Cache {
 struct IncompleteCache {
 	pub window: Option<WindowSection>,
 	pub updates: Option<CacheUpdateSection>,
+	pub image: Option<CacheImageSection>,
 }
 
 impl From<IncompleteCache> for Cache {
@@ -105,6 +113,7 @@ impl From<IncompleteCache> for Cache {
 		Self {
 			window: cache.window.unwrap_or_default(),
 			updates: cache.updates.unwrap_or_default(),
+			image: cache.image.unwrap_or_default(),
 		}
 	}
 }

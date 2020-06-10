@@ -13,6 +13,7 @@ pub static IMG_NEXT_NAME: &str = "img_next";
 pub static IMG_PREV_NAME: &str = "img_prev";
 pub static IMG_ORIG_NAME: &str = "img_orig";
 pub static IMG_FIT_NAME: &str = "img_fit";
+pub static IMG_FIT_BEST_NAME: &str = "img_fit_best";
 pub static IMG_DEL_NAME: &str = "img_del";
 pub static PAN_NAME: &str = "pan";
 pub static PLAY_ANIM_NAME: &str = "play_anim";
@@ -22,12 +23,13 @@ pub static PLAY_PRESENT_RND_NAME: &str = "play_present_rnd";
 lazy_static! {
 	pub static ref DEFAULT_BINDINGS: HashMap<&'static str, Vec<&'static str>> = {
 		let mut m = HashMap::new();
-		m.insert(TOGGLE_FULLSCREEN_NAME, vec!["F11"]);
+		m.insert(TOGGLE_FULLSCREEN_NAME, vec!["F11", "Return"]);
 		m.insert(ESCAPE_NAME, vec!["Escape"]);
 		m.insert(IMG_NEXT_NAME, vec!["D", "Right", "PageDown"]);
 		m.insert(IMG_PREV_NAME, vec!["A", "Left", "PageUp"]);
-		m.insert(IMG_ORIG_NAME, vec!["Q"]);
+		m.insert(IMG_ORIG_NAME, vec!["Q", "1"]);
 		m.insert(IMG_FIT_NAME, vec!["F"]);
+		m.insert(IMG_FIT_BEST_NAME, vec!["E"]);
 		m.insert(IMG_DEL_NAME, vec!["Delete"]);
 		m.insert(PAN_NAME, vec!["Space"]);
 		m.insert(PLAY_ANIM_NAME, vec!["Alt+A", "Alt+V"]);

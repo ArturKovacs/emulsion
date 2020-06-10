@@ -19,6 +19,7 @@ struct ButtonData {
 	click: bool,
 	hover: bool,
 	icon: Option<Rc<Picture>>,
+	bg_color: [f32; 4],
 	on_click: Option<Rc<dyn Fn()>>,
 
 	rendered_valid: bool,
@@ -49,6 +50,7 @@ impl Button {
 				click: false,
 				hover: false,
 				on_click: None,
+				bg_color: [0.0; 4],
 				icon: None,
 				rendered_valid: false,
 			}),
@@ -67,6 +69,12 @@ impl Button {
 	pub fn set_icon(&self, img: Option<Rc<Picture>>) {
 		let mut borrowed = self.data.borrow_mut();
 		borrowed.icon = img;
+		borrowed.rendered_valid = false;
+	}
+
+	pub fn set_bg_color(&self, bg_color: [f32; 4]) {
+		let mut borrowed = self.data.borrow_mut();
+		borrowed.bg_color = bg_color;
 		borrowed.rendered_valid = false;
 	}
 }
@@ -115,7 +123,7 @@ impl Widget for Button {
 				let uniforms = uniform! {
 					matrix: Into::<[[f32; 4]; 4]>::into(transform),
 					tex: sampler,
-					color: [1.0f32, 0.1, 0.5, 0.5],
+					bg_color: borrowed.bg_color,
 					texture_size: texture_size,
 					//brighten: if self.hover { 0.15f32 } else { 0.0f32 },
 					brighten: 0.0f32,
@@ -137,7 +145,7 @@ impl Widget for Button {
 				// building the uniforms
 				let uniforms = uniform! {
 					matrix: Into::<[[f32; 4]; 4]>::into(transform),
-					color: [1.0f32, 0.1, 0.5, 0.5],
+					bg_color: borrowed.bg_color,
 					size: texture_size,
 					//brighten: if self.hover { 0.15f32 } else { 0.0f32 },
 					brighten: 0.0f32,
