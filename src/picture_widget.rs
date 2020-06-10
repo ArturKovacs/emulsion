@@ -73,7 +73,7 @@ struct PictureWidgetData {
 	next_update: NextUpdate,
 	slider: Rc<Slider>,
 	orig_scale_button: Rc<Button>,
-	fit_min_button: Rc<Button>,
+	fit_best_button: Rc<Button>,
 	fit_stretch_button: Rc<Button>,
 	bottom_panel: Rc<HorizontalLayoutContainer>,
 	window: Weak<Window>,
@@ -203,17 +203,17 @@ impl PictureWidgetData {
 				} else {
 					self.orig_scale_button.set_bg_color(NO_BG_COLOR);
 				}
-				self.fit_min_button.set_bg_color(NO_BG_COLOR);
+				self.fit_best_button.set_bg_color(NO_BG_COLOR);
 				self.fit_stretch_button.set_bg_color(NO_BG_COLOR);
 			}
 			ScalingMode::FitMin => {
 				self.orig_scale_button.set_bg_color(NO_BG_COLOR);
-				self.fit_min_button.set_bg_color(ACTIVE_BG_COLOR);
+				self.fit_best_button.set_bg_color(ACTIVE_BG_COLOR);
 				self.fit_stretch_button.set_bg_color(NO_BG_COLOR);
 			}
 			ScalingMode::FitStretch => {
 				self.orig_scale_button.set_bg_color(NO_BG_COLOR);
-				self.fit_min_button.set_bg_color(NO_BG_COLOR);
+				self.fit_best_button.set_bg_color(NO_BG_COLOR);
 				self.fit_stretch_button.set_bg_color(ACTIVE_BG_COLOR);
 			}
 		}
@@ -229,7 +229,7 @@ impl PictureWidget {
 		window: &Rc<Window>,
 		slider: Rc<Slider>,
 		orig_scale_button: Rc<Button>,
-		fit_min_button: Rc<Button>,
+		fit_best_button: Rc<Button>,
 		fit_stretch_button: Rc<Button>,
 		bottom_panel: Rc<HorizontalLayoutContainer>,
 		configuration: Rc<RefCell<Configuration>>,
@@ -282,7 +282,7 @@ impl PictureWidget {
 			next_update: NextUpdate::Latest,
 			slider,
 			orig_scale_button,
-			fit_min_button,
+			fit_best_button,
 			fit_stretch_button,
 			bottom_panel,
 			window: Rc::downgrade(window),
@@ -362,7 +362,7 @@ impl PictureWidget {
 		if triggered!(IMG_FIT_NAME) {
 			borrowed.set_img_size_to_fit(true);
 		}
-		if triggered!(IMG_FIT_MIN_NAME) {
+		if triggered!(IMG_FIT_BEST_NAME) {
 			borrowed.set_img_size_to_fit(false);
 		}
 		if triggered!(IMG_ORIG_NAME) {

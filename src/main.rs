@@ -112,7 +112,7 @@ fn main() {
 		&window,
 		bottom_bar.slider.clone(),
 		bottom_bar.orig_scale_button.clone(),
-		bottom_bar.fit_min_button.clone(),
+		bottom_bar.fit_best_button.clone(),
 		bottom_bar.fit_stretch_button.clone(),
 		bottom_bar.widget.clone(),
 		config.clone(),
@@ -189,7 +189,7 @@ fn main() {
 	}
 	{
 		let picture_widget = picture_widget.clone();
-		bottom_bar.fit_min_button.set_on_click(move || {
+		bottom_bar.fit_best_button.set_on_click(move || {
 			picture_widget.set_img_size_to_fit(false);
 		});
 	}
@@ -343,7 +343,7 @@ fn make_picture_widget(
 	window: &Rc<Window>,
 	slider: Rc<Slider>,
 	orig_scale_button: Rc<Button>,
-	fit_min_button: Rc<Button>,
+	fit_best_button: Rc<Button>,
 	fit_stretch_button: Rc<Button>,
 	bottom_container: Rc<HorizontalLayoutContainer>,
 	config: Rc<RefCell<Configuration>>,
@@ -354,7 +354,7 @@ fn make_picture_widget(
 		window,
 		slider,
 		orig_scale_button,
-		fit_min_button,
+		fit_best_button,
 		fit_stretch_button,
 		bottom_container.clone(),
 		config.clone(),

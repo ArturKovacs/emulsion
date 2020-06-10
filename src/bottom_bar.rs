@@ -20,14 +20,14 @@ static ONE: &[u8] = include_bytes!("../resource/1.png");
 static ONE_LIGHT: &[u8] = include_bytes!("../resource/1-light.png");
 static FIT_STRETCH: &[u8] = include_bytes!("../resource/fit-stretch.png");
 static FIT_STRETCH_LIGHT: &[u8] = include_bytes!("../resource/fit-stretch-light.png");
-static FIT_MIN: &[u8] = include_bytes!("../resource/fit-min.png");
-static FIT_MIN_LIGHT: &[u8] = include_bytes!("../resource/fit-min-light.png");
+static FIT_BEST: &[u8] = include_bytes!("../resource/fit-min.png");
+static FIT_BEST_LIGHT: &[u8] = include_bytes!("../resource/fit-min-light.png");
 
 pub struct BottomBar {
 	pub widget: Rc<HorizontalLayoutContainer>,
 	pub orig_scale_button: Rc<Button>,
 	pub fit_stretch_button: Rc<Button>,
-	pub fit_min_button: Rc<Button>,
+	pub fit_best_button: Rc<Button>,
 	pub slider: Rc<Slider>,
 	pub theme_button: Rc<Button>,
 	pub help_button: Rc<Button>,
@@ -42,8 +42,8 @@ pub struct BottomBar {
 	one_light: Rc<Picture>,
 	fit_stretch: Rc<Picture>,
 	fit_stretch_light: Rc<Picture>,
-	fit_min: Rc<Picture>,
-	fit_min_light: Rc<Picture>,
+	fit_best: Rc<Picture>,
+	fit_best_light: Rc<Picture>,
 }
 
 impl BottomBar {
@@ -58,8 +58,8 @@ impl BottomBar {
 		let one_light = Rc::new(Picture::from_encoded_bytes(ONE_LIGHT));
 		let fit_stretch = Rc::new(Picture::from_encoded_bytes(FIT_STRETCH));
 		let fit_stretch_light = Rc::new(Picture::from_encoded_bytes(FIT_STRETCH_LIGHT));
-		let fit_min = Rc::new(Picture::from_encoded_bytes(FIT_MIN));
-		let fit_min_light = Rc::new(Picture::from_encoded_bytes(FIT_MIN_LIGHT));
+		let fit_best = Rc::new(Picture::from_encoded_bytes(FIT_BEST));
+		let fit_best_light = Rc::new(Picture::from_encoded_bytes(FIT_BEST_LIGHT));
 
 		let theme_button = make_theme_button();
 		let help_button = make_help_button();
@@ -74,11 +74,11 @@ impl BottomBar {
 		widget.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
 
 		let orig_scale_button = make_orig_scale_button();
-		let fit_min_button = make_fit_min_button();
+		let fit_best_button = make_fit_best_button();
 		let fit_stretch_button = make_fit_stretch_button();
 
 		widget.add_child(orig_scale_button.clone());
-		widget.add_child(fit_min_button.clone());
+		widget.add_child(fit_best_button.clone());
 		widget.add_child(fit_stretch_button.clone());
 
 		widget.add_child(slider.clone());
@@ -89,7 +89,7 @@ impl BottomBar {
 			widget,
 			orig_scale_button,
 			fit_stretch_button,
-			fit_min_button,
+			fit_best_button,
 			slider,
 			theme_button,
 			help_button,
@@ -104,8 +104,8 @@ impl BottomBar {
 			one_light,
 			fit_stretch,
 			fit_stretch_light,
-			fit_min,
-			fit_min_light,
+			fit_best,
+			fit_best_light,
 		}
 	}
 
@@ -113,7 +113,7 @@ impl BottomBar {
 		match theme {
 			Theme::Light => {
 				self.orig_scale_button.set_icon(Some(self.one.clone()));
-				self.fit_min_button.set_icon(Some(self.fit_min.clone()));
+				self.fit_best_button.set_icon(Some(self.fit_best.clone()));
 				self.fit_stretch_button.set_icon(Some(self.fit_stretch.clone()));
 				self.theme_button.set_icon(Some(self.moon_img.clone()));
 				self.widget.set_bg_color([1.0, 1.0, 1.0, 1.0]);
@@ -127,7 +127,7 @@ impl BottomBar {
 			}
 			Theme::Dark => {
 				self.orig_scale_button.set_icon(Some(self.one_light.clone()));
-				self.fit_min_button.set_icon(Some(self.fit_min_light.clone()));
+				self.fit_best_button.set_icon(Some(self.fit_best_light.clone()));
 				self.fit_stretch_button.set_icon(Some(self.fit_stretch_light.clone()));
 				self.theme_button.set_icon(Some(self.light_img.clone()));
 				self.widget.set_bg_color([0.08, 0.08, 0.08, 1.0]);
@@ -154,7 +154,7 @@ fn make_orig_scale_button() -> Rc<Button> {
 	button
 }
 
-fn make_fit_min_button() -> Rc<Button> {
+fn make_fit_best_button() -> Rc<Button> {
 	let button = Rc::new(Button::new());
 	button.set_margin_top(4.0);
 	button.set_margin_left(0.0);

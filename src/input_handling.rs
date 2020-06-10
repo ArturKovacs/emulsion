@@ -13,7 +13,7 @@ pub static IMG_NEXT_NAME: &str = "img_next";
 pub static IMG_PREV_NAME: &str = "img_prev";
 pub static IMG_ORIG_NAME: &str = "img_orig";
 pub static IMG_FIT_NAME: &str = "img_fit";
-pub static IMG_FIT_MIN_NAME: &str = "img_fit_min";
+pub static IMG_FIT_BEST_NAME: &str = "img_fit_best";
 pub static IMG_DEL_NAME: &str = "img_del";
 pub static PAN_NAME: &str = "pan";
 pub static PLAY_ANIM_NAME: &str = "play_anim";
@@ -29,7 +29,7 @@ lazy_static! {
 		m.insert(IMG_PREV_NAME, vec!["A", "Left", "PageUp"]);
 		m.insert(IMG_ORIG_NAME, vec!["Q", "1"]);
 		m.insert(IMG_FIT_NAME, vec!["F"]);
-		m.insert(IMG_FIT_MIN_NAME, vec!["E"]);
+		m.insert(IMG_FIT_BEST_NAME, vec!["E"]);
 		m.insert(IMG_DEL_NAME, vec!["Delete"]);
 		m.insert(PAN_NAME, vec!["Space"]);
 		m.insert(PLAY_ANIM_NAME, vec!["Alt+A", "Alt+V"]);
