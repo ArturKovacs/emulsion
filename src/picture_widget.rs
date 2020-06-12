@@ -414,10 +414,10 @@ impl PictureWidget {
 }
 
 impl Widget for PictureWidget {
-	fn before_draw(&self, window: &Window) {
+	fn before_draw(&self, window: &Window) -> NextUpdate {
 		let mut data = self.data.borrow_mut();
 		if !data.visible {
-			return;
+			return NextUpdate::Latest;
 		}
 		if data.first_draw {
 			// Don't block on the main thread and
@@ -425,15 +425,27 @@ impl Widget for PictureWidget {
 			// instead let the ui draw itself first and then we can wait.
 			data.first_draw = false;
 			data.next_update = NextUpdate::Soonest;
-			return;
+			return data.next_update;
 		}
+		let prev_texture = data.playback_manager.image_texture();
 		data.next_update = data.playback_manager.update_image(window);
+		let new_texture = data.playback_manager.image_texture();
 		let curr_file_index = data.playback_manager.current_file_index() as u32;
 		let curr_dir_len = data.playback_manager.current_dir_len() as u32;
 		data.slider.set_steps(curr_dir_len, curr_file_index);
 		//data.slider.set_step_bg(data.playback_manager.cached_from_dir());
 		let playback_state = data.playback_manager.playback_state();
 		data.set_window_title_filename(window, playback_state, data.playback_manager.file_path());
+		if prev_texture.is_none() != new_texture.is_none() {
+			data.render_validity.invalidate();
+		} else {
+			if let (Some(prev_tex), Some(new_tex)) = (prev_texture, new_texture) {
+				if !Rc::ptr_eq(&prev_tex, &new_tex) {
+					data.render_validity.invalidate();
+				}
+			}
+		}
+		data.next_update
 	}
 
 	fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<NextUpdate, WidgetError> {
@@ -516,7 +528,7 @@ impl Widget for PictureWidget {
 					.unwrap();
 			}
 		}
-		let mut borrowed = self.data.borrow_mut();
+		let borrowed = self.data.borrow();
 		Ok(borrowed.next_update)
 	}
 

@@ -66,8 +66,6 @@ impl HelpScreen {
 }
 
 impl Widget for HelpScreen {
-	fn before_draw(&self, _window: &Window) {}
-
 	fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<NextUpdate, WidgetError> {
 		use gelatin::glium::{Blend, BlendingFunction, LinearBlendingFactor};
 		{

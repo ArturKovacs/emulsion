@@ -135,13 +135,15 @@ impl<Dim: PickDimension + 'static> LineLayoutContainer<Dim> {
 	}
 }
 impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
-	fn before_draw(&self, window: &Window) {
+	fn before_draw(&self, window: &Window) -> NextUpdate {
+		let mut next_update = NextUpdate::Latest;
 		let borrowed = self.data.borrow();
 		if borrowed.visible {
 			for child in borrowed.children.iter() {
-				child.before_draw(window);
+				next_update = next_update.aggregate(child.before_draw(window));
 			}
 		}
+		next_update
 	}
 
 	fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<NextUpdate, WidgetError> {

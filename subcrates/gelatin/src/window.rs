@@ -23,7 +23,7 @@ use crate::application::Application;
 use crate::shaders;
 use crate::{
 	misc::{FromPhysical, LogicalRect, LogicalVector},
-	DrawContext, Event, EventKind, Vertex, Widget,
+	DrawContext, Event, EventKind, NextUpdate, Vertex, Widget,
 };
 
 const EVENT_UPDATE_DELTA: std::time::Duration = std::time::Duration::from_millis(2);
@@ -85,15 +85,11 @@ struct WindowData {
 	display: glium::Display,
 	size_before_fullscreen: PhysicalSize<u32>,
 	fullscreen: bool,
-	
-	// TODO improve CPU usage along these lines:
-	//
-	// Using these fields...
-	//
 	last_mouse_move_update_time: std::time::Instant,
 	unprocessed_move_event: Option<Event>,
 	last_event_invalidated: bool,
-
+	should_sleep: bool,
+	
 	render_validity: RenderValidity,
 	cursor_pos: LogicalVector,
 	modifiers: glutin::event::ModifiersState,
@@ -209,6 +205,7 @@ impl Window {
 				last_mouse_move_update_time: std::time::Instant::now(),
 				unprocessed_move_event: None,
 				last_event_invalidated: true,
+				should_sleep: false,
 				cursor_pos: Default::default(),
 				modifiers: glutin::event::ModifiersState::empty(),
 				render_validity: RenderValidity { validity: Rc::new(Cell::new(false)) },
@@ -355,17 +352,23 @@ impl Window {
 			let cloned = self.data.borrow().root_widget.clone();
 			cloned.handle_event(&event);
 			let mut borrowed = self.data.borrow_mut();
+			borrowed.should_sleep = false;
 			if borrowed.render_validity.get() {
 				match event.kind {
 					EventKind::MouseMove => {
-						std::thread::sleep(EVENT_UPDATE_DELTA);
+						borrowed.should_sleep = true;
+						//std::thread::sleep(EVENT_UPDATE_DELTA);
 					}
-					_ => ()
+					_ => (),
 				}
 			} else {
 				borrowed.last_event_invalidated = true;
 			}
 		}
+	}
+	
+	pub fn should_sleep(&self) -> bool {
+		self.data.borrow().should_sleep
 	}
 
 	pub fn display_mut(&self) -> WindowDisplayRefMut<'_> {
@@ -380,13 +383,13 @@ impl Window {
 		self.data.borrow_mut().display.gl_window().window().request_redraw();
 	}
 
-	pub fn main_events_cleared(&self) {
+	pub fn main_events_cleared(&self) -> NextUpdate {
 		// this way self.data is not borrowed while `before_draw` is running.
 		let root_widget = self.data.borrow().root_widget.clone();
 		if let Some(event) = self.data.borrow_mut().unprocessed_move_event.take() {
 			root_widget.handle_event(&event);
 		}
-		root_widget.before_draw(self);
+		root_widget.before_draw(self)
 	}
 
 	pub fn redraw_needed(&self) -> bool {
