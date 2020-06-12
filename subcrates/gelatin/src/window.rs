@@ -9,6 +9,7 @@ use glium::glutin::{
 use glium::{program, uniform, Display, Frame, IndexBuffer, Program, Rect, Surface, VertexBuffer};
 use glium::{Blend, BlendingFunction};
 
+use std::cell::Cell;
 use std::cell::{RefCell, RefMut};
 use std::cmp::Eq;
 use std::hash::{Hash, Hasher};
@@ -24,6 +25,33 @@ use crate::{
 	misc::{FromPhysical, LogicalRect, LogicalVector},
 	DrawContext, Event, EventKind, Vertex, Widget,
 };
+
+const EVENT_UPDATE_DELTA: std::time::Duration = std::time::Duration::from_millis(2);
+
+/// Stores whether the window contets need to be re-rendered.
+///
+/// Widgets must call `invalidate` whenever they go through a
+/// a change that requires the widget to be re-drawn.
+///
+/// This object holds a reference counted bool.
+#[derive(Debug, Clone, Default)]
+pub struct RenderValidity {
+	validity: Rc<Cell<bool>>,
+}
+impl RenderValidity {
+	pub fn invalidate(&self) {
+		self.validity.set(false);
+	}
+
+	pub fn get(&self) -> bool {
+		self.validity.get()
+	}
+
+	/// Private accessability because this is only allowed for the window.
+	fn make_valid(&self) {
+		self.validity.set(true);
+	}
+}
 
 pub struct WindowDisplayRefMut<'a> {
 	window_ref: RefMut<'a, WindowData>,
@@ -57,7 +85,16 @@ struct WindowData {
 	display: glium::Display,
 	size_before_fullscreen: PhysicalSize<u32>,
 	fullscreen: bool,
-	redraw_needed: bool,
+	
+	// TODO improve CPU usage along these lines:
+	//
+	// Using these fields...
+	//
+	last_mouse_move_update_time: std::time::Instant,
+	unprocessed_move_event: Option<Event>,
+	last_event_invalidated: bool,
+
+	render_validity: RenderValidity,
 	cursor_pos: LogicalVector,
 	modifiers: glutin::event::ModifiersState,
 	root_widget: Rc<dyn Widget>,
@@ -169,9 +206,12 @@ impl Window {
 				display,
 				size_before_fullscreen: desc.size,
 				fullscreen: false,
+				last_mouse_move_update_time: std::time::Instant::now(),
+				unprocessed_move_event: None,
+				last_event_invalidated: true,
 				cursor_pos: Default::default(),
 				modifiers: glutin::event::ModifiersState::empty(),
-				redraw_needed: false,
+				render_validity: RenderValidity { validity: Rc::new(Cell::new(false)) },
 				root_widget: Rc::new(crate::line_layout_container::VerticalLayoutContainer::new()),
 				bg_color: [0.85, 0.85, 0.85, 1.0],
 
@@ -196,8 +236,9 @@ impl Window {
 
 	pub fn set_root<T: Widget>(&self, widget: Rc<T>) {
 		let mut borrowed = self.data.borrow_mut();
+		widget.set_valid_ref(borrowed.render_validity.clone());
 		borrowed.root_widget = widget;
-		borrowed.redraw_needed = true;
+		borrowed.render_validity.invalidate();
 	}
 
 	pub fn set_bg_color(&self, color: [f32; 4]) {
@@ -241,11 +282,19 @@ impl Window {
 						//logical_pos.vec.y = logical_dimensions.vec.y - logical_pos.vec.y;
 					}
 					borrowed.cursor_pos = logical_pos;
-					event = Some(Event {
+					let move_event = Event {
 						cursor_pos: borrowed.cursor_pos,
 						modifiers: borrowed.modifiers,
 						kind: EventKind::MouseMove,
-					});
+					};
+					let last_update_elapsed = borrowed.last_mouse_move_update_time.elapsed();
+					if borrowed.last_event_invalidated || last_update_elapsed > EVENT_UPDATE_DELTA {
+						borrowed.last_mouse_move_update_time = std::time::Instant::now();
+						event = Some(move_event);
+					} else {
+						event = None;
+						borrowed.unprocessed_move_event = Some(move_event);
+					}
 				}
 				WindowEvent::MouseWheel { delta: native_delta, .. } => {
 					let delta;
@@ -305,7 +354,17 @@ impl Window {
 		if let Some(event) = event {
 			let cloned = self.data.borrow().root_widget.clone();
 			cloned.handle_event(&event);
-			self.data.borrow_mut().redraw_needed = !cloned.is_valid();
+			let mut borrowed = self.data.borrow_mut();
+			if borrowed.render_validity.get() {
+				match event.kind {
+					EventKind::MouseMove => {
+						std::thread::sleep(EVENT_UPDATE_DELTA);
+					}
+					_ => ()
+				}
+			} else {
+				borrowed.last_event_invalidated = true;
+			}
 		}
 	}
 
@@ -324,19 +383,21 @@ impl Window {
 	pub fn main_events_cleared(&self) {
 		// this way self.data is not borrowed while `before_draw` is running.
 		let root_widget = self.data.borrow().root_widget.clone();
+		if let Some(event) = self.data.borrow_mut().unprocessed_move_event.take() {
+			root_widget.handle_event(&event);
+		}
 		root_widget.before_draw(self);
 	}
 
 	pub fn redraw_needed(&self) -> bool {
-		// TODO return true if any of the components
-		// `is_valid` returns false
-		true
+		!self.data.borrow().render_validity.get()
 	}
 
 	/// WARNING The window may not be changed during the drawing phase.
 	/// This means that trying to borrow the window *mutably* in a widget's
 	/// draw function will fail.
 	pub fn redraw(&self) -> crate::NextUpdate {
+		self.data.borrow_mut().last_event_invalidated = false;
 		// this way self.data is not borrowed while before draw is running.
 		let dpi_scaling = self.data.borrow().display.gl_window().window().scale_factor();
 		let mut target = self.data.borrow().display.draw();
@@ -397,6 +458,7 @@ impl Window {
 		self.set_alpha_to_1(&mut target, &draw_context);
 
 		target.finish().unwrap();
+		borrowed.render_validity.make_valid();
 		retval
 	}
 

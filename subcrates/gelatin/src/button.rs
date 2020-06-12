@@ -8,6 +8,7 @@ use glium::{uniform, Frame, Surface};
 use crate::add_common_widget_functions;
 use crate::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
 use crate::picture::Picture;
+use crate::window::RenderValidity;
 use crate::NextUpdate;
 use crate::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
 
@@ -22,7 +23,7 @@ struct ButtonData {
 	bg_color: [f32; 4],
 	on_click: Option<Rc<dyn Fn()>>,
 
-	rendered_valid: bool,
+	render_validity: RenderValidity,
 }
 impl WidgetData for ButtonData {
 	fn placement(&mut self) -> &mut WidgetPlacement {
@@ -52,7 +53,7 @@ impl Button {
 				on_click: None,
 				bg_color: [0.0; 4],
 				icon: None,
-				rendered_valid: false,
+				render_validity: Default::default(),
 			}),
 		}
 	}
@@ -69,21 +70,17 @@ impl Button {
 	pub fn set_icon(&self, img: Option<Rc<Picture>>) {
 		let mut borrowed = self.data.borrow_mut();
 		borrowed.icon = img;
-		borrowed.rendered_valid = false;
+		borrowed.render_validity.invalidate();
 	}
 
 	pub fn set_bg_color(&self, bg_color: [f32; 4]) {
 		let mut borrowed = self.data.borrow_mut();
 		borrowed.bg_color = bg_color;
-		borrowed.rendered_valid = false;
+		borrowed.render_validity.invalidate();
 	}
 }
 
 impl Widget for Button {
-	fn is_valid(&self) -> bool {
-		self.data.borrow().rendered_valid
-	}
-
 	fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<NextUpdate, WidgetError> {
 		use glium::{Blend, BlendingFunction, LinearBlendingFactor};
 		{
@@ -165,7 +162,6 @@ impl Widget for Button {
 					.unwrap();
 			}
 		}
-		self.data.borrow_mut().rendered_valid = true;
 		Ok(NextUpdate::Latest)
 	}
 
@@ -178,12 +174,17 @@ impl Widget for Button {
 		match event.kind {
 			EventKind::MouseMove => {
 				let mut borrowed = self.data.borrow_mut();
+				let prev_hover = borrowed.hover;
 				borrowed.hover = borrowed.drawn_bounds.contains(event.cursor_pos);
+				if borrowed.hover != prev_hover {
+					borrowed.render_validity.invalidate();
+				}
 			}
 			EventKind::MouseButton { state, button: MouseButton::Left, .. } => match state {
 				ElementState::Pressed => {
 					let mut borrowed = self.data.borrow_mut();
 					borrowed.click = borrowed.hover;
+					borrowed.render_validity.invalidate();
 				}
 				ElementState::Released => {
 					let on_click;
@@ -195,6 +196,7 @@ impl Widget for Button {
 							on_click = None;
 						}
 						borrowed.click = false;
+						borrowed.render_validity.invalidate();
 					}
 					if let Some(callback) = on_click {
 						callback();
@@ -214,5 +216,9 @@ impl Widget for Button {
 
 	fn visible(&self) -> bool {
 		self.data.borrow().visible
+	}
+
+	fn set_valid_ref(&self, render_validity: RenderValidity) {
+		self.data.borrow_mut().render_validity = render_validity;
 	}
 }

@@ -6,6 +6,7 @@ use glium::Frame;
 use crate::misc::{
 	Alignment, HorDim, Length, LogicalRect, LogicalVector, PickDimension, VerDim, WidgetPlacement,
 };
+use crate::window::RenderValidity;
 use crate::window::Window;
 use crate::NextUpdate;
 use crate::{
@@ -20,7 +21,7 @@ struct LineLayoutContainerData {
 	drawn_bounds: LogicalRect,
 	placement: WidgetPlacement,
 	visible: bool,
-	rendered_valid: bool,
+	render_validity: RenderValidity,
 
 	bg_color: [f32; 4],
 
@@ -68,7 +69,7 @@ impl<Dim: PickDimension + 'static> LineLayoutContainer<Dim> {
 			data: RefCell::new(LineLayoutContainerData {
 				drawn_bounds: Default::default(),
 				placement: Default::default(),
-				rendered_valid: false,
+				render_validity: Default::default(),
 				bg_color: [0.0, 0.0, 0.0, 0.0],
 				visible: true,
 				children: Vec::new(),
@@ -85,7 +86,7 @@ impl<Dim: PickDimension + 'static> LineLayoutContainer<Dim> {
 	pub fn set_bg_color(&self, color: [f32; 4]) {
 		let mut borrowed = self.data.borrow_mut();
 		borrowed.bg_color = color;
-		borrowed.rendered_valid = false;
+		borrowed.render_validity.invalidate();
 	}
 
 	pub fn add_child(&self, new_child: Rc<dyn Widget>) {
@@ -98,14 +99,14 @@ impl<Dim: PickDimension + 'static> LineLayoutContainer<Dim> {
 			}
 		}
 		borrowed.children.push(new_child);
-		borrowed.rendered_valid = false;
+		borrowed.render_validity.invalidate();
 	}
 
 	pub fn remove_child(&self, target: Rc<dyn Widget>) {
 		let mut borrowed = self.data.borrow_mut();
 		let target_ptr = widget_data_ptr(&target);
 		borrowed.children.retain(|child| target_ptr != widget_data_ptr(child));
-		borrowed.rendered_valid = false;
+		borrowed.render_validity.invalidate();
 	}
 
 	fn layout_aligned_children(
@@ -134,10 +135,6 @@ impl<Dim: PickDimension + 'static> LineLayoutContainer<Dim> {
 	}
 }
 impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
-	fn is_valid(&self) -> bool {
-		self.data.borrow().rendered_valid
-	}
-
 	fn before_draw(&self, window: &Window) {
 		let borrowed = self.data.borrow();
 		if borrowed.visible {
@@ -161,7 +158,6 @@ impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
 				next_update = next_update.aggregate(child.draw(target, context)?);
 			}
 		}
-		self.data.borrow_mut().rendered_valid = true;
 		Ok(next_update)
 	}
 
@@ -287,5 +283,15 @@ impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
 
 	fn visible(&self) -> bool {
 		self.data.borrow().visible
+	}
+
+	fn set_valid_ref(&self, render_validity: RenderValidity) {
+		{
+			let borrowed = self.data.borrow();
+			for child in borrowed.children.iter() {
+				child.set_valid_ref(render_validity.clone());
+			}
+		}
+		self.data.borrow_mut().render_validity = render_validity;
 	}
 }

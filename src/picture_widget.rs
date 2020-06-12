@@ -13,7 +13,7 @@ use gelatin::button::Button;
 use gelatin::line_layout_container::HorizontalLayoutContainer;
 use gelatin::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
 use gelatin::slider::Slider;
-use gelatin::window::Window;
+use gelatin::window::{RenderValidity, Window};
 use gelatin::NextUpdate;
 use gelatin::{
 	application::request_exit, DrawContext, Event, EventKind, Widget, WidgetData, WidgetError,
@@ -48,7 +48,7 @@ struct PictureWidgetData {
 	drawn_bounds: LogicalRect,
 	prev_draw_size: LogicalVector,
 	visible: bool,
-	rendered_valid: bool,
+	render_validity: RenderValidity,
 
 	click: bool,
 	hover: bool,
@@ -130,6 +130,7 @@ impl PictureWidgetData {
 		self.img_texel_size = image_texel_size;
 		self.scaling = ScalingMode::Fixed;
 		self.update_scaling_buttons();
+		self.render_validity.invalidate();
 	}
 
 	fn update_image_transform(&mut self, display: &Display, dpi_scale: f32) {
@@ -181,7 +182,7 @@ impl PictureWidgetData {
 		self.img_texel_size = 1.0;
 		self.scaling = ScalingMode::Fixed;
 		self.update_scaling_buttons();
-		self.rendered_valid = false;
+		self.render_validity.invalidate();
 	}
 
 	pub fn set_img_size_to_fit(&mut self, stretch: bool) {
@@ -191,7 +192,7 @@ impl PictureWidgetData {
 		}
 		self.scaling = if stretch { ScalingMode::FitStretch } else { ScalingMode::FitMin };
 		self.update_scaling_buttons();
-		self.rendered_valid = false;
+		self.render_validity.invalidate();
 	}
 
 	#[allow(clippy::float_cmp)]
@@ -267,7 +268,7 @@ impl PictureWidget {
 			configuration,
 			cache,
 			playback_manager: PlaybackManager::new(),
-			rendered_valid: false,
+			render_validity: Default::default(),
 
 			program,
 			bright_shade: 0.95,
@@ -296,7 +297,7 @@ impl PictureWidget {
 	pub fn set_bright_shade(&self, shade: f32) {
 		let mut borrowed = self.data.borrow_mut();
 		borrowed.bright_shade = shade;
-		borrowed.rendered_valid = false;
+		borrowed.render_validity.invalidate();
 	}
 
 	pub fn set_img_size_to_orig(&self) {
@@ -312,13 +313,13 @@ impl PictureWidget {
 	pub fn jump_to_index(&self, index: u32) {
 		let mut borrowed = self.data.borrow_mut();
 		borrowed.playback_manager.request_load(LoadRequest::LoadAtIndex(index as usize));
-		borrowed.rendered_valid = false;
+		borrowed.render_validity.invalidate();
 	}
 
 	pub fn jump_to_path<P: Into<PathBuf>>(&self, path: P) {
 		let mut borrowed = self.data.borrow_mut();
 		borrowed.playback_manager.request_load(LoadRequest::FilePath(path.into()));
-		borrowed.rendered_valid = false;
+		borrowed.render_validity.invalidate();
 	}
 
 	fn handle_key_input(&self, input_key: &str, modifiers: ModifiersState) {
@@ -353,11 +354,11 @@ impl PictureWidget {
 		}
 		if triggered!(IMG_PREV_NAME) {
 			borrowed.playback_manager.request_load(LoadRequest::LoadPrevious);
-			borrowed.rendered_valid = false;
+			borrowed.render_validity.invalidate();
 		}
 		if triggered!(IMG_NEXT_NAME) {
 			borrowed.playback_manager.request_load(LoadRequest::LoadNext);
-			borrowed.rendered_valid = false;
+			borrowed.render_validity.invalidate();
 		}
 		if triggered!(IMG_FIT_NAME) {
 			borrowed.set_img_size_to_fit(true);
@@ -373,14 +374,14 @@ impl PictureWidget {
 				PlaybackState::Present => borrowed.playback_manager.pause_playback(),
 				_ => borrowed.playback_manager.start_presentation(),
 			}
-			borrowed.rendered_valid = false;
+			borrowed.render_validity.invalidate();
 		}
 		if triggered!(PLAY_PRESENT_RND_NAME) {
 			match borrowed.playback_manager.playback_state() {
 				PlaybackState::RandomPresent => borrowed.playback_manager.pause_playback(),
 				_ => borrowed.playback_manager.start_random_presentation(),
 			}
-			borrowed.rendered_valid = false;
+			borrowed.render_validity.invalidate();
 		}
 		if triggered!(IMG_DEL_NAME) {
 			let path = borrowed.playback_manager.current_file_path();
@@ -390,7 +391,7 @@ impl PictureWidget {
 			if let Err(e) = borrowed.playback_manager.update_directory() {
 				eprintln!("Error while updating directory {:?}", e);
 			}
-			borrowed.rendered_valid = false;
+			borrowed.render_validity.invalidate();
 		}
 		let img_path = borrowed.playback_manager.current_file_path();
 		if let Some(folder_path) = img_path.parent() {
@@ -413,11 +414,6 @@ impl PictureWidget {
 }
 
 impl Widget for PictureWidget {
-	fn is_valid(&self) -> bool {
-		let borrowed = self.data.borrow();
-		borrowed.rendered_valid
-	}
-
 	fn before_draw(&self, window: &Window) {
 		let mut data = self.data.borrow_mut();
 		if !data.visible {
@@ -521,7 +517,6 @@ impl Widget for PictureWidget {
 			}
 		}
 		let mut borrowed = self.data.borrow_mut();
-		borrowed.rendered_valid = true;
 		Ok(borrowed.next_update)
 	}
 
@@ -544,7 +539,7 @@ impl Widget for PictureWidget {
 					borrowed.scaling = ScalingMode::Fixed;
 					borrowed.update_scaling_buttons();
 					borrowed.img_pos += delta;
-					borrowed.rendered_valid = false;
+					borrowed.render_validity.invalidate();
 				}
 				borrowed.last_mouse_pos = event.cursor_pos;
 			}
@@ -567,7 +562,7 @@ impl Widget for PictureWidget {
 							}
 						}
 					}
-					borrowed.rendered_valid = false;
+					borrowed.render_validity.invalidate();
 				}
 				MouseButton::Right => {
 					let mut borrowed = self.data.borrow_mut();
@@ -578,7 +573,7 @@ impl Widget for PictureWidget {
 						borrowed.panning = false;
 						borrowed.click = false;
 					}
-					borrowed.rendered_valid = false;
+					borrowed.render_validity.invalidate();
 				}
 				_ => {}
 			},
@@ -617,7 +612,7 @@ impl Widget for PictureWidget {
 				let mut borrowed = self.data.borrow_mut();
 				borrowed.playback_manager.request_load(LoadRequest::FilePath(path.clone()));
 				borrowed.hover_state = HoverState::None;
-				borrowed.rendered_valid = false;
+				borrowed.render_validity.invalidate();
 			}
 			EventKind::HoveredFile(ref path) => {
 				let mut borrowed = self.data.borrow_mut();
@@ -630,7 +625,7 @@ impl Widget for PictureWidget {
 					HoverState::ItemHovered { .. } => {}
 				}
 				borrowed.playback_manager.request_load(LoadRequest::FilePath(path.clone()));
-				borrowed.rendered_valid = false;
+				borrowed.render_validity.invalidate();
 			}
 			EventKind::HoveredFileCancelled => {
 				let mut borrowed = self.data.borrow_mut();
@@ -643,7 +638,7 @@ impl Widget for PictureWidget {
 						borrowed.hover_state = HoverState::None;
 					}
 				}
-				borrowed.rendered_valid = false;
+				borrowed.render_validity.invalidate();
 			}
 		}
 	}
@@ -657,5 +652,9 @@ impl Widget for PictureWidget {
 
 	fn visible(&self) -> bool {
 		self.data.borrow().visible
+	}
+
+	fn set_valid_ref(&self, render_validity: RenderValidity) {
+		self.data.borrow_mut().render_validity = render_validity;
 	}
 }
