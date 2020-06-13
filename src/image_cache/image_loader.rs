@@ -35,6 +35,8 @@ use self::errors::*;
 pub static FOCUSED_REQUEST_ID: AtomicU32 = AtomicU32::new(0); // The first request usually
 pub const NO_FOCUSED_REQUEST: u32 = std::u32::MAX;
 
+/// Detects the format of an image file. It looks at the first 512 bytes;
+/// if that fails, it uses the file ending.
 pub fn detect_format(path: &Path) -> Result<ImageFormat> {
 	let mut file = fs::File::open(path)?;
 	let mut file_start_bytes = [0; 512];
@@ -47,13 +49,30 @@ pub fn detect_format(path: &Path) -> Result<ImageFormat> {
 	}
 
 	// If that didn't work, try to detect the format from the file ending
-	let format = ImageFormat::from_path(path)?;
-	Ok(format)
+	Ok(ImageFormat::from_path(path)?)
 }
 
 pub fn load_image(path: &Path, image_format: ImageFormat) -> Result<image::RgbaImage> {
 	let reader = BufReader::new(fs::File::open(path)?);
 	Ok(image::load(reader, image_format)?.to_rgba())
+}
+
+/// Returns an iterator over the animation frames of a GIF file
+pub fn load_gif(path: &Path, req_id: u32) -> Result<impl Iterator<Item = Result<LoadResult>>> {
+	let file = fs::File::open(path)?;
+	let decoder = GifDecoder::new(file)?;
+	let frames = decoder.into_frames();
+
+	Ok(frames.into_iter().map(move |frame| {
+		Ok(frame.map(|frame| {
+			let (numerator_ms, denom_ms) = frame.delay().numer_denom_ms();
+			let numerator_nano = numerator_ms as u64 * 1_000_000;
+			let denom_nano = denom_ms as u64;
+			let delay_nano = numerator_nano / denom_nano;
+			let image = frame.into_buffer();
+			LoadResult::Frame { req_id, image, delay_nano }
+		})?)
+	}))
 }
 
 pub fn texture_from_image(
@@ -197,42 +216,22 @@ impl ImageLoader {
 				img_sender.send(LoadResult::Start { req_id: request.req_id, metadata }).unwrap();
 
 				if image_format == ImageFormat::Gif {
-					if let Ok(file) = fs::File::open(&request.path) {
-						if let Ok(decoder) = GifDecoder::new(file) {
-							let frames = decoder.into_frames();
-							load_succeeded = true;
-							for frame in frames {
-								if let Ok(frame) = frame {
-									let (numerator_ms, denom_ms) = frame.delay().numer_denom_ms();
-									let numerator_nano = numerator_ms as u64 * 1_000_000;
-									let denom_nano = denom_ms as u64;
-									let delay_nano = numerator_nano / denom_nano;
-									let image = frame.into_buffer();
-									img_sender
-										.send(LoadResult::Frame {
-											req_id: request.req_id,
-											image,
-											delay_nano,
-										})
-										.unwrap();
-								} else {
-									load_succeeded = false;
-									break;
-								}
+					if let Ok(frames) = load_gif(&request.path, request.req_id) {
+						load_succeeded = true;
+						for frame in frames {
+							if let Ok(frame) = frame {
+								img_sender.send(frame).unwrap();
+							} else {
+								load_succeeded = false;
+								break;
 							}
 						}
 					}
-				} else {
-					if let Ok(image) = load_image(&request.path, image_format) {
-						img_sender
-							.send(LoadResult::Frame {
-								req_id: request.req_id,
-								image,
-								delay_nano: 0,
-							})
-							.unwrap();
-						load_succeeded = true;
-					}
+				} else if let Ok(image) = load_image(&request.path, image_format) {
+					img_sender
+						.send(LoadResult::Frame { req_id: request.req_id, image, delay_nano: 0 })
+						.unwrap();
+					load_succeeded = true;
 				}
 			}
 		}
