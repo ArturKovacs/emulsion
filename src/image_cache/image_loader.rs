@@ -209,33 +209,26 @@ impl ImageLoader {
 	}
 
 	fn load_and_send(img_sender: &Sender<LoadResult>, request: LoadRequest) {
-		let mut load_succeeded = false;
+		fn try_load_and_send(img_sender: &Sender<LoadResult>, request: &LoadRequest) -> Result<()> {
+			let metadata = fs::metadata(&request.path)?;
+			let image_format = detect_format(&request.path)?;
+			img_sender.send(LoadResult::Start { req_id: request.req_id, metadata }).unwrap();
 
-		if let Ok(metadata) = fs::metadata(&request.path) {
-			if let Ok(image_format) = detect_format(&request.path) {
-				img_sender.send(LoadResult::Start { req_id: request.req_id, metadata }).unwrap();
-
-				if image_format == ImageFormat::Gif {
-					if let Ok(frames) = load_gif(&request.path, request.req_id) {
-						load_succeeded = true;
-						for frame in frames {
-							if let Ok(frame) = frame {
-								img_sender.send(frame).unwrap();
-							} else {
-								load_succeeded = false;
-								break;
-							}
-						}
-					}
-				} else if let Ok(image) = load_image(&request.path, image_format) {
-					img_sender
-						.send(LoadResult::Frame { req_id: request.req_id, image, delay_nano: 0 })
-						.unwrap();
-					load_succeeded = true;
+			if image_format == ImageFormat::Gif {
+				let frames = load_gif(&request.path, request.req_id)?;
+				for frame in frames {
+					img_sender.send(frame?).unwrap();
 				}
+			} else {
+				let image = load_image(&request.path, image_format)?;
+				img_sender
+					.send(LoadResult::Frame { req_id: request.req_id, image, delay_nano: 0 })
+					.unwrap();
 			}
+			Ok(())
 		}
-		if load_succeeded {
+
+		if try_load_and_send(img_sender, &request).is_ok() {
 			img_sender.send(LoadResult::Done { req_id: request.req_id }).unwrap();
 		} else {
 			img_sender.send(LoadResult::Failed { req_id: request.req_id }).unwrap();
