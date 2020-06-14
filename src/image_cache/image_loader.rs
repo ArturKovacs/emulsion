@@ -1,6 +1,6 @@
 use std;
 use std::fs;
-use std::io::Read;
+use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
@@ -35,8 +35,44 @@ use self::errors::*;
 pub static FOCUSED_REQUEST_ID: AtomicU32 = AtomicU32::new(0); // The first request usually
 pub const NO_FOCUSED_REQUEST: u32 = std::u32::MAX;
 
-pub fn load_image(image_path: &Path) -> Result<image::RgbaImage> {
-	Ok(image::open(image_path)?.to_rgba())
+/// Detects the format of an image file. It looks at the first 512 bytes;
+/// if that fails, it uses the file ending.
+pub fn detect_format(path: &Path) -> Result<ImageFormat> {
+	let mut file = fs::File::open(path)?;
+	let mut file_start_bytes = [0; 512];
+
+	// Try to detect the format from the first 512 bytes
+	if file.read_exact(&mut file_start_bytes).is_ok() {
+		if let Ok(format) = image::guess_format(&file_start_bytes) {
+			return Ok(format);
+		}
+	}
+
+	// If that didn't work, try to detect the format from the file ending
+	Ok(ImageFormat::from_path(path)?)
+}
+
+pub fn load_image(path: &Path, image_format: ImageFormat) -> Result<image::RgbaImage> {
+	let reader = BufReader::new(fs::File::open(path)?);
+	Ok(image::load(reader, image_format)?.to_rgba())
+}
+
+/// Returns an iterator over the animation frames of a GIF file
+pub fn load_gif(path: &Path, req_id: u32) -> Result<impl Iterator<Item = Result<LoadResult>>> {
+	let file = fs::File::open(path)?;
+	let decoder = GifDecoder::new(file)?;
+	let frames = decoder.into_frames();
+
+	Ok(frames.into_iter().map(move |frame| {
+		Ok(frame.map(|frame| {
+			let (numerator_ms, denom_ms) = frame.delay().numer_denom_ms();
+			let numerator_nano = numerator_ms as u64 * 1_000_000;
+			let denom_nano = denom_ms as u64;
+			let delay_nano = numerator_nano / denom_nano;
+			let image = frame.into_buffer();
+			LoadResult::Frame { req_id, image, delay_nano }
+		})?)
+	}))
 }
 
 pub fn texture_from_image(
@@ -173,54 +209,26 @@ impl ImageLoader {
 	}
 
 	fn load_and_send(img_sender: &Sender<LoadResult>, request: LoadRequest) {
-		let mut file_start_bytes = [0; 512];
-		let mut load_succeeded = false;
-		if let Ok(metadata) = fs::metadata(&request.path) {
-			let mut is_gif = false;
-			if let Ok(mut file) = fs::File::open(&request.path) {
-				if file.read_exact(&mut file_start_bytes).is_ok() {
-					if let Ok(ImageFormat::Gif) = image::guess_format(&file_start_bytes) {
-						is_gif = true;
-					}
-				}
-			}
+		fn try_load_and_send(img_sender: &Sender<LoadResult>, request: &LoadRequest) -> Result<()> {
+			let metadata = fs::metadata(&request.path)?;
+			let image_format = detect_format(&request.path)?;
 			img_sender.send(LoadResult::Start { req_id: request.req_id, metadata }).unwrap();
-			if is_gif {
-				if let Ok(file) = fs::File::open(&request.path) {
-					if let Ok(decoder) = GifDecoder::new(file) {
-						let frames = decoder.into_frames();
-						load_succeeded = true;
-						for frame in frames {
-							if let Ok(frame) = frame {
-								let (numerator_ms, denom_ms) = frame.delay().numer_denom_ms();
-								let numerator_nano = numerator_ms as u64 * 1_000_000;
-								let denom_nano = denom_ms as u64;
-								let delay_nano = numerator_nano / denom_nano;
-								let image = frame.into_buffer();
-								img_sender
-									.send(LoadResult::Frame {
-										req_id: request.req_id,
-										image,
-										delay_nano,
-									})
-									.unwrap();
-							} else {
-								load_succeeded = false;
-								break;
-							}
-						}
-					}
+
+			if image_format == ImageFormat::Gif {
+				let frames = load_gif(&request.path, request.req_id)?;
+				for frame in frames {
+					img_sender.send(frame?).unwrap();
 				}
 			} else {
-				if let Ok(image) = load_image(request.path.as_path()) {
-					img_sender
-						.send(LoadResult::Frame { req_id: request.req_id, image, delay_nano: 0 })
-						.unwrap();
-					load_succeeded = true;
-				}
+				let image = load_image(&request.path, image_format)?;
+				img_sender
+					.send(LoadResult::Frame { req_id: request.req_id, image, delay_nano: 0 })
+					.unwrap();
 			}
+			Ok(())
 		}
-		if load_succeeded {
+
+		if try_load_and_send(img_sender, &request).is_ok() {
 			img_sender.send(LoadResult::Done { req_id: request.req_id }).unwrap();
 		} else {
 			img_sender.send(LoadResult::Failed { req_id: request.req_id }).unwrap();
