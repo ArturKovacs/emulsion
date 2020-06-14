@@ -89,7 +89,7 @@ struct WindowData {
 	unprocessed_move_event: Option<Event>,
 	last_event_invalidated: bool,
 	should_sleep: bool,
-	
+
 	render_validity: RenderValidity,
 	cursor_pos: LogicalVector,
 	modifiers: glutin::event::ModifiersState,
@@ -365,7 +365,7 @@ impl Window {
 			}
 		}
 	}
-	
+
 	pub fn should_sleep(&self) -> bool {
 		self.data.borrow().should_sleep
 	}
