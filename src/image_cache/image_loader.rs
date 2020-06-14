@@ -233,7 +233,7 @@ impl ImageLoader {
 				Ok(()) => LoadResult::Done { req_id: request.req_id },
 				Err(error) => {
 					eprintln!(
-						"Request #{}: Error occured while loading file {:?}\n    {}",
+						"Request #{}: Error occurred while loading file {:?}\n    {}",
 						request.req_id, request.path, error,
 					);
 					LoadResult::Failed { req_id: request.req_id }
@@ -253,7 +253,7 @@ impl Drop for ImageLoader {
 
 			for handle in join_handles.into_iter() {
 				if let Err(err) = handle.join() {
-					eprintln!("Error occured while joining handle {:?}", err);
+					eprintln!("Error occurred while joining handle {:?}", err);
 				}
 			}
 		}
