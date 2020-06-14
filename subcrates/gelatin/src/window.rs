@@ -357,7 +357,6 @@ impl Window {
 				match event.kind {
 					EventKind::MouseMove => {
 						borrowed.should_sleep = true;
-						//std::thread::sleep(EVENT_UPDATE_DELTA);
 					}
 					_ => (),
 				}
