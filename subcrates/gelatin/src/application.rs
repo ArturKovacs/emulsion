@@ -12,14 +12,15 @@ use glium::glutin::{
 use crate::window::Window;
 use crate::NextUpdate;
 
+const MAX_SLEEP_DURATION: std::time::Duration = std::time::Duration::from_millis(4);
 static EXIT_REQUESTED: AtomicBool = AtomicBool::new(false);
 
 pub fn request_exit() {
 	EXIT_REQUESTED.store(true, Ordering::Relaxed);
 }
 
-/// Returns true of original was replaced by new
-fn update_control_flow(original: &mut ControlFlow, new: ControlFlow) -> bool {
+/// Returns true if original was replaced by new
+fn aggregate_control_flow(original: &mut ControlFlow, new: ControlFlow) -> bool {
 	if *original == ControlFlow::Exit {
 		return false;
 	}
@@ -44,6 +45,21 @@ fn update_control_flow(original: &mut ControlFlow, new: ControlFlow) -> bool {
 		_ => (),
 	}
 	false
+}
+
+fn update_control_flow(
+	prev_control_flow_source: &mut WindowId,
+	new_control_flow_source: WindowId,
+	control_flow: &mut ControlFlow,
+	new_control_flow: ControlFlow,
+) {
+	if *prev_control_flow_source == new_control_flow_source {
+		*control_flow = new_control_flow;
+	} else if *control_flow != ControlFlow::Exit
+		&& aggregate_control_flow(control_flow, new_control_flow)
+	{
+		*prev_control_flow_source = new_control_flow_source;
+	}
 }
 
 pub struct Application {
@@ -88,7 +104,7 @@ impl Application {
 		let mut control_flow_source = *windows.keys().next().unwrap();
 		self.event_loop.run(move |event, _event_loop, control_flow| {
 			for handler in global_handlers.iter_mut() {
-				update_control_flow(control_flow, handler(&event).into());
+				aggregate_control_flow(control_flow, handler(&event).into());
 			}
 			match event {
 				Event::WindowEvent { event, window_id } => match event {
@@ -104,10 +120,38 @@ impl Application {
 				},
 				Event::MainEventsCleared => {
 					if !EXIT_REQUESTED.load(Ordering::Relaxed) {
-						for (_, window) in windows.iter() {
-							window.main_events_cleared();
+						let mut should_sleep = match control_flow {
+							ControlFlow::Poll => false,
+							_ => true,
+						};
+						for (window_id, window) in windows.iter() {
+							let new_control_flow = window.main_events_cleared().into();
+							update_control_flow(
+								&mut control_flow_source,
+								*window_id,
+								control_flow,
+								new_control_flow,
+							);
+							should_sleep = should_sleep && window.should_sleep();
 							if window.redraw_needed() {
 								window.request_redraw();
+							}
+						}
+						if should_sleep {
+							let mut sleep_duration = MAX_SLEEP_DURATION;
+							if let ControlFlow::WaitUntil(next_update) = control_flow {
+								let now = std::time::Instant::now();
+								if *next_update > now {
+									let control_flow_sleep = *next_update - now;
+									if control_flow_sleep < sleep_duration {
+										sleep_duration = control_flow_sleep;
+									}
+								} else {
+									should_sleep = false;
+								}
+							}
+							if should_sleep {
+								std::thread::sleep(sleep_duration);
 							}
 						}
 					} else {
@@ -116,13 +160,12 @@ impl Application {
 				}
 				Event::RedrawRequested(window_id) => {
 					let new_control_flow = windows.get(&window_id).unwrap().redraw().into();
-					if control_flow_source == window_id {
-						*control_flow = new_control_flow;
-					} else if *control_flow != ControlFlow::Exit
-						&& update_control_flow(control_flow, new_control_flow)
-					{
-						control_flow_source = window_id;
-					}
+					update_control_flow(
+						&mut control_flow_source,
+						window_id,
+						control_flow,
+						new_control_flow,
+					);
 				}
 				Event::RedrawEventsCleared => {
 					if EXIT_REQUESTED.load(Ordering::Relaxed) {

@@ -7,6 +7,7 @@ use glium::{uniform, Frame, Surface};
 
 use crate::add_common_widget_functions;
 use crate::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
+use crate::window::RenderValidity;
 use crate::NextUpdate;
 use crate::{DrawContext, Event, EventKind, Widget, WidgetData, WidgetError};
 
@@ -22,7 +23,8 @@ struct SliderData {
 	on_value_change: Option<Rc<dyn Fn()>>,
 	shadow_color: [f32; 3],
 
-	rendered_valid: bool,
+	render_validity: RenderValidity,
+	//rendered_valid: bool,
 }
 impl WidgetData for SliderData {
 	fn placement(&mut self) -> &mut WidgetPlacement {
@@ -53,7 +55,8 @@ impl Slider {
 				hover: false,
 				on_value_change: None,
 				shadow_color: [0.0, 0.0, 0.0],
-				rendered_valid: false,
+				render_validity: Default::default(),
+				//rendered_valid: false,
 			}),
 		}
 	}
@@ -70,15 +73,19 @@ impl Slider {
 
 	pub fn set_steps(&self, steps: u32, value: u32) {
 		let mut borrowed = self.data.borrow_mut();
+		let prev_steps = borrowed.steps;
+		let prev_value = borrowed.value;
 		borrowed.steps = steps;
 		borrowed.value = value;
-		borrowed.rendered_valid = false;
+		if prev_steps != steps || prev_value != value {
+			borrowed.render_validity.invalidate();
+		}
 	}
 
 	pub fn set_value(&self, value: u32) {
 		let mut borrowed = self.data.borrow_mut();
 		borrowed.value = value;
-		borrowed.rendered_valid = false;
+		borrowed.render_validity.invalidate();
 	}
 
 	/// Feel free to use `RefCell`s within the callback to satisfy the apparent constnes
@@ -91,15 +98,11 @@ impl Slider {
 	pub fn set_shadow_color(&self, color: [f32; 3]) {
 		let mut borrowed = self.data.borrow_mut();
 		borrowed.shadow_color = color;
-		borrowed.rendered_valid = false;
+		borrowed.render_validity.invalidate();
 	}
 }
 
 impl Widget for Slider {
-	fn is_valid(&self) -> bool {
-		self.data.borrow().rendered_valid
-	}
-
 	fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<NextUpdate, WidgetError> {
 		use glium::{Blend, BlendingFunction, LinearBlendingFactor};
 		{
@@ -176,7 +179,6 @@ impl Widget for Slider {
 				)
 				.unwrap();
 		}
-		self.data.borrow_mut().rendered_valid = true;
 		Ok(NextUpdate::Latest)
 	}
 
@@ -206,6 +208,7 @@ impl Widget for Slider {
 					borrowed.value =
 						(proportion * (1.0 + 1.0 / stepsf) * (stepsf - 1.0)).floor() as u32;
 					if borrowed.value != prev_value {
+						borrowed.render_validity.invalidate();
 						on_value_change = borrowed.on_value_change.clone();
 					} else {
 						on_value_change = None;
@@ -248,5 +251,9 @@ impl Widget for Slider {
 
 	fn visible(&self) -> bool {
 		self.data.borrow().visible
+	}
+
+	fn set_valid_ref(&self, render_validity: RenderValidity) {
+		self.data.borrow_mut().render_validity = render_validity;
 	}
 }
