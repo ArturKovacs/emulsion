@@ -8,6 +8,7 @@ use std::path::Path;
 #[cfg(windows)]
 fn platform_specific() {
 	let mut res = winres::WindowsResource::new();
+	res.set("FileDescription", "Emulsion");
 	res.set_icon("resource_dev/emulsion.ico");
 	res.compile().unwrap();
 }
