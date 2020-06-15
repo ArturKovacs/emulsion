@@ -488,7 +488,7 @@ impl ImgSequencePlayer {
 					self.file_path = None;
 					let stderr = &mut ::std::io::stderr();
 					let stderr_errmsg = "Error writing to stderr";
-					writeln!(stderr, "Error occured while loading image: {}", err)
+					writeln!(stderr, "Error occurred while loading image: {}", err)
 						.expect(stderr_errmsg);
 					for e in err.iter().skip(1) {
 						writeln!(stderr, "... caused by: {}", e).expect(stderr_errmsg);
