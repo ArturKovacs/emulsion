@@ -8,6 +8,7 @@ use gelatin::glium::{uniform, Frame, Surface};
 use gelatin::add_common_widget_functions;
 use gelatin::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
 use gelatin::picture::Picture;
+use gelatin::window::RenderValidity;
 use gelatin::window::Window;
 use gelatin::NextUpdate;
 use gelatin::{DrawContext, Event, Widget, WidgetData, WidgetError};
@@ -16,7 +17,7 @@ struct HelpScreenData {
 	placement: WidgetPlacement,
 	drawn_bounds: LogicalRect,
 	visible: bool,
-	rendered_valid: bool,
+	render_validity: RenderValidity,
 	initiaizlied: bool,
 	parent_space: LogicalRect,
 	usage_image: Picture,
@@ -53,7 +54,7 @@ impl HelpScreen {
 				placement,
 				drawn_bounds: Default::default(),
 				visible: false,
-				rendered_valid: false,
+				render_validity: Default::default(),
 				initiaizlied: false,
 				parent_space: LogicalRect::default(),
 				usage_image: usage_img,
@@ -65,15 +66,8 @@ impl HelpScreen {
 }
 
 impl Widget for HelpScreen {
-	fn is_valid(&self) -> bool {
-		self.data.borrow().rendered_valid
-	}
-
-	fn before_draw(&self, _window: &Window) {}
-
 	fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<NextUpdate, WidgetError> {
 		use gelatin::glium::{Blend, BlendingFunction, LinearBlendingFactor};
-		self.data.borrow_mut().rendered_valid = true;
 		{
 			let borrowed = self.data.borrow();
 			if !borrowed.visible {
@@ -192,5 +186,9 @@ impl Widget for HelpScreen {
 
 	fn visible(&self) -> bool {
 		self.data.borrow().visible
+	}
+
+	fn set_valid_ref(&self, render_validity: RenderValidity) {
+		self.data.borrow_mut().render_validity = render_validity;
 	}
 }

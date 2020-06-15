@@ -228,11 +228,18 @@ impl ImageLoader {
 			Ok(())
 		}
 
-		if try_load_and_send(img_sender, &request).is_ok() {
-			img_sender.send(LoadResult::Done { req_id: request.req_id }).unwrap();
-		} else {
-			img_sender.send(LoadResult::Failed { req_id: request.req_id }).unwrap();
-		}
+		img_sender
+			.send(match try_load_and_send(img_sender, &request) {
+				Ok(()) => LoadResult::Done { req_id: request.req_id },
+				Err(error) => {
+					eprintln!(
+						"Request #{}: Error occurred while loading file {:?}\n    {}",
+						request.req_id, request.path, error,
+					);
+					LoadResult::Failed { req_id: request.req_id }
+				}
+			})
+			.unwrap();
 	}
 }
 
@@ -246,7 +253,7 @@ impl Drop for ImageLoader {
 
 			for handle in join_handles.into_iter() {
 				if let Err(err) = handle.join() {
-					eprintln!("Error occured while joining handle {:?}", err);
+					eprintln!("Error occurred while joining handle {:?}", err);
 				}
 			}
 		}

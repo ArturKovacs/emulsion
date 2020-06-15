@@ -32,7 +32,9 @@ pub mod errors {
 				description("ImageCache is waiting for loader to send result")
 				display("ImageCache is waiting for loader to send result")
 			}
-			FailedToLoadImage {}
+			FailedToLoadImage(req_id: u32) {
+				display("Failed to load #{}", req_id)
+			}
 		}
 	}
 }
@@ -453,7 +455,7 @@ impl ImageCache {
 				for result in result_vec {
 					match self.upload_to_texture(display, result) {
 						// it's okay to ignore if the image falied to load here, this is just pre-fetch.
-						Err(Error(ErrorKind::FailedToLoadImage, ..)) => {}
+						Err(Error(ErrorKind::FailedToLoadImage(..), ..)) => {}
 						Err(e) => return Err(e),
 						_ => {}
 					}
@@ -493,7 +495,7 @@ impl ImageCache {
 		// Check if it is inside the texture cache first
 		if let Some(tex) = self.texture_cache.get(&req_id) {
 			if tex.failed {
-				return Err(Error::from_kind(ErrorKind::FailedToLoadImage));
+				return Err(Error::from_kind(ErrorKind::FailedToLoadImage(req_id)));
 			}
 			let modified = fs::metadata(&path).ok().and_then(|m| m.modified().ok());
 			let mut get_from_cache = false;
@@ -624,7 +626,7 @@ impl ImageCache {
 				}
 				FOCUSED_REQUEST_ID.compare_and_swap(req_id, NO_FOCUSED_REQUEST, Ordering::Relaxed);
 				self.ongoing_requests.remove(&req_id);
-				Err(errors::Error::from_kind(errors::ErrorKind::FailedToLoadImage))
+				Err(errors::Error::from_kind(errors::ErrorKind::FailedToLoadImage(req_id)))
 			}
 		}
 	}

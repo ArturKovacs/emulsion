@@ -195,18 +195,15 @@ impl Into<ControlFlow> for NextUpdate {
 }
 
 pub trait Widget: Any {
-	/// When this is false, the window containing the widget
-	/// will be re-rendered entirely and will run a new event loop
-	/// immediately after this one, without sleeping.
-	fn is_valid(&self) -> bool;
-
 	/// This function is called before calling the draw function.
 	/// Widgets may use this function to mutate the window. This is however not allowed in the
 	/// `draw` method.
 	///
 	/// Note that the `Window` uses inner mutability so all window related functions take a
 	/// reference to a seemingly immutable window.
-	fn before_draw(&self, _window: &window::Window) {}
+	fn before_draw(&self, _window: &window::Window) -> NextUpdate {
+		NextUpdate::Latest
+	}
 
 	/// This function is called when the window is being re-rendered.
 	///
@@ -232,6 +229,14 @@ pub trait Widget: Any {
 	fn placement(&self) -> WidgetPlacement;
 
 	fn visible(&self) -> bool;
+
+	/// Implementer of this trait must store the provided object
+	/// and call `invalidate` on it whenever a change happens on them
+	/// that requires a re-draw.
+	///
+	/// Containers must call this function for all of their children
+	/// immediately and pass a clone of the provided object.
+	fn set_valid_ref(&self, rendered_valid: window::RenderValidity);
 }
 
 /// This function can be used to avoid comparing fat trait pointers as those can be
@@ -252,64 +257,64 @@ macro_rules! add_common_widget_functions {
 			borrowed.placement.margin_right = pixels;
 			borrowed.placement.margin_top = pixels;
 			borrowed.placement.margin_bottom = pixels;
-			borrowed.rendered_valid = false;
+			borrowed.render_validity.invalidate();
 		}
 
 		pub fn set_margin_left(&self, pixels: f32) {
 			let mut borrowed = self.$data_field.borrow_mut();
 			borrowed.placement.margin_left = pixels;
-			borrowed.rendered_valid = false;
+			borrowed.render_validity.invalidate();
 		}
 		pub fn set_margin_right(&self, pixels: f32) {
 			let mut borrowed = self.$data_field.borrow_mut();
 			borrowed.placement.margin_right = pixels;
-			borrowed.rendered_valid = false;
+			borrowed.render_validity.invalidate();
 		}
 		pub fn set_margin_top(&self, pixels: f32) {
 			let mut borrowed = self.$data_field.borrow_mut();
 			borrowed.placement.margin_top = pixels;
-			borrowed.rendered_valid = false;
+			borrowed.render_validity.invalidate();
 		}
 		pub fn set_margin_bottom(&self, pixels: f32) {
 			let mut borrowed = self.$data_field.borrow_mut();
 			borrowed.placement.margin_bottom = pixels;
-			borrowed.rendered_valid = false;
+			borrowed.render_validity.invalidate();
 		}
 		pub fn set_horizontal_align(&self, align: Alignment) {
 			let mut borrowed = self.$data_field.borrow_mut();
 			borrowed.placement.horizontal_align = align;
-			borrowed.rendered_valid = false;
+			borrowed.render_validity.invalidate();
 		}
 		pub fn set_vertical_align(&self, align: Alignment) {
 			let mut borrowed = self.$data_field.borrow_mut();
 			borrowed.placement.vertical_align = align;
-			borrowed.rendered_valid = false;
+			borrowed.render_validity.invalidate();
 		}
 		pub fn set_fixed_size(&self, size: LogicalVector) {
 			let mut borrowed = self.$data_field.borrow_mut();
 			borrowed.placement.width = Length::Fixed(size.vec.x);
 			borrowed.placement.height = Length::Fixed(size.vec.y);
-			borrowed.rendered_valid = false;
+			borrowed.render_validity.invalidate();
 		}
 		pub fn set_width(&self, width: Length) {
 			let mut borrowed = self.$data_field.borrow_mut();
 			borrowed.placement.width = width;
-			borrowed.rendered_valid = false;
+			borrowed.render_validity.invalidate();
 		}
 		pub fn set_height(&self, height: Length) {
 			let mut borrowed = self.$data_field.borrow_mut();
 			borrowed.placement.height = height;
-			borrowed.rendered_valid = false;
+			borrowed.render_validity.invalidate();
 		}
 		pub fn set_ignore_layout(&self, ignore: bool) {
 			let mut borrowed = self.$data_field.borrow_mut();
 			borrowed.placement.ignore_layout = ignore;
-			borrowed.rendered_valid = false;
+			borrowed.render_validity.invalidate();
 		}
 		pub fn set_visible(&self, visible: bool) {
 			let mut borrowed = self.$data_field.borrow_mut();
 			borrowed.visible = visible;
-			borrowed.rendered_valid = false;
+			borrowed.render_validity.invalidate();
 		}
 	};
 }

@@ -7,6 +7,7 @@ use glium::{uniform, Frame, Surface};
 use crate::add_common_widget_functions;
 use crate::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
 use crate::picture::Picture;
+use crate::window::RenderValidity;
 use crate::NextUpdate;
 use crate::{DrawContext, Event, Widget, WidgetData, WidgetError};
 
@@ -17,7 +18,7 @@ struct LabelData {
 
 	icon: Option<Rc<Picture>>,
 
-	rendered_valid: bool,
+	render_validity: RenderValidity,
 }
 impl WidgetData for LabelData {
 	fn placement(&mut self) -> &mut WidgetPlacement {
@@ -43,7 +44,7 @@ impl Label {
 				drawn_bounds: Default::default(),
 				visible: true,
 				icon: None,
-				rendered_valid: false,
+				render_validity: Default::default(),
 			}),
 		}
 	}
@@ -53,15 +54,11 @@ impl Label {
 	pub fn set_icon(&self, img: Option<Rc<Picture>>) {
 		let mut borrowed = self.data.borrow_mut();
 		borrowed.icon = img;
-		borrowed.rendered_valid = false;
+		borrowed.render_validity.invalidate();
 	}
 }
 
 impl Widget for Label {
-	fn is_valid(&self) -> bool {
-		self.data.borrow().rendered_valid
-	}
-
 	fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<NextUpdate, WidgetError> {
 		use glium::{Blend, BlendingFunction, LinearBlendingFactor};
 		{
@@ -138,7 +135,6 @@ impl Widget for Label {
 					.unwrap();
 			}
 		}
-		self.data.borrow_mut().rendered_valid = true;
 		Ok(NextUpdate::Latest)
 	}
 
@@ -158,5 +154,9 @@ impl Widget for Label {
 
 	fn visible(&self) -> bool {
 		self.data.borrow().visible
+	}
+
+	fn set_valid_ref(&self, render_validity: RenderValidity) {
+		self.data.borrow_mut().render_validity = render_validity;
 	}
 }
