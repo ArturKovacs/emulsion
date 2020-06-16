@@ -42,6 +42,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8052e2d8aabbb8d556d6abbcce2a22b9590996c5f849b9c7ce4544a2e3b984e"
 
 [[package]]
+name = "any_ascii"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "900fc408aadfe9806e9002c480d69a3c1cd0dcff3bfd246523cfe3bc39e71f39"
+
+[[package]]
 name = "approx"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -429,12 +435,6 @@ dependencies = [
  "quote 1.0.6",
  "syn",
 ]
-
-[[package]]
-name = "deunicode"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80115a2dfde04491e181c2440a39e4be26e52d9ca4e92bed213f65b94e0b8db1"
 
 [[package]]
 name = "directories-next"
@@ -840,11 +840,11 @@ checksum = "b294d6fa9ee409a054354afc4352b0b9ef7ca222c69b8812cbea9e7d2bf3783f"
 
 [[package]]
 name = "lexical-sort"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fff6260c96b887dd6e869c37c27e832a862c85d80d95e610863698e012ebd454"
+checksum = "79da6f9b60ff4d69eea4823fc7502b5af76451638e9e084adf680acb9cce6957"
 dependencies = [
- "deunicode",
+ "any_ascii",
 ]
 
 [[package]]
