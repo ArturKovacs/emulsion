@@ -48,12 +48,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8052e2d8aabbb8d556d6abbcce2a22b9590996c5f849b9c7ce4544a2e3b984e"
 
 [[package]]
-name = "any_ascii"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "900fc408aadfe9806e9002c480d69a3c1cd0dcff3bfd246523cfe3bc39e71f39"
-
-[[package]]
 name = "approx"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
