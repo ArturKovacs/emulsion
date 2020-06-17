@@ -51,10 +51,7 @@ pub fn get_image_size_estimate(width: u32, height: u32) -> isize {
 pub fn get_anim_size_estimate(frames: &[AnimationFrameTexture]) -> isize {
 	frames
 		.iter()
-		.map(|frame| {
-			let (width, height) = frame.texture.dimensions();
-			get_image_size_estimate(width, height)
-		})
+		.map(|frame| get_image_size_estimate(frame.texture.width(), frame.texture.height()))
 		.sum()
 }
 
@@ -336,11 +333,7 @@ impl ImageCache {
 		self.remaining_capacity = self.total_capacity;
 		sorted_files.retain(|(_, (_, texture))| {
 			// TODO consider retaining individual frames.
-			let all_frames_size: isize = texture
-				.frames
-				.iter()
-				.map(|t| get_image_size_estimate(t.texture.width(), t.texture.height()))
-				.sum();
+			let all_frames_size = get_anim_size_estimate(&texture.frames);
 
 			if self.remaining_capacity > (all_frames_size + self.curr_est_size) {
 				self.remaining_capacity -= all_frames_size;
