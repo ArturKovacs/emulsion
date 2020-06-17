@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use gelatin::glium;
-use gelatin::image::{self, gif::GifDecoder, AnimationDecoder, ImageFormat};
+use gelatin::image::{self, gif::GifDecoder, png::PngDecoder, AnimationDecoder, ImageFormat};
 
 use glium::texture::{MipmapsOption, RawImage2d, SrgbTexture2d};
 
@@ -61,6 +61,13 @@ pub fn load_image(path: &Path, image_format: ImageFormat) -> Result<image::RgbaI
 pub fn load_gif(path: &Path, req_id: u32) -> Result<impl Iterator<Item = Result<LoadResult>>> {
 	let file = fs::File::open(path)?;
 	let decoder = GifDecoder::new(file)?;
+	load_animation(req_id, decoder)
+}
+
+fn load_animation(
+	req_id: u32,
+	decoder: impl AnimationDecoder<'static>,
+) -> Result<impl Iterator<Item = Result<LoadResult>>> {
 	let frames = decoder.into_frames();
 
 	Ok(frames.into_iter().map(move |frame| {
@@ -218,6 +225,19 @@ impl ImageLoader {
 				let frames = load_gif(&request.path, request.req_id)?;
 				for frame in frames {
 					img_sender.send(frame?).unwrap();
+				}
+			} else if image_format == ImageFormat::Png {
+				let file = fs::File::open(&request.path)?;
+				let decoder = PngDecoder::new(file)?;
+				if decoder.is_apng() {
+					for frame in load_animation(request.req_id, decoder.apng())? {
+						img_sender.send(frame?).unwrap();
+					}
+				} else {
+					let image = load_image(&request.path, image_format)?;
+					img_sender
+						.send(LoadResult::Frame { req_id: request.req_id, image, delay_nano: 0 })
+						.unwrap();
 				}
 			} else {
 				let image = load_image(&request.path, image_format)?;
