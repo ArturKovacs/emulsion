@@ -16,6 +16,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d2e7343e7fc9de883d1b0341e0b13970f764c14101234857d2ddafa1cb1cac2"
 
 [[package]]
+name = "alphanumeric-sort"
+version = "1.0.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d338a8e22f0d04e4f44b0915c537d4dfa2e002ffa7ef78364de604d180b0448"
+
+[[package]]
 name = "andrew"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -431,12 +437,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "deunicode"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80115a2dfde04491e181c2440a39e4be26e52d9ca4e92bed213f65b94e0b8db1"
-
-[[package]]
 name = "directories-next"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -494,13 +494,13 @@ checksum = "bb1f6b1ce1c140482ea30ddd3335fc0024ac7ee112895426e0a629a6c20adfe3"
 name = "emulsion"
 version = "2.1.0"
 dependencies = [
+ "alphanumeric-sort",
  "backtrace",
  "clap",
  "directories-next",
  "error-chain",
  "gelatin",
  "lazy_static",
- "lexical-sort",
  "open",
  "rand 0.7.3",
  "serde",
@@ -837,15 +837,6 @@ name = "lazycell"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b294d6fa9ee409a054354afc4352b0b9ef7ca222c69b8812cbea9e7d2bf3783f"
-
-[[package]]
-name = "lexical-sort"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fff6260c96b887dd6e869c37c27e832a862c85d80d95e610863698e012ebd454"
-dependencies = [
- "deunicode",
-]
 
 [[package]]
 name = "libc"

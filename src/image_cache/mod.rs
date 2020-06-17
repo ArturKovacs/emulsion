@@ -42,19 +42,19 @@ pub mod errors {
 pub use self::errors::Result;
 use self::errors::*;
 
-pub fn get_image_size_estimate(dimensions: (u32, u32)) -> u32 {
+pub fn get_image_size_estimate(width: u32, height: u32) -> isize {
+	// In an RGBA image, each pixel is 4 bytes.
 	// counting all the mipmaps would add an additionnal multiplier of around ~1.6
 	// but only the gpu textures have mip maps so just multiply by 1.5
-	((dimensions.0 * dimensions.1 * 4) as f32 * 1.5) as u32
+	// 4 x 1.5 gives the factor 6.
+	(width * height * 6) as isize
 }
 
-pub fn get_anim_size_estimate(frames: &[AnimationFrameTexture]) -> u32 {
-	let mut size = 0;
-	for frame in frames {
-		let dimensions = frame.texture.dimensions();
-		size += get_image_size_estimate(dimensions);
-	}
-	size
+pub fn get_anim_size_estimate(frames: &[AnimationFrameTexture]) -> isize {
+	frames
+		.iter()
+		.map(|frame| get_image_size_estimate(frame.texture.width(), frame.texture.height()))
+		.sum()
 }
 
 struct ImageDescriptor {
@@ -247,11 +247,8 @@ impl ImageCache {
 			}
 		}
 
-		if self.dir_files.len() > self.current_file_idx {
-			return Ok(());
-		} else if !self.dir_files.is_empty() {
+		if self.dir_files.len() <= self.current_file_idx && !self.dir_files.is_empty() {
 			self.current_file_idx = 0;
-			return Ok(());
 		}
 
 		Ok(())
@@ -268,9 +265,8 @@ impl ImageCache {
 			.get(index)
 			.ok_or_else(|| {
 				format!(
-					"Index {} is out of bounds of the current directory '{}'",
-					index,
-					self.dir_path.to_str().unwrap()
+					"Index {} is out of bounds of the current directory {:?}",
+					index, self.dir_path
 				)
 			})?
 			.dir_entry
@@ -281,6 +277,17 @@ impl ImageCache {
 		Ok((result, path))
 	}
 
+	fn get_file_index(&self, parent: &Path, file_name: &OsStr) -> Result<usize> {
+		for (index, desc) in self.dir_files.iter().enumerate() {
+			if desc.dir_entry.file_name() == file_name {
+				return Ok(index);
+			}
+		}
+		let mut path = parent.to_owned();
+		path.push(file_name);
+		bail!("Image at path {:?} not found", path);
+	}
+
 	/// Returns `Err(errors::Error::from_kind(errors::ErrorKind::WaitingOnLoader))`
 	/// when the image
 	pub fn load_specific(
@@ -289,84 +296,56 @@ impl ImageCache {
 		path: &Path,
 		frame_id: Option<isize>,
 	) -> Result<AnimationFrameTexture> {
-		let maybe_parent = path.parent();
-		let target_file_name = match path.file_name() {
-			Some(filename) => filename.to_owned(),
-			None => bail!(format!("Could not get filename from path '{}'", path.to_str().unwrap())),
-		};
-		let path = path.canonicalize()?;
-
-		let parent;
-		match maybe_parent {
-			Some(p) => parent = p.canonicalize()?,
-			None => parent = path.parent().ok_or("Could not get parent directory")?.to_owned(),
-		}
+		let (target_file_name, parent) = get_file_name_and_parent(path)?;
 
 		// Lets just process incoming images
 		//self.process_prefetched(display)?;
-		let requested_frame_id;
 		self.receive_prefetched();
 		if self.dir_path != parent {
 			self.change_directory(&parent, &target_file_name)?;
 			self.send_request_for_index(self.current_file_idx, true);
 			return Err(errors::Error::from_kind(errors::ErrorKind::WaitingOnLoader));
-		} else {
-			let mut image_found = false;
-			let mut new_file_index = self.current_file_idx;
-			for (index, desc) in self.dir_files.iter().enumerate() {
-				if desc.dir_entry.file_name() == target_file_name {
-					image_found = true;
-					new_file_index = index;
-					break;
-				}
-			}
-			if !image_found {
-				// The image must have been removed from the folder. It cannot be loaded
-				bail!("Image not found at '{:?}'", path);
-			}
-			if let Some(frame_id) = frame_id {
-				requested_frame_id = frame_id;
-			} else if self.current_file_idx != new_file_index {
-				requested_frame_id = 0;
-			} else {
-				requested_frame_id = self.current_frame_idx as isize;
-			}
-			self.current_file_idx = new_file_index;
-			let mut tmp_cache = BTreeMap::new();
-			mem::swap(&mut self.texture_cache, &mut tmp_cache);
-
-			// Delete all entries that are outside the range of files around the current file
-			// allowed by the capacity.
-			// Walk through our list of directory entries sorted by their distance from the current
-			// file and in each step remove an entry from the cache until we reach the desired cache
-			// size
-			let mut sorted_files: Vec<_> = tmp_cache.into_iter().enumerate().collect();
-			sorted_files.sort_unstable_by_key(|(index, _)| {
-				(*index as isize - self.current_file_idx as isize).abs()
-			});
-			let mut remaining_capacity = self.total_capacity;
-			sorted_files.retain(|cached| {
-				let (_path, texture) = &cached.1;
-				let mut all_frames_size = 0;
-				// TODO consider retaining individual frames.
-				for t in texture.frames.iter() {
-					// Thew new file has to fit in the cache after this operation
-					// which is why we multiply the estimated size by two
-					let dimensions = (t.texture.width(), t.texture.height());
-					all_frames_size += get_image_size_estimate(dimensions) as isize;
-				}
-				let shoudl_retain = remaining_capacity > all_frames_size + self.curr_est_size;
-				if shoudl_retain {
-					remaining_capacity -= all_frames_size;
-				}
-				shoudl_retain
-			});
-			tmp_cache = sorted_files.into_iter().map(|(_, entry)| entry).collect();
-			mem::swap(&mut self.texture_cache, &mut tmp_cache);
-			self.remaining_capacity = remaining_capacity;
 		}
 
+		let new_file_index = self.get_file_index(&parent, &target_file_name)?;
+
+		let requested_frame_id = match frame_id {
+			Some(frame_id) => frame_id,
+			None if self.current_file_idx != new_file_index => 0,
+			None => self.current_frame_idx as isize,
+		};
+
+		self.current_file_idx = new_file_index;
+		self.refresh_cache();
 		self.try_getting_requested_image(display, self.current_file_idx, requested_frame_id)
+	}
+
+	fn refresh_cache(&mut self) {
+		let cache = mem::take(&mut self.texture_cache);
+
+		// Delete all entries that are outside the range of files around the current file
+		// allowed by the capacity.
+		// Walk through our list of directory entries sorted by their distance from the current
+		// file and in each step remove an entry from the cache until we reach the desired cache
+		// size
+		let mut sorted_files: Vec<_> = cache.into_iter().enumerate().collect();
+		sorted_files.sort_unstable_by_key(|&(index, _)| {
+			(index as isize - self.current_file_idx as isize).abs()
+		});
+		self.remaining_capacity = self.total_capacity;
+		sorted_files.retain(|(_, (_, texture))| {
+			// TODO consider retaining individual frames.
+			let all_frames_size = get_anim_size_estimate(&texture.frames);
+
+			if self.remaining_capacity > (all_frames_size + self.curr_est_size) {
+				self.remaining_capacity -= all_frames_size;
+				true
+			} else {
+				false
+			}
+		});
+
+		self.texture_cache = sorted_files.into_iter().map(|(_, entry)| entry).collect();
 	}
 
 	pub fn load_next(
@@ -401,18 +380,16 @@ impl ImageCache {
 		}
 
 		if self.dir_files.is_empty() {
-			return Err("Folder is empty or no folder was open when trying to load image.".into());
+			bail!("Folder is empty or no folder was open when trying to load image.");
 		}
 
-		let mut target_index = (self.current_file_idx as isize + file_jump_count as isize)
-			% self.dir_files.len() as isize;
-		if target_index < 0 {
-			target_index += self.dir_files.len() as isize;
-		}
+		// rem_euclid calculates the least nonnegative remainder
+		let target_index = (self.current_file_idx as isize + file_jump_count as isize)
+			.rem_euclid(self.dir_files.len() as isize) as usize;
 
-		let target_path = self.dir_files[target_index as usize].dir_entry.path();
+		let target_path = self.dir_files[target_index].dir_entry.path();
 		let result = self.load_specific(display, &target_path, None)?;
-		self.current_file_idx = target_index as usize;
+		self.current_file_idx = target_index;
 
 		Ok((result, target_path))
 	}
@@ -482,7 +459,7 @@ impl ImageCache {
 			path = desc.dir_entry.path();
 			req_id = desc.request_id;
 		} else {
-			bail!("Was not in the folder.");
+			bail!("Index {} was not in the folder.", file_index);
 		}
 		// Check if it's among the prefetched, and upload it, if it is
 		if let Some(result_vec) = self.prefetched.remove(&path) {
@@ -581,8 +558,7 @@ impl ImageCache {
 							}
 						}
 						if overwrite {
-							let old_size_estimate =
-								get_anim_size_estimate(&entry.get().frames) as isize;
+							let old_size_estimate = get_anim_size_estimate(&entry.get().frames);
 							self.remaining_capacity += old_size_estimate;
 							let mut_entry = entry.get_mut();
 							mut_entry.frames.clear();
@@ -600,8 +576,7 @@ impl ImageCache {
 				} else {
 					return Ok(None);
 				}
-				let size_estimate =
-					get_image_size_estimate((image.width(), image.height())) as isize;
+				let size_estimate = get_image_size_estimate(image.width(), image.height());
 				if let Some(entry) = self.texture_cache.get_mut(&req_id) {
 					let texture = Rc::new(texture_from_image(display, image)?);
 					let anim_frame = AnimationFrameTexture { texture, delay_nano };
@@ -637,14 +612,14 @@ impl ImageCache {
 		// Send as many load requests so that the estimated total will just fill the cache
 		let mut estimated_remaining_cap = self.remaining_capacity;
 
-		while estimated_remaining_cap > self.curr_est_size as isize {
+		while estimated_remaining_cap > self.curr_est_size {
 			if self.ongoing_requests.len() >= Self::MAX_PENDING_REQUESTS {
 				break;
 			}
 			// Send a load request for the closest file not in the cache or outdated
 			index += 1;
 			if self.prefetch_at_index(index) {
-				estimated_remaining_cap -= self.curr_est_size as isize;
+				estimated_remaining_cap -= self.curr_est_size;
 			} else {
 				break;
 			}
@@ -655,7 +630,7 @@ impl ImageCache {
 		if self.ongoing_requests.len() >= Self::MAX_PENDING_REQUESTS {
 			return false;
 		}
-		if self.remaining_capacity > self.curr_est_size as isize {
+		if self.remaining_capacity > self.curr_est_size {
 			return self.send_request_for_index(index, false);
 		}
 		false
@@ -728,12 +703,7 @@ impl ImageCache {
 			}
 		}
 
-		Err(format!(
-			"Could not find file '{}' in directory '{}'",
-			filename.to_str().unwrap(),
-			dir_path.to_str().unwrap()
-		)
-		.into())
+		bail!("Could not find file {:?} in directory {:?}", filename, dir_path);
 	}
 
 	fn collect_directory(&mut self) -> Result<Vec<ImageDescriptor>> {
@@ -759,12 +729,28 @@ impl ImageCache {
 			.collect();
 
 		dir_files.sort_unstable_by(|a, b| {
-			lexical_sort::lexical_natural_cmp(
-				&a.dir_entry.file_name().to_string_lossy(),
-				&b.dir_entry.file_name().to_string_lossy(),
-			)
+			alphanumeric_sort::compare_os_str(&a.dir_entry.file_name(), &b.dir_entry.file_name())
 		});
 
 		Ok(dir_files)
 	}
+}
+
+fn get_file_name_and_parent(path: &Path) -> Result<(OsString, PathBuf)> {
+	let file_name = match path.file_name() {
+		Some(f) => f.to_owned(),
+		None => bail!("Could not get file name from path {:?}", path),
+	};
+	let parent = match path.parent() {
+		Some(p) => p.canonicalize()?,
+		None => {
+			let mut path = path.canonicalize()?;
+			if !path.pop() {
+				bail!("Could not get parent directory of {:?}", path);
+			}
+			path
+		}
+	};
+
+	Ok((file_name, parent))
 }
