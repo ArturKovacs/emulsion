@@ -43,9 +43,11 @@ pub use self::errors::Result;
 use self::errors::*;
 
 pub fn get_image_size_estimate(width: u32, height: u32) -> isize {
+	// In an SRGB image, each pixel is 4 bytes.
 	// counting all the mipmaps would add an additionnal multiplier of around ~1.6
 	// but only the gpu textures have mip maps so just multiply by 1.5
-	((width * height * 4) as f32 * 1.5) as isize
+	// 4 x 1.5 gives the factor 6.
+	(width * height * 6) as isize
 }
 
 pub fn get_anim_size_estimate(frames: &[AnimationFrameTexture]) -> isize {
