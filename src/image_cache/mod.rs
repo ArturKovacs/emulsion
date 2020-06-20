@@ -296,25 +296,37 @@ impl ImageCache {
 		path: &Path,
 		frame_id: Option<isize>,
 	) -> Result<AnimationFrameTexture> {
-		let (target_file_name, parent) = get_file_name_and_parent(path)?;
-
-		// Lets just process incoming images
-		//self.process_prefetched(display)?;
 		self.receive_prefetched();
+		let target_file_name;
+		let parent;
+		if path.is_dir() {
+			parent = path.to_owned();
+			target_file_name = None;
+		} else {
+			let filename_and_parent = get_file_name_and_parent(path)?;
+			target_file_name = Some(filename_and_parent.0);
+			parent = filename_and_parent.1;
+		}
+
+		let new_file_index;
+		if let Some(target_file_name) = target_file_name {
+			self.change_directory_with_filename(&parent, &target_file_name)?;
+			new_file_index = self.get_file_index(&parent, &target_file_name)?;
+		} else {
+			self.change_directory(&parent)?;
+			self.current_file_idx = 0;
+			self.current_frame_idx = 0;
+			new_file_index = 0;
+		}
 		if self.dir_path != parent {
-			self.change_directory(&parent, &target_file_name)?;
 			self.send_request_for_index(self.current_file_idx, true);
 			return Err(errors::Error::from_kind(errors::ErrorKind::WaitingOnLoader));
 		}
-
-		let new_file_index = self.get_file_index(&parent, &target_file_name)?;
-
 		let requested_frame_id = match frame_id {
 			Some(frame_id) => frame_id,
 			None if self.current_file_idx != new_file_index => 0,
 			None => self.current_frame_idx as isize,
 		};
-
 		self.current_file_idx = new_file_index;
 		self.refresh_cache();
 		self.try_getting_requested_image(display, self.current_file_idx, requested_frame_id)
@@ -682,7 +694,7 @@ impl ImageCache {
 		false
 	}
 
-	fn change_directory(&mut self, dir_path: &Path, filename: &OsStr) -> Result<()> {
+	fn change_directory(&mut self, dir_path: &Path) -> Result<()> {
 		self.texture_cache.clear();
 		self.prefetched.clear();
 		self.remaining_capacity = self.total_capacity;
@@ -694,6 +706,11 @@ impl ImageCache {
 
 		self.dir_path = dir_path.to_owned();
 		self.dir_files = self.collect_directory()?;
+		Ok(())
+	}
+
+	fn change_directory_with_filename(&mut self, dir_path: &Path, filename: &OsStr) -> Result<()> {
+		self.change_directory(dir_path)?;
 
 		// Look up the index of the filename in the directory
 		for (index, desc) in self.dir_files.iter().enumerate() {
