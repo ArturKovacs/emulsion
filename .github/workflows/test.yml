@@ -32,4 +32,4 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Build and run tests
-        run: RUSTFLAGS="-C opt-level=0" cargo test --verbose
+        run: env RUSTFLAGS="-C opt-level=0" cargo test --verbose
