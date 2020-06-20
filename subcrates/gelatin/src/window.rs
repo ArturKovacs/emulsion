@@ -340,6 +340,13 @@ impl Window {
 						kind: EventKind::HoveredFileCancelled,
 					});
 				}
+				WindowEvent::Focused(focused) => {
+					event = Some(Event {
+						cursor_pos: borrowed.cursor_pos,
+						modifiers: borrowed.modifiers,
+						kind: EventKind::Focused(focused),
+					});
+				}
 				WindowEvent::ModifiersChanged(modifiers) => {
 					borrowed.modifiers = modifiers;
 					event = None;

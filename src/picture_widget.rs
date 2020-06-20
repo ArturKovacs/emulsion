@@ -310,6 +310,14 @@ impl PictureWidget {
 		borrowed.set_img_size_to_fit(stretch);
 	}
 
+	pub fn reload_folder(&self) {
+		let mut borrowed = self.data.borrow_mut();
+		if let Err(e) = borrowed.playback_manager.update_directory() {
+			eprintln!("ERROR while reloading the folder: {}", e);
+		}
+		borrowed.render_validity.invalidate();
+	}
+
 	pub fn jump_to_index(&self, index: u32) {
 		let mut borrowed = self.data.borrow_mut();
 		borrowed.playback_manager.request_load(LoadRequest::LoadAtIndex(index as usize));
@@ -651,6 +659,15 @@ impl Widget for PictureWidget {
 					}
 				}
 				borrowed.render_validity.invalidate();
+			}
+			EventKind::Focused(focused) => {
+				if focused {
+					let mut borrowed = self.data.borrow_mut();
+					if let Err(e) = borrowed.playback_manager.update_directory() {
+						eprintln!("{}", e);
+					}
+					borrowed.render_validity.invalidate();
+				}
 			}
 		}
 	}

@@ -335,6 +335,7 @@ pub enum EventKind {
 	DroppedFile(PathBuf),
 	HoveredFile(PathBuf),
 	HoveredFileCancelled,
+	Focused(bool),
 }
 
 #[derive(Copy, Clone)]
