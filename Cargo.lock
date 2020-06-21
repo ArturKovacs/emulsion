@@ -518,7 +518,7 @@ checksum = "bb1f6b1ce1c140482ea30ddd3335fc0024ac7ee112895426e0a629a6c20adfe3"
 
 [[package]]
 name = "emulsion"
-version = "2.1.0"
+version = "3.0.0"
 dependencies = [
  "alphanumeric-sort",
  "backtrace",
@@ -592,7 +592,7 @@ checksum = "3dcaa9ae7725d12cdb85b3ad99a434db70b468c09ded17e012d86b5c1010f7a7"
 
 [[package]]
 name = "gelatin"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "cgmath",
  "derive_builder",
