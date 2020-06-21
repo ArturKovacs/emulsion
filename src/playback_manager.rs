@@ -205,9 +205,12 @@ impl PlaybackManager {
 	pub fn update_directory(&mut self) -> image_cache::Result<()> {
 		match self.folder_player.load_request {
 			LoadRequest::None => {
-				self.image_cache.update_directory()?;
-				let index = self.current_file_index();
-				self.request_load(LoadRequest::LoadAtIndex(index));
+				let curr_path = self.image_cache.current_file_path();
+				if !curr_path.to_string_lossy().is_empty() {
+					self.image_cache.update_directory()?;
+					let index = self.current_file_index();
+					self.request_load(LoadRequest::LoadAtIndex(index));
+				}
 			}
 			_ => (),
 		}
