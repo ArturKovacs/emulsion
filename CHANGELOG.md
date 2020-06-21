@@ -1,5 +1,23 @@
 
-## Current
+## 3.0 on 2020-06-21
+
+### Added
+- Linux .deb package
+- Animated PNG support
+- Support for opening directories (both drag & drop and cli argument)
+- Best fit mode that displays images at their original size when they fit into the window instead of stretching them.
+
+### Changed
+- Changed the UI layout to accomodate the scaling mode buttons.
+- Directory contents and the current file is refreshed when the Emulsion window gains focus.
+- Image files are now ordered case-insensitively
+- Significantly decreased CPU and GPU usage.
+- Instead of the description, the program name is shown in many context on Windows.
+- Many images that couldn't be opened with Emulsion now can be.
+- The '1' key can now by default be used for setting the scaling mode to "original size"
+- The Return key can now by default be used to toogle full-screen mode.
+
+## 2.1 on 2020-05-23
 
 ### Added
 - Custom commands to execute on the current image.
