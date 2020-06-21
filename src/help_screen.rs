@@ -9,7 +9,6 @@ use gelatin::add_common_widget_functions;
 use gelatin::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
 use gelatin::picture::Picture;
 use gelatin::window::RenderValidity;
-use gelatin::window::Window;
 use gelatin::NextUpdate;
 use gelatin::{DrawContext, Event, Widget, WidgetData, WidgetError};
 
