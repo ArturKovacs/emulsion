@@ -32,6 +32,7 @@ icon = ["resource_dev/emulsion.png"]
 resources = ["LICENSE.txt"]
 short_description = "A lightweight and minimalistic image viewer"
 copyright = "Copyright (c) 2020 The Emulsion Contributors"
+linux_exec_args = "%f"
 
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1"
