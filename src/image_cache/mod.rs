@@ -746,7 +746,10 @@ impl ImageCache {
 			.collect();
 
 		dir_files.sort_unstable_by(|a, b| {
-			alphanumeric_sort::compare_os_str(&a.dir_entry.file_name(), &b.dir_entry.file_name())
+			lexical_sort::natural_lexical_cmp(
+				&a.dir_entry.file_name().to_string_lossy(),
+				&b.dir_entry.file_name().to_string_lossy(),
+			)
 		});
 
 		Ok(dir_files)
