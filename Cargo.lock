@@ -16,12 +16,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d2e7343e7fc9de883d1b0341e0b13970f764c14101234857d2ddafa1cb1cac2"
 
 [[package]]
-name = "alphanumeric-sort"
-version = "1.0.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d338a8e22f0d04e4f44b0915c537d4dfa2e002ffa7ef78364de604d180b0448"
-
-[[package]]
 name = "andrew"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -40,6 +34,12 @@ name = "android_glue"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "000444226fcff248f2bc4c7625be32c63caccfecc2723a2b9f78a7487a49c407"
+
+[[package]]
+name = "any_ascii"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "900fc408aadfe9806e9002c480d69a3c1cd0dcff3bfd246523cfe3bc39e71f39"
 
 [[package]]
 name = "approx"
@@ -520,13 +520,13 @@ checksum = "bb1f6b1ce1c140482ea30ddd3335fc0024ac7ee112895426e0a629a6c20adfe3"
 name = "emulsion"
 version = "3.0.0"
 dependencies = [
- "alphanumeric-sort",
  "backtrace",
  "clap",
  "directories-next",
  "error-chain",
  "gelatin",
  "lazy_static",
+ "lexical-sort",
  "open",
  "rand 0.7.3",
  "serde",
@@ -849,6 +849,15 @@ name = "lazycell"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b294d6fa9ee409a054354afc4352b0b9ef7ca222c69b8812cbea9e7d2bf3783f"
+
+[[package]]
+name = "lexical-sort"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14983e5d0cb68ae7983de223b8f640548cb55a34cb6ec5f1a7137bb5731ecc32"
+dependencies = [
+ "any_ascii",
+]
 
 [[package]]
 name = "libc"
