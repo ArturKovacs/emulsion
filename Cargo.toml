@@ -1,6 +1,6 @@
 [package]
 name = "emulsion"
-version = "3.0.0"
+version = "4.0.0"
 description = "A fast and minimalistic image viewer"
 repository = "https://github.com/ArturKovacs/emulsion"
 authors = ["Artur Barnabas <kovacs.artur.barnabas@gmail.com>"]
@@ -38,8 +38,8 @@ linux_exec_args = "%f"
 winres = "0.1"
 
 [dependencies]
-gelatin = { path = "./subcrates/gelatin" }
-#gelatin = "0.3"
+#gelatin = { path = "./subcrates/gelatin" }
+gelatin = "0.4"
 ureq = { version = "1", features = ["json"], optional = true }
 lazy_static = "1.4.0"
 directories-next = "1.0"
