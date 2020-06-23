@@ -1,4 +1,9 @@
 
+## 4.0 on 2020-06-23
+
+### Changed
+- Image files are now ordered case-insensitively
+
 ## 3.0 on 2020-06-21
 
 ### Added
@@ -10,7 +15,7 @@
 ### Changed
 - Changed the UI layout to accomodate the scaling mode buttons.
 - Directory contents and the current file is refreshed when the Emulsion window gains focus.
-- Image files are now ordered case-insensitively
+- ~~Image files are now ordered case-insensitively~~
 - Significantly decreased CPU and GPU usage.
 - Instead of the description, the program name is shown in many context on Windows.
 - Many images that couldn't be opened with Emulsion now can be.
