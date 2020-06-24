@@ -1,5 +1,5 @@
-use std::ffi::OsString;
 use std::io::Write;
+use std::marker::PhantomData;
 use std::mem;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -8,10 +8,8 @@ use std::time::{Duration, Instant};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
-use gelatin::glium;
-
+use gelatin::glium::{texture::SrgbTexture2d, Display};
 use gelatin::window::Window;
-//use crate::window::Window;
 
 use crate::image_cache::{self, AnimationFrameTexture, ImageCache};
 
@@ -36,70 +34,88 @@ pub enum PlaybackState {
 	//Backward,
 }
 
-fn folder_load_next(image_cache: &mut ImageCache, display: &glium::Display) -> FrameLoadResult {
-	image_cache.load_next(display)
-}
-fn folder_load_prev(image_cache: &mut ImageCache, display: &glium::Display) -> FrameLoadResult {
-	image_cache.load_prev(display)
-}
-fn folder_load_jump(
-	image_cache: &mut ImageCache,
-	display: &glium::Display,
-	amount: i32,
-) -> FrameLoadResult {
-	image_cache.load_jump(display, amount, 0)
-}
-fn folder_load_path(
-	image_cache: &mut ImageCache,
-	display: &glium::Display,
-	path: &Path,
-) -> image_cache::Result<AnimationFrameTexture> {
-	image_cache.load_specific(display, path, None)
-}
-fn folder_load_at_index(
-	image_cache: &mut ImageCache,
-	display: &glium::Display,
-	index: usize,
-) -> FrameLoadResult {
-	image_cache.load_at_index(display, index, None)
-}
-fn folder_delay_nanos(_player: &ImgSequencePlayer) -> u64 {
-	const FRAMERATE: u64 = 25;
-	NANOS_PER_SEC / FRAMERATE
+trait Playback: Sized {
+	fn load_next(image_cache: &mut ImageCache, display: &Display) -> FrameLoadResult;
+
+	fn load_prev(image_cache: &mut ImageCache, display: &Display) -> FrameLoadResult;
+
+	fn load_jump(image_cache: &mut ImageCache, display: &Display, amount: i32) -> FrameLoadResult;
+
+	fn load_path(
+		image_cache: &mut ImageCache,
+		display: &Display,
+		path: &Path,
+	) -> image_cache::Result<AnimationFrameTexture> {
+		image_cache.load_specific(display, path, None)
+	}
+
+	fn load_at_index(
+		image_cache: &mut ImageCache,
+		display: &Display,
+		index: usize,
+	) -> FrameLoadResult;
+
+	fn delay_nanos(player: &ImgSequencePlayer<Self>) -> u64;
 }
 
-fn anim_load_next(image_cache: &mut ImageCache, display: &glium::Display) -> FrameLoadResult {
-	image_cache.load_jump(display, 0, 1)
+struct FolderPlayback;
+
+impl Playback for FolderPlayback {
+	fn load_next(image_cache: &mut ImageCache, display: &Display) -> FrameLoadResult {
+		image_cache.load_next(display)
+	}
+
+	fn load_prev(image_cache: &mut ImageCache, display: &Display) -> FrameLoadResult {
+		image_cache.load_prev(display)
+	}
+
+	fn load_jump(image_cache: &mut ImageCache, display: &Display, amount: i32) -> FrameLoadResult {
+		image_cache.load_jump(display, amount, 0)
+	}
+
+	fn load_at_index(
+		image_cache: &mut ImageCache,
+		display: &Display,
+		index: usize,
+	) -> FrameLoadResult {
+		image_cache.load_at_index(display, index, None)
+	}
+
+	fn delay_nanos(_player: &ImgSequencePlayer<Self>) -> u64 {
+		const FRAMERATE: u64 = 25;
+		NANOS_PER_SEC / FRAMERATE
+	}
 }
-fn anim_load_prev(image_cache: &mut ImageCache, display: &glium::Display) -> FrameLoadResult {
-	image_cache.load_jump(display, 0, -1)
-}
-fn anim_load_jump(
-	image_cache: &mut ImageCache,
-	display: &glium::Display,
-	amount: i32,
-) -> FrameLoadResult {
-	image_cache.load_jump(display, 0, amount as isize)
-}
-fn anim_load_path(
-	image_cache: &mut ImageCache,
-	display: &glium::Display,
-	path: &Path,
-) -> image_cache::Result<AnimationFrameTexture> {
-	image_cache.load_specific(display, path, None)
-}
-fn anim_load_at_index(
-	image_cache: &mut ImageCache,
-	display: &glium::Display,
-	index: usize,
-) -> FrameLoadResult {
-	image_cache.load_at_index(display, image_cache.current_file_index(), Some(index as isize))
-}
-fn anim_delay_nanos(player: &ImgSequencePlayer) -> u64 {
-	if let Some(ref frame) = player.image_texture {
-		frame.delay_nano
-	} else {
-		0
+
+struct AnimPlayback;
+
+impl Playback for AnimPlayback {
+	fn load_next(image_cache: &mut ImageCache, display: &Display) -> FrameLoadResult {
+		image_cache.load_jump(display, 0, 1)
+	}
+
+	fn load_prev(image_cache: &mut ImageCache, display: &Display) -> FrameLoadResult {
+		image_cache.load_jump(display, 0, -1)
+	}
+
+	fn load_jump(image_cache: &mut ImageCache, display: &Display, amount: i32) -> FrameLoadResult {
+		image_cache.load_jump(display, 0, amount as isize)
+	}
+
+	fn load_at_index(
+		image_cache: &mut ImageCache,
+		display: &Display,
+		index: usize,
+	) -> FrameLoadResult {
+		image_cache.load_at_index(display, image_cache.current_file_index(), Some(index as isize))
+	}
+
+	fn delay_nanos(player: &ImgSequencePlayer<Self>) -> u64 {
+		if let Some(ref frame) = player.image_texture {
+			frame.delay_nano
+		} else {
+			0
+		}
 	}
 }
 
@@ -109,8 +125,8 @@ pub struct PlaybackManager {
 
 	// image_texture: Option<Rc<glium::texture::SrgbTexture2d>>,
 	// filename: Option<OsString>,
-	folder_player: ImgSequencePlayer,
-	image_player: ImgSequencePlayer,
+	folder_player: ImgSequencePlayer<FolderPlayback>,
+	image_player: ImgSequencePlayer<AnimPlayback>,
 }
 
 impl PlaybackManager {
@@ -135,22 +151,8 @@ impl PlaybackManager {
 		let result = PlaybackManager {
 			//playback_state: PlaybackState::Paused,
 			image_cache: ImageCache::new(cache_capaxity, thread_count),
-			folder_player: ImgSequencePlayer::new(
-				&folder_load_next,
-				&folder_load_prev,
-				&folder_load_jump,
-				&folder_load_path,
-				&folder_load_at_index,
-				&folder_delay_nanos,
-			),
-			image_player: ImgSequencePlayer::new(
-				&anim_load_next,
-				&anim_load_prev,
-				&anim_load_jump,
-				&anim_load_path,
-				&anim_load_at_index,
-				&anim_delay_nanos,
-			),
+			folder_player: ImgSequencePlayer::new(),
+			image_player: ImgSequencePlayer::new(),
 		};
 		result
 	}
@@ -186,10 +188,6 @@ impl PlaybackManager {
 		// self.playback_state = PlaybackState::Present;
 	}
 
-	pub fn _current_filename(&self) -> OsString {
-		self.image_cache.current_filename()
-	}
-
 	pub fn current_file_path(&self) -> PathBuf {
 		self.image_cache.current_file_path()
 	}
@@ -217,16 +215,12 @@ impl PlaybackManager {
 		Ok(())
 	}
 
-	pub fn _cached_from_dir(&self) -> Vec<bool> {
-		self.image_cache._cached_from_dir()
-	}
-
 	pub fn request_load(&mut self, request: LoadRequest) {
 		self.folder_player.request_load(request);
 		self.image_player.request_load(LoadRequest::Jump(0));
 	}
 
-	pub fn image_texture(&self) -> Option<Rc<glium::texture::SrgbTexture2d>> {
+	pub fn image_texture(&self) -> Option<Rc<SrgbTexture2d>> {
 		self.image_player.image_texture()
 	}
 
@@ -256,7 +250,7 @@ impl PlaybackManager {
 
 type FrameLoadResult = image_cache::Result<(AnimationFrameTexture, PathBuf)>;
 
-struct ImgSequencePlayer {
+struct ImgSequencePlayer<P: Playback> {
 	playback_state: PlaybackState,
 	present_remaining: Vec<usize>,
 
@@ -268,32 +262,11 @@ struct ImgSequencePlayer {
 	image_texture: Option<AnimationFrameTexture>,
 	file_path: Option<PathBuf>,
 
-	load_next: &'static dyn Fn(&mut ImageCache, &glium::Display) -> FrameLoadResult,
-	load_prev: &'static dyn Fn(&mut ImageCache, &glium::Display) -> FrameLoadResult,
-	load_jump: &'static dyn Fn(&mut ImageCache, &glium::Display, i32) -> FrameLoadResult,
-	load_path: &'static dyn Fn(
-		&mut ImageCache,
-		&glium::Display,
-		&Path,
-	) -> image_cache::Result<AnimationFrameTexture>,
-	load_at_index: &'static dyn Fn(&mut ImageCache, &glium::Display, usize) -> FrameLoadResult,
-
-	get_delay_nanos: &'static dyn Fn(&Self) -> u64,
+	_playback: PhantomData<P>,
 }
 
-impl ImgSequencePlayer {
-	pub fn new(
-		load_next: &'static dyn Fn(&mut ImageCache, &glium::Display) -> FrameLoadResult,
-		load_prev: &'static dyn Fn(&mut ImageCache, &glium::Display) -> FrameLoadResult,
-		load_jump: &'static dyn Fn(&mut ImageCache, &glium::Display, i32) -> FrameLoadResult,
-		load_path: &'static dyn Fn(
-			&mut ImageCache,
-			&glium::Display,
-			&Path,
-		) -> image_cache::Result<AnimationFrameTexture>,
-		load_at_index: &'static dyn Fn(&mut ImageCache, &glium::Display, usize) -> FrameLoadResult,
-		get_delay_nanos: &'static dyn Fn(&Self) -> u64,
-	) -> ImgSequencePlayer {
+impl<P: Playback> ImgSequencePlayer<P> {
+	pub fn new() -> Self {
 		ImgSequencePlayer {
 			playback_state: PlaybackState::Paused,
 			present_remaining: Vec::new(),
@@ -304,12 +277,8 @@ impl ImgSequencePlayer {
 			//should_sleep: true,
 			image_texture: None,
 			file_path: None,
-			load_next,
-			load_prev,
-			load_jump,
-			load_path,
-			load_at_index,
-			get_delay_nanos,
+
+			_playback: PhantomData,
 		}
 	}
 
@@ -347,13 +316,13 @@ impl ImgSequencePlayer {
 		self.load_request = request;
 	}
 
-	pub fn image_texture(&self) -> Option<Rc<glium::texture::SrgbTexture2d>> {
+	pub fn image_texture(&self) -> Option<Rc<SrgbTexture2d>> {
 		self.image_texture.clone().map(|t| t.texture)
 	}
 
 	pub fn update_image(
 		&mut self,
-		display: &glium::Display,
+		display: &Display,
 		image_cache: &mut ImageCache,
 	) -> gelatin::NextUpdate {
 		let now = Instant::now();
@@ -370,7 +339,7 @@ impl ImgSequencePlayer {
 				frame_delta_time_nanos = (NANOS_PER_SEC * 6) as i64;
 			}
 			_ => {
-				frame_delta_time_nanos = (self.get_delay_nanos)(&self) as i64;
+				frame_delta_time_nanos = P::delay_nanos(&self) as i64;
 			}
 		};
 		if self.playback_state == PlaybackState::Paused {
@@ -462,18 +431,13 @@ impl ImgSequencePlayer {
 			}
 		}
 		let load_result = match load_request {
-			LoadRequest::LoadNext => Some((self.load_next)(image_cache, display)),
-			LoadRequest::LoadPrevious => Some((self.load_prev)(image_cache, display)),
+			LoadRequest::LoadNext => Some(P::load_next(image_cache, display)),
+			LoadRequest::LoadPrevious => Some(P::load_prev(image_cache, display)),
 			LoadRequest::FilePath(file_path) => {
-				let load_path = self.load_path;
-				Some(load_path(image_cache, display, &file_path).map(|x| (x, file_path)))
+				Some(P::load_path(image_cache, display, &file_path).map(|x| (x, file_path)))
 			}
-			LoadRequest::LoadAtIndex(index) => {
-				Some((self.load_at_index)(image_cache, display, index))
-			}
-			LoadRequest::Jump(jump_count) => {
-				Some((self.load_jump)(image_cache, display, jump_count))
-			}
+			LoadRequest::LoadAtIndex(index) => Some(P::load_at_index(image_cache, display, index)),
+			LoadRequest::Jump(jump_count) => Some(P::load_jump(image_cache, display, jump_count)),
 			LoadRequest::None => None,
 		};
 		if let Some(result) = load_result {
