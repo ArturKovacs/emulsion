@@ -27,7 +27,6 @@ use gelatin::{
 	line_layout_container::*,
 	misc::*,
 	picture::*,
-	slider::*,
 	window::{Window, WindowDescriptorBuilder},
 	NextUpdate, Widget,
 };
@@ -117,16 +116,8 @@ fn main() {
 	let help_screen = Rc::new(HelpScreen::new(usage_img));
 
 	let bottom_bar = Rc::new(BottomBar::new());
-	let picture_widget = make_picture_widget(
-		&window,
-		bottom_bar.slider.clone(),
-		bottom_bar.orig_scale_button.clone(),
-		bottom_bar.fit_best_button.clone(),
-		bottom_bar.fit_stretch_button.clone(),
-		bottom_bar.widget.clone(),
-		config.clone(),
-		cache.clone(),
-	);
+	let picture_widget =
+		make_picture_widget(&window, bottom_bar.clone(), config.clone(), cache.clone());
 
 	if let Some(file_path) = args.file_path {
 		picture_widget.jump_to_path(file_path);
@@ -215,10 +206,12 @@ fn main() {
 		let update_available = update_available.clone();
 		let help_screen = help_screen.clone();
 		let update_notification = update_notification.clone();
+		let bottom_bar_clone = bottom_bar.clone();
 
 		bottom_bar.help_button.set_on_click(move || {
 			help_visible.set(!help_visible.get());
 			help_screen.set_visible(help_visible.get());
+			bottom_bar_clone.set_help_visible(help_visible.get());
 			update_notification
 				.set_visible(help_visible.get() && update_available.load(Ordering::SeqCst));
 		});
@@ -350,25 +343,12 @@ fn make_update_notification(update_label: Rc<Label>) -> Rc<HorizontalLayoutConta
 
 fn make_picture_widget(
 	window: &Rc<Window>,
-	slider: Rc<Slider>,
-	orig_scale_button: Rc<Button>,
-	fit_best_button: Rc<Button>,
-	fit_stretch_button: Rc<Button>,
-	bottom_container: Rc<HorizontalLayoutContainer>,
+	bottom_bar: Rc<BottomBar>,
 	config: Rc<RefCell<Configuration>>,
 	cache: Arc<Mutex<Cache>>,
 ) -> Rc<PictureWidget> {
-	let picture_widget = Rc::new(PictureWidget::new(
-		&window.display_mut(),
-		window,
-		slider,
-		orig_scale_button,
-		fit_best_button,
-		fit_stretch_button,
-		bottom_container.clone(),
-		config.clone(),
-		cache.clone(),
-	));
+	let picture_widget =
+		Rc::new(PictureWidget::new(&window.display_mut(), window, bottom_bar, config, cache));
 	picture_widget.set_height(Length::Stretch { min: 0.0, max: f32::INFINITY });
 	picture_widget.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
 	picture_widget

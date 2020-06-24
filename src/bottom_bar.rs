@@ -1,4 +1,4 @@
-use crate::Theme;
+use crate::{picture_widget::ScalingMode, Theme};
 
 use gelatin::{
 	button::Button,
@@ -22,6 +22,13 @@ static FIT_STRETCH: &[u8] = include_bytes!("../resource/fit-stretch.png");
 static FIT_STRETCH_LIGHT: &[u8] = include_bytes!("../resource/fit-stretch-light.png");
 static FIT_BEST: &[u8] = include_bytes!("../resource/fit-min.png");
 static FIT_BEST_LIGHT: &[u8] = include_bytes!("../resource/fit-min-light.png");
+
+const NO_BG_COLOR: [f32; 4] = [0.0, 0.0, 0.0, 0.0];
+const ACTIVE_BG_COLOR: [f32; 4] = [0.3, 0.3, 0.3, 0.5];
+
+const SMALL_BUTTON_GAP: f32 = 4.0;
+const BIG_BUTTON_GAP: f32 = 32.0;
+const BUTTON_SIZE: f32 = 24.0;
 
 pub struct BottomBar {
 	pub widget: Rc<HorizontalLayoutContainer>,
@@ -61,26 +68,28 @@ impl BottomBar {
 		let fit_best = Rc::new(Picture::from_encoded_bytes(FIT_BEST));
 		let fit_best_light = Rc::new(Picture::from_encoded_bytes(FIT_BEST_LIGHT));
 
-		let theme_button = make_theme_button();
-		let help_button = make_help_button();
-		let slider = make_slider();
-
 		let widget = Rc::new(HorizontalLayoutContainer::new());
-		// widget.set_margin_top(4.0);
-		// widget.set_margin_bottom(4.0);
 		widget.set_margin_left(0.0);
 		widget.set_margin_right(0.0);
 		widget.set_height(Length::Fixed(32.0));
 		widget.set_width(Length::Stretch { min: 0.0, max: f32::INFINITY });
 
-		let orig_scale_button = make_orig_scale_button();
-		let fit_best_button = make_fit_best_button();
-		let fit_stretch_button = make_fit_stretch_button();
+		let orig_scale_button = make_icon_button(Alignment::Start);
+		let fit_best_button = make_icon_button(Alignment::Start);
+		let fit_stretch_button = make_icon_button(Alignment::Start);
+		let slider = make_slider();
+		let theme_button = make_icon_button(Alignment::End);
+		let help_button = make_icon_button(Alignment::End);
+
+		orig_scale_button.set_margin_left(SMALL_BUTTON_GAP);
+		fit_stretch_button.set_margin_right(SMALL_BUTTON_GAP);
+		theme_button.set_margin_left(SMALL_BUTTON_GAP);
+		help_button.set_margin_left(SMALL_BUTTON_GAP);
+		help_button.set_margin_right(SMALL_BUTTON_GAP);
 
 		widget.add_child(orig_scale_button.clone());
 		widget.add_child(fit_best_button.clone());
 		widget.add_child(fit_stretch_button.clone());
-
 		widget.add_child(slider.clone());
 		widget.add_child(theme_button.clone());
 		widget.add_child(help_button.clone());
@@ -141,70 +150,56 @@ impl BottomBar {
 			}
 		}
 	}
+
+	pub fn set_visible(&self, visible: bool) {
+		self.widget.set_visible(visible);
+	}
+
+	pub fn set_help_visible(&self, visible: bool) {
+		self.help_button.set_bg_color(if visible { ACTIVE_BG_COLOR } else { NO_BG_COLOR })
+	}
+
+	pub fn update_scaling_buttons(&self, scaling: ScalingMode, img_texel_size: f32) {
+		match scaling {
+			#[allow(clippy::float_cmp)]
+			ScalingMode::Fixed => {
+				if img_texel_size == 1.0 {
+					self.orig_scale_button.set_bg_color(ACTIVE_BG_COLOR);
+				} else {
+					self.orig_scale_button.set_bg_color(NO_BG_COLOR);
+				}
+				self.fit_best_button.set_bg_color(NO_BG_COLOR);
+				self.fit_stretch_button.set_bg_color(NO_BG_COLOR);
+			}
+			ScalingMode::FitMin => {
+				self.orig_scale_button.set_bg_color(NO_BG_COLOR);
+				self.fit_best_button.set_bg_color(ACTIVE_BG_COLOR);
+				self.fit_stretch_button.set_bg_color(NO_BG_COLOR);
+			}
+			ScalingMode::FitStretch => {
+				self.orig_scale_button.set_bg_color(NO_BG_COLOR);
+				self.fit_best_button.set_bg_color(NO_BG_COLOR);
+				self.fit_stretch_button.set_bg_color(ACTIVE_BG_COLOR);
+			}
+		}
+	}
 }
 
-fn make_orig_scale_button() -> Rc<Button> {
+fn make_icon_button(alignment: Alignment) -> Rc<Button> {
 	let button = Rc::new(Button::new());
-	button.set_margin_top(4.0);
-	button.set_margin_left(4.0);
-	button.set_margin_right(0.0);
-	button.set_height(Length::Fixed(24.0));
-	button.set_width(Length::Fixed(24.0));
-	button.set_horizontal_align(Alignment::Start);
-	button
-}
-
-fn make_fit_best_button() -> Rc<Button> {
-	let button = Rc::new(Button::new());
-	button.set_margin_top(4.0);
-	button.set_margin_left(0.0);
-	button.set_margin_right(0.0);
-	button.set_height(Length::Fixed(24.0));
-	button.set_width(Length::Fixed(24.0));
-	button.set_horizontal_align(Alignment::Start);
-	button
-}
-
-fn make_fit_stretch_button() -> Rc<Button> {
-	let button = Rc::new(Button::new());
-	button.set_margin_top(4.0);
-	button.set_margin_left(0.0);
-	button.set_margin_right(32.0);
-	button.set_height(Length::Fixed(24.0));
-	button.set_width(Length::Fixed(24.0));
-	button.set_bg_color([0.4, 0.4, 0.4, 0.5]);
-	button.set_horizontal_align(Alignment::Start);
-	button
-}
-
-fn make_theme_button() -> Rc<Button> {
-	let button = Rc::new(Button::new());
-	button.set_margin_top(4.0);
-	button.set_margin_left(32.0);
-	button.set_margin_right(4.0);
-	button.set_height(Length::Fixed(24.0));
-	button.set_width(Length::Fixed(24.0));
-	button.set_horizontal_align(Alignment::End);
-	button
-}
-
-fn make_help_button() -> Rc<Button> {
-	let button = Rc::new(Button::new());
-	button.set_margin_top(4.0);
-	button.set_margin_left(4.0);
-	button.set_margin_right(4.0);
-	button.set_height(Length::Fixed(24.0));
-	button.set_width(Length::Fixed(24.0));
-	button.set_horizontal_align(Alignment::End);
+	button.set_margin_top(SMALL_BUTTON_GAP);
+	button.set_height(Length::Fixed(BUTTON_SIZE));
+	button.set_width(Length::Fixed(BUTTON_SIZE));
+	button.set_horizontal_align(alignment);
 	button
 }
 
 fn make_slider() -> Rc<Slider> {
 	let slider = Rc::new(Slider::new());
-	slider.set_margin_top(4.0);
-	slider.set_margin_left(4.0);
-	slider.set_margin_right(4.0);
-	slider.set_height(Length::Fixed(24.0));
+	slider.set_margin_top(SMALL_BUTTON_GAP);
+	slider.set_margin_left(BIG_BUTTON_GAP);
+	slider.set_margin_right(BIG_BUTTON_GAP);
+	slider.set_height(Length::Fixed(BUTTON_SIZE));
 	slider.set_width(Length::Stretch { min: 0.0, max: std::f32::INFINITY });
 	slider.set_horizontal_align(Alignment::Center);
 	slider.set_steps(6, 1);

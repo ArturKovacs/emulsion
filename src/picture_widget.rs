@@ -9,10 +9,7 @@ use gelatin::glium::glutin::event::{ElementState, ModifiersState, MouseButton};
 use gelatin::glium::{program, texture::SrgbTexture2d, uniform, Display, Frame, Program, Surface};
 
 use gelatin::add_common_widget_functions;
-use gelatin::button::Button;
-use gelatin::line_layout_container::HorizontalLayoutContainer;
 use gelatin::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
-use gelatin::slider::Slider;
 use gelatin::window::{RenderValidity, Window};
 use gelatin::NextUpdate;
 use gelatin::{
@@ -23,6 +20,7 @@ use crate::input_handling::*;
 use crate::shaders;
 use crate::utils::{virtual_keycode_is_char, virtual_keycode_to_string};
 use crate::{
+	bottom_bar::BottomBar,
 	configuration::{Cache, Configuration},
 	playback_manager::*,
 };
@@ -39,9 +37,6 @@ enum HoverState {
 	None,
 	ItemHovered { prev_path: PathBuf },
 }
-
-static NO_BG_COLOR: [f32; 4] = [0.0, 0.0, 0.0, 0.0];
-static ACTIVE_BG_COLOR: [f32; 4] = [0.3, 0.3, 0.3, 0.5];
 
 struct PictureWidgetData {
 	placement: WidgetPlacement,
@@ -71,11 +66,7 @@ struct PictureWidgetData {
 
 	first_draw: bool,
 	next_update: NextUpdate,
-	slider: Rc<Slider>,
-	orig_scale_button: Rc<Button>,
-	fit_best_button: Rc<Button>,
-	fit_stretch_button: Rc<Button>,
-	bottom_panel: Rc<HorizontalLayoutContainer>,
+	bottom_bar: Rc<BottomBar>,
 	window: Weak<Window>,
 }
 impl WidgetData for PictureWidgetData {
@@ -195,29 +186,8 @@ impl PictureWidgetData {
 		self.render_validity.invalidate();
 	}
 
-	#[allow(clippy::float_cmp)]
 	fn update_scaling_buttons(&mut self) {
-		match self.scaling {
-			ScalingMode::Fixed => {
-				if self.img_texel_size == 1.0 {
-					self.orig_scale_button.set_bg_color(ACTIVE_BG_COLOR);
-				} else {
-					self.orig_scale_button.set_bg_color(NO_BG_COLOR);
-				}
-				self.fit_best_button.set_bg_color(NO_BG_COLOR);
-				self.fit_stretch_button.set_bg_color(NO_BG_COLOR);
-			}
-			ScalingMode::FitMin => {
-				self.orig_scale_button.set_bg_color(NO_BG_COLOR);
-				self.fit_best_button.set_bg_color(ACTIVE_BG_COLOR);
-				self.fit_stretch_button.set_bg_color(NO_BG_COLOR);
-			}
-			ScalingMode::FitStretch => {
-				self.orig_scale_button.set_bg_color(NO_BG_COLOR);
-				self.fit_best_button.set_bg_color(NO_BG_COLOR);
-				self.fit_stretch_button.set_bg_color(ACTIVE_BG_COLOR);
-			}
-		}
+		self.bottom_bar.update_scaling_buttons(self.scaling, self.img_texel_size);
 	}
 }
 
@@ -228,11 +198,7 @@ impl PictureWidget {
 	pub fn new(
 		display: &Display,
 		window: &Rc<Window>,
-		slider: Rc<Slider>,
-		orig_scale_button: Rc<Button>,
-		fit_best_button: Rc<Button>,
-		fit_stretch_button: Rc<Button>,
-		bottom_panel: Rc<HorizontalLayoutContainer>,
+		bottom_bar: Rc<BottomBar>,
 		configuration: Rc<RefCell<Configuration>>,
 		cache: Arc<Mutex<Cache>>,
 	) -> PictureWidget {
@@ -281,11 +247,7 @@ impl PictureWidget {
 			hover_state: HoverState::None,
 			first_draw: true,
 			next_update: NextUpdate::Latest,
-			slider,
-			orig_scale_button,
-			fit_best_button,
-			fit_stretch_button,
-			bottom_panel,
+			bottom_bar,
 			window: Rc::downgrade(window),
 		};
 		data.update_scaling_buttons();
@@ -333,14 +295,14 @@ impl PictureWidget {
 			if let Some(window) = borrowed.window.upgrade() {
 				let fullscreen = !window.fullscreen();
 				window.set_fullscreen(fullscreen);
-				borrowed.bottom_panel.set_visible(!fullscreen);
+				borrowed.bottom_bar.set_visible(!fullscreen);
 			}
 		}
 		if triggered!(ESCAPE_NAME) {
 			if let Some(window) = borrowed.window.upgrade() {
 				if window.fullscreen() {
 					window.set_fullscreen(false);
-					borrowed.bottom_panel.set_visible(true);
+					borrowed.bottom_bar.set_visible(true);
 				} else {
 					request_exit();
 				}
@@ -432,7 +394,7 @@ impl Widget for PictureWidget {
 		let new_texture = data.playback_manager.image_texture();
 		let curr_file_index = data.playback_manager.current_file_index() as u32;
 		let curr_dir_len = data.playback_manager.current_dir_len() as u32;
-		data.slider.set_steps(curr_dir_len, curr_file_index);
+		data.bottom_bar.slider.set_steps(curr_dir_len, curr_file_index);
 		//data.slider.set_step_bg(data.playback_manager.cached_from_dir());
 		let playback_state = data.playback_manager.playback_state();
 		data.set_window_title_filename(window, playback_state, data.playback_manager.file_path());
@@ -568,7 +530,7 @@ impl Widget for PictureWidget {
 								Some(window) => {
 									let fullscreen = !window.fullscreen();
 									window.set_fullscreen(fullscreen);
-									borrowed.bottom_panel.set_visible(!fullscreen);
+									borrowed.bottom_bar.set_visible(!fullscreen);
 								}
 								None => unreachable!(),
 							}
