@@ -216,6 +216,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cmake"
+version = "0.1.44"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e56268c17a6248366d66d4a47a3381369d068cce8409bb1716ed77ea32163bb"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "cocoa"
 version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -527,6 +536,7 @@ dependencies = [
  "gelatin 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static",
  "lexical-sort",
+ "libavif-image",
  "open",
  "rand 0.7.3",
  "serde",
@@ -870,6 +880,35 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14983e5d0cb68ae7983de223b8f640548cb55a34cb6ec5f1a7137bb5731ecc32"
 dependencies = [
  "any_ascii",
+]
+
+[[package]]
+name = "libavif"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ae7f77ae177da36de0b27e61a6cdcca9cce241c68f1da7393074459bdb5e059"
+dependencies = [
+ "libavif-sys",
+]
+
+[[package]]
+name = "libavif-image"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a61173a948aeca588882ec3a654176324d5859430a766b7d4e311be333b791e6"
+dependencies = [
+ "image",
+ "libavif",
+]
+
+[[package]]
+name = "libavif-sys"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7cfdcf29227e8588fa78d58dfce6d40230d8b3f3dafac04e78af19c808ede6bb"
+dependencies = [
+ "cmake",
+ "libc",
 ]
 
 [[package]]
