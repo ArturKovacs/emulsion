@@ -35,21 +35,33 @@ use self::errors::*;
 pub static FOCUSED_REQUEST_ID: AtomicU32 = AtomicU32::new(0); // The first request usually
 pub const NO_FOCUSED_REQUEST: u32 = std::u32::MAX;
 
+pub enum ImgFormat {
+	Image(ImageFormat),
+	#[cfg(feature = "avif")]
+	Avif,
+}
+
 /// Detects the format of an image file. It looks at the first 512 bytes;
 /// if that fails, it uses the file ending.
-pub fn detect_format(path: &Path) -> Result<ImageFormat> {
+pub fn detect_format(path: &Path) -> Result<ImgFormat> {
 	let mut file = fs::File::open(path)?;
 	let mut file_start_bytes = [0; 512];
 
 	// Try to detect the format from the first 512 bytes
 	if file.read_exact(&mut file_start_bytes).is_ok() {
+		#[cfg(feature = "avif")]
+		{
+			if libavif_image::is_avif(&file_start_bytes) {
+				return Ok(ImgFormat::Avif);
+			}
+		}
 		if let Ok(format) = image::guess_format(&file_start_bytes) {
-			return Ok(format);
+			return Ok(ImgFormat::Image(format));
 		}
 	}
 
 	// If that didn't work, try to detect the format from the file ending
-	Ok(ImageFormat::from_path(path)?)
+	Ok(ImgFormat::Image(ImageFormat::from_path(path)?))
 }
 
 pub fn load_image(path: &Path, image_format: ImageFormat) -> Result<image::RgbaImage> {
@@ -113,6 +125,8 @@ pub fn is_file_supported(filename: &Path) -> bool {
 				| "bmp" | "ico" | "hdr" | "pbm" | "pam" | "ppm" | "pgm" => {
 					return true;
 				}
+				#[cfg(feature = "avif")]
+				"avif" => return true,
 				_ => (),
 			}
 		}
@@ -221,29 +235,45 @@ impl ImageLoader {
 			let image_format = detect_format(&request.path)?;
 			img_sender.send(LoadResult::Start { req_id: request.req_id, metadata }).unwrap();
 
-			if image_format == ImageFormat::Gif {
-				let frames = load_gif(&request.path, request.req_id)?;
-				for frame in frames {
-					img_sender.send(frame?).unwrap();
-				}
-			} else if image_format == ImageFormat::Png {
-				let file = fs::File::open(&request.path)?;
-				let decoder = PngDecoder::new(file)?;
-				if decoder.is_apng() {
-					for frame in load_animation(request.req_id, decoder.apng())? {
+			match image_format {
+				ImgFormat::Image(ImageFormat::Gif) => {
+					let frames = load_gif(&request.path, request.req_id)?;
+					for frame in frames {
 						img_sender.send(frame?).unwrap();
 					}
-				} else {
+				}
+				ImgFormat::Image(ImageFormat::Png) => {
+					let file = fs::File::open(&request.path)?;
+					let decoder = PngDecoder::new(file)?;
+					if decoder.is_apng() {
+						for frame in load_animation(request.req_id, decoder.apng())? {
+							img_sender.send(frame?).unwrap();
+						}
+					} else {
+						let image = load_image(&request.path, ImageFormat::Png)?;
+						img_sender
+							.send(LoadResult::Frame {
+								req_id: request.req_id,
+								image,
+								delay_nano: 0,
+							})
+							.unwrap();
+					}
+				}
+				ImgFormat::Image(image_format) => {
 					let image = load_image(&request.path, image_format)?;
 					img_sender
 						.send(LoadResult::Frame { req_id: request.req_id, image, delay_nano: 0 })
 						.unwrap();
 				}
-			} else {
-				let image = load_image(&request.path, image_format)?;
-				img_sender
-					.send(LoadResult::Frame { req_id: request.req_id, image, delay_nano: 0 })
-					.unwrap();
+				#[cfg(feature = "avif")]
+				ImgFormat::Avif => {
+					let buf = fs::read(&request.path)?;
+					let image = libavif_image::read(&buf)?.to_rgba();
+					img_sender
+						.send(LoadResult::Frame { req_id: request.req_id, image, delay_nano: 0 })
+						.unwrap();
+				}
 			}
 			Ok(())
 		}

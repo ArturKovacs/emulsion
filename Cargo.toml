@@ -24,6 +24,7 @@ lto = true
 [features]
 default = []
 networking = ["ureq"]
+avif = ["libavif-image"]
 
 [package.metadata.bundle]
 name = "Emulsion"
@@ -53,3 +54,4 @@ rand = "0.7"
 lexical-sort = "0.3"
 trash = "1.0"
 clap = { version = "2.33", default-features = false }
+libavif-image = { version = "0.2", optional = true }
