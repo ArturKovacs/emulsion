@@ -762,7 +762,13 @@ fn get_file_name_and_parent(path: &Path) -> Result<(OsString, PathBuf)> {
 		None => bail!("Could not get file name from path {:?}", path),
 	};
 	let parent = match path.parent() {
-		Some(p) => p.canonicalize()?,
+		Some(p) => {
+			if p == Path::new("") {
+				Path::new(".").canonicalize()?
+			} else {
+				p.canonicalize()?
+			}
+		}
 		None => {
 			let mut path = path.canonicalize()?;
 			if !path.pop() {
