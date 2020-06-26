@@ -116,11 +116,16 @@ impl PictureWidgetData {
 	fn zoom_image(&mut self, anchor: LogicalVector, mut image_texel_size: f32) {
 		if (image_texel_size - 1.0).abs() < 0.01 {
 			image_texel_size = 1.0;
+		} else if image_texel_size < 0.0001 {
+			image_texel_size = 0.0001;
+		} else if image_texel_size > 10_000.0 {
+			image_texel_size = 10_000.0;
 		}
 		self.img_pos = (image_texel_size / self.img_texel_size) * (self.img_pos - anchor) + anchor;
 		self.img_texel_size = image_texel_size;
 		self.scaling = ScalingMode::Fixed;
 		self.update_scaling_buttons();
+		self.set_bounds();
 		self.render_validity.invalidate();
 	}
 
@@ -184,6 +189,33 @@ impl PictureWidgetData {
 		self.scaling = if stretch { ScalingMode::FitStretch } else { ScalingMode::FitMin };
 		self.update_scaling_buttons();
 		self.render_validity.invalidate();
+	}
+
+	/// Ensures that the image is within the widget, or at least touches an edge of the widget
+	fn set_bounds(&mut self) {
+		if self.scaling == ScalingMode::Fixed {
+			if let Some(texture) = self.get_texture() {
+				let img_w = texture.width() as f32 * self.img_texel_size;
+				let img_h = texture.height() as f32 * self.img_texel_size;
+
+				let widget_size = self.drawn_bounds.size.vec;
+				let img_pos = self.img_pos.vec;
+
+				if img_pos.x < -img_w / 2.0 {
+					self.img_pos.vec.x = -img_w / 2.0;
+				}
+				if img_pos.y < -img_h / 2.0 {
+					self.img_pos.vec.y = -img_h / 2.0;
+				}
+
+				if img_pos.x > widget_size.x + img_w / 2.0 {
+					self.img_pos.vec.x = (widget_size.x + img_w / 2.0).ceil();
+				}
+				if img_pos.y > widget_size.y + img_h / 2.0 {
+					self.img_pos.vec.y = (widget_size.y + img_h / 2.0).ceil();
+				}
+			}
+		}
 	}
 
 	fn update_scaling_buttons(&mut self) {
@@ -513,6 +545,7 @@ impl Widget for PictureWidget {
 					borrowed.scaling = ScalingMode::Fixed;
 					borrowed.update_scaling_buttons();
 					borrowed.img_pos += delta;
+					borrowed.set_bounds();
 					borrowed.render_validity.invalidate();
 				}
 				borrowed.last_mouse_pos = event.cursor_pos;
