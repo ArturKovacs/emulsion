@@ -25,6 +25,9 @@ use crate::{
 	playback_manager::*,
 };
 
+const MIN_ZOOM_FACTOR: f32 = 0.0001;
+const MAX_ZOOM_FACTOR: f32 = 10000.0;
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ScalingMode {
 	Fixed,
@@ -116,10 +119,10 @@ impl PictureWidgetData {
 	fn zoom_image(&mut self, anchor: LogicalVector, mut image_texel_size: f32) {
 		if (image_texel_size - 1.0).abs() < 0.01 {
 			image_texel_size = 1.0;
-		} else if image_texel_size < 0.0001 {
-			image_texel_size = 0.0001;
-		} else if image_texel_size > 10_000.0 {
-			image_texel_size = 10_000.0;
+		} else if image_texel_size < MIN_ZOOM_FACTOR {
+			image_texel_size = MIN_ZOOM_FACTOR;
+		} else if image_texel_size > MAX_ZOOM_FACTOR {
+			image_texel_size = MAX_ZOOM_FACTOR;
 		}
 		self.img_pos = (image_texel_size / self.img_texel_size) * (self.img_pos - anchor) + anchor;
 		self.img_texel_size = image_texel_size;
