@@ -128,7 +128,6 @@ impl PictureWidgetData {
 		self.img_texel_size = image_texel_size;
 		self.scaling = ScalingMode::Fixed;
 		self.update_scaling_buttons();
-		self.set_bounds();
 		self.render_validity.invalidate();
 	}
 
@@ -137,6 +136,7 @@ impl PictureWidgetData {
 			ScalingMode::Fixed => {
 				let center_offset = (self.drawn_bounds.size - self.prev_draw_size) * 0.5f32;
 				self.img_pos += center_offset;
+				self.apply_img_bounds(dpi_scale);
 			}
 			ScalingMode::FitStretch => {
 				self.fit_image_to_panel(display, dpi_scale, true);
@@ -195,28 +195,28 @@ impl PictureWidgetData {
 	}
 
 	/// Ensures that the image is within the widget, or at least touches an edge of the widget
-	fn set_bounds(&mut self) {
-		if self.scaling == ScalingMode::Fixed {
-			if let Some(texture) = self.get_texture() {
-				let img_w = texture.width() as f32 * self.img_texel_size;
-				let img_h = texture.height() as f32 * self.img_texel_size;
+	fn apply_img_bounds(&mut self, dpi_scale: f32) {
+		if let Some(texture) = self.get_texture() {
+			let img_phys_w = texture.width() as f32 * self.img_texel_size;
+			let img_phys_h = texture.height() as f32 * self.img_texel_size;
+			let img_w = img_phys_w / dpi_scale;
+			let img_h = img_phys_h / dpi_scale;
 
-				let widget_size = self.drawn_bounds.size.vec;
-				let img_pos = self.img_pos.vec;
+			let widget_size = self.drawn_bounds.size.vec;
+			let img_pos = self.img_pos.vec;
 
-				if img_pos.x < -img_w / 2.0 {
-					self.img_pos.vec.x = -img_w / 2.0;
-				}
-				if img_pos.y < -img_h / 2.0 {
-					self.img_pos.vec.y = -img_h / 2.0;
-				}
+			if img_pos.x < -img_w / 2.0 {
+				self.img_pos.vec.x = -img_w / 2.0;
+			}
+			if img_pos.y < -img_h / 2.0 {
+				self.img_pos.vec.y = -img_h / 2.0;
+			}
 
-				if img_pos.x > widget_size.x + img_w / 2.0 {
-					self.img_pos.vec.x = (widget_size.x + img_w / 2.0).ceil();
-				}
-				if img_pos.y > widget_size.y + img_h / 2.0 {
-					self.img_pos.vec.y = (widget_size.y + img_h / 2.0).ceil();
-				}
+			if img_pos.x > widget_size.x + img_w / 2.0 {
+				self.img_pos.vec.x = (widget_size.x + img_w / 2.0).ceil();
+			}
+			if img_pos.y > widget_size.y + img_h / 2.0 {
+				self.img_pos.vec.y = (widget_size.y + img_h / 2.0).ceil();
 			}
 		}
 	}
@@ -548,7 +548,6 @@ impl Widget for PictureWidget {
 					borrowed.scaling = ScalingMode::Fixed;
 					borrowed.update_scaling_buttons();
 					borrowed.img_pos += delta;
-					borrowed.set_bounds();
 					borrowed.render_validity.invalidate();
 				}
 				borrowed.last_mouse_pos = event.cursor_pos;
