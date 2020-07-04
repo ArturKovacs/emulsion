@@ -22,6 +22,7 @@ use crate::utils::{virtual_keycode_is_char, virtual_keycode_to_string};
 use crate::{
 	bottom_bar::BottomBar,
 	configuration::{Cache, Configuration},
+	help_screen::HelpScreen,
 	playback_manager::*,
 };
 
@@ -70,6 +71,7 @@ struct PictureWidgetData {
 	first_draw: bool,
 	next_update: NextUpdate,
 	bottom_bar: Rc<BottomBar>,
+	left_to_pan_hint: Rc<HelpScreen>,
 	window: Weak<Window>,
 }
 impl WidgetData for PictureWidgetData {
@@ -234,6 +236,7 @@ impl PictureWidget {
 		display: &Display,
 		window: &Rc<Window>,
 		bottom_bar: Rc<BottomBar>,
+		left_to_pan_hint: Rc<HelpScreen>,
 		configuration: Rc<RefCell<Configuration>>,
 		cache: Arc<Mutex<Cache>>,
 	) -> PictureWidget {
@@ -283,6 +286,7 @@ impl PictureWidget {
 			first_draw: true,
 			next_update: NextUpdate::Latest,
 			bottom_bar,
+			left_to_pan_hint,
 			window: Rc::downgrade(window),
 		};
 		data.update_scaling_buttons();
@@ -583,7 +587,9 @@ impl Widget for PictureWidget {
 					borrowed.render_validity.invalidate();
 				}
 				MouseButton::Right => {
-					//TODO: show image telling user to use left click for panning.
+					let mut borrowed = self.data.borrow_mut();
+					let pressed = state == ElementState::Pressed;
+					borrowed.left_to_pan_hint.set_visible(pressed);
 				}
 				_ => {}
 			},
