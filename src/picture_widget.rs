@@ -555,34 +555,35 @@ impl Widget for PictureWidget {
 			EventKind::MouseButton { state, button, .. } => match button {
 				MouseButton::Left => {
 					let mut borrowed = self.data.borrow_mut();
-					if state == ElementState::Pressed && borrowed.hover {
-						let now = Instant::now();
-						let duration_since_last_click =
-							now.duration_since(borrowed.last_click_time);
-						borrowed.last_click_time = now;
-						if duration_since_last_click < Duration::from_millis(250) {
-							match borrowed.window.upgrade() {
-								Some(window) => {
-									let fullscreen = !window.fullscreen();
-									window.set_fullscreen(fullscreen);
-									borrowed.bottom_bar.set_visible(!fullscreen);
+					if state == ElementState::Pressed {
+						if borrowed.hover {
+							borrowed.click = true;
+							borrowed.panning = true
+						}
+					} else {
+						borrowed.panning = false;
+						borrowed.click = false;
+						if borrowed.hover {
+							let now = Instant::now();
+							let duration_since_last_click =
+								now.duration_since(borrowed.last_click_time);
+							borrowed.last_click_time = now;
+							if duration_since_last_click < Duration::from_millis(250) {
+								match borrowed.window.upgrade() {
+									Some(window) => {
+										let fullscreen = !window.fullscreen();
+										window.set_fullscreen(fullscreen);
+										borrowed.bottom_bar.set_visible(!fullscreen);
+									}
+									None => unreachable!(),
 								}
-								None => unreachable!(),
 							}
 						}
 					}
 					borrowed.render_validity.invalidate();
 				}
 				MouseButton::Right => {
-					let mut borrowed = self.data.borrow_mut();
-					if state == ElementState::Pressed {
-						borrowed.click = borrowed.hover;
-						borrowed.panning = borrowed.hover;
-					} else {
-						borrowed.panning = false;
-						borrowed.click = false;
-					}
-					borrowed.render_validity.invalidate();
+					//TODO: show image telling user to use left click for panning.
 				}
 				_ => {}
 			},
