@@ -22,6 +22,7 @@ use crate::utils::{virtual_keycode_is_char, virtual_keycode_to_string};
 use crate::{
 	bottom_bar::BottomBar,
 	configuration::{Cache, Configuration},
+	help_screen::HelpScreen,
 	playback_manager::*,
 };
 
@@ -70,6 +71,7 @@ struct PictureWidgetData {
 	first_draw: bool,
 	next_update: NextUpdate,
 	bottom_bar: Rc<BottomBar>,
+	left_to_pan_hint: Rc<HelpScreen>,
 	window: Weak<Window>,
 }
 impl WidgetData for PictureWidgetData {
@@ -234,6 +236,7 @@ impl PictureWidget {
 		display: &Display,
 		window: &Rc<Window>,
 		bottom_bar: Rc<BottomBar>,
+		left_to_pan_hint: Rc<HelpScreen>,
 		configuration: Rc<RefCell<Configuration>>,
 		cache: Arc<Mutex<Cache>>,
 	) -> PictureWidget {
@@ -283,6 +286,7 @@ impl PictureWidget {
 			first_draw: true,
 			next_update: NextUpdate::Latest,
 			bottom_bar,
+			left_to_pan_hint,
 			window: Rc::downgrade(window),
 		};
 		data.update_scaling_buttons();
@@ -555,19 +559,28 @@ impl Widget for PictureWidget {
 			EventKind::MouseButton { state, button, .. } => match button {
 				MouseButton::Left => {
 					let mut borrowed = self.data.borrow_mut();
-					if state == ElementState::Pressed && borrowed.hover {
-						let now = Instant::now();
-						let duration_since_last_click =
-							now.duration_since(borrowed.last_click_time);
-						borrowed.last_click_time = now;
-						if duration_since_last_click < Duration::from_millis(250) {
-							match borrowed.window.upgrade() {
-								Some(window) => {
-									let fullscreen = !window.fullscreen();
-									window.set_fullscreen(fullscreen);
-									borrowed.bottom_bar.set_visible(!fullscreen);
+					if state == ElementState::Pressed {
+						if borrowed.hover {
+							borrowed.click = true;
+							borrowed.panning = true
+						}
+					} else {
+						borrowed.panning = false;
+						borrowed.click = false;
+						if borrowed.hover {
+							let now = Instant::now();
+							let duration_since_last_click =
+								now.duration_since(borrowed.last_click_time);
+							borrowed.last_click_time = now;
+							if duration_since_last_click < Duration::from_millis(250) {
+								match borrowed.window.upgrade() {
+									Some(window) => {
+										let fullscreen = !window.fullscreen();
+										window.set_fullscreen(fullscreen);
+										borrowed.bottom_bar.set_visible(!fullscreen);
+									}
+									None => unreachable!(),
 								}
-								None => unreachable!(),
 							}
 						}
 					}
@@ -575,14 +588,8 @@ impl Widget for PictureWidget {
 				}
 				MouseButton::Right => {
 					let mut borrowed = self.data.borrow_mut();
-					if state == ElementState::Pressed {
-						borrowed.click = borrowed.hover;
-						borrowed.panning = borrowed.hover;
-					} else {
-						borrowed.panning = false;
-						borrowed.click = false;
-					}
-					borrowed.render_validity.invalidate();
+					let pressed = state == ElementState::Pressed;
+					borrowed.left_to_pan_hint.set_visible(pressed);
 				}
 				_ => {}
 			},
