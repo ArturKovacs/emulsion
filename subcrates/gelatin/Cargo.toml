@@ -15,7 +15,3 @@ cgmath = "0.17"
 image = "0.23.6"
 derive_builder = "0.9"
 glium = { version = "0.27" }
-
-# Forcing 0.22.0 to avoid running into
-# https://github.com/rust-windowing/winit/issues/1587
-winit = "=0.22.0" 
