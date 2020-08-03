@@ -33,16 +33,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Install dependencies (linux)
+      - name: Install avif build dependencies (linux)
         if: matrix.os == 'ubuntu-20.04'
         run: |
           DEBIAN_FRONTEND=noninteractive sudo apt-get update
           DEBIAN_FRONTEND=noninteractive sudo apt-get install -y ninja-build nasm meson
 
-      - name: Install dependencies (macOS)
+      - name: Install avif build dependencies (macOS)
         if: matrix.os == 'macOS-latest'
         run: |
           brew install ninja nasm meson
+
+      - name: Install avif build dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          choco install -y ninja
+          pip install meson
+          $NASM_VERSION="2.15.02"
+          $LINK="https://www.nasm.us/pub/nasm/releasebuilds/$NASM_VERSION/win64"
+          curl -LO "$LINK/nasm-$NASM_VERSION-win64.zip"
+          7z e -y "nasm-$NASM_VERSION-win64.zip" -o"C:\nasm"
+          echo "::add-path::C:\nasm"
 
       - name: Build and run tests (linux/macOS)
         if: matrix.os != 'windows-latest'
@@ -51,5 +62,7 @@ jobs:
 
       - name: Build and run tests (windows)
         if: matrix.os == 'windows-latest'
+        shell: cmd
         run: |
-          env RUSTFLAGS="-C opt-level=0" cargo test --verbose --features=networking
+          call "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
+          env RUSTFLAGS="-C opt-level=0" cargo test --verbose --all-features
