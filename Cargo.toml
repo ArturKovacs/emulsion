@@ -55,7 +55,7 @@ trash = "1.0"
 clap = { version = "2.33", default-features = false }
 
 [dependencies.libavif-image]
-version = "0.2"
+version = "0.3"
 default-features = false
 features = ["codec-dav1d"]
 optional = true
