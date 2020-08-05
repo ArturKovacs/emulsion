@@ -91,6 +91,7 @@ struct OngoingRequest {
 pub struct AnimationFrameTexture {
 	pub texture: Rc<SrgbTexture2d>,
 	pub delay_nano: u64,
+	pub orienation: f32,
 }
 
 struct CachedTexture {
@@ -539,7 +540,7 @@ impl ImageCache {
 	) -> Result<Option<AnimationFrameTexture>> {
 		use std::collections::btree_map::Entry;
 		match load_result {
-			LoadResult::Start { req_id, metadata } => {
+			LoadResult::Start { req_id, metadata, orientation } => {
 				let curr_mod_time = metadata.modified().ok();
 				if let Some(request) = self.ongoing_requests.get(&req_id) {
 					if request.cancelled {
@@ -591,7 +592,7 @@ impl ImageCache {
 				let size_estimate = get_image_size_estimate(image.width(), image.height());
 				if let Some(entry) = self.texture_cache.get_mut(&req_id) {
 					let texture = Rc::new(texture_from_image(display, image)?);
-					let anim_frame = AnimationFrameTexture { texture, delay_nano };
+					let anim_frame = AnimationFrameTexture { texture, delay_nano, orientation };
 					entry.frames.push(anim_frame.clone());
 					self.remaining_capacity -= size_estimate;
 					return Ok(Some(anim_frame));
