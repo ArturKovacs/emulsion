@@ -220,7 +220,7 @@ impl PlaybackManager {
 		self.image_player.request_load(LoadRequest::Jump(0));
 	}
 
-	pub fn image_texture(&self) -> Option<Rc<SrgbTexture2d>> {
+	pub fn image_texture(&self) -> Option<AnimationFrameTexture> {
 		self.image_player.image_texture()
 	}
 
@@ -235,7 +235,7 @@ impl PlaybackManager {
 		let new_file = self.folder_player.image_texture();
 		let mut file_changed = prev_file.is_none() != new_file.is_none();
 		if let (Some(prev), Some(new)) = (prev_file, new_file) {
-			file_changed = !Rc::ptr_eq(&prev, &new);
+			file_changed = !Rc::ptr_eq(&prev.texture, &new.texture);
 		}
 		if file_changed {
 			self.image_player.start_playback_forward();
@@ -316,8 +316,8 @@ impl<P: Playback> ImgSequencePlayer<P> {
 		self.load_request = request;
 	}
 
-	pub fn image_texture(&self) -> Option<Rc<SrgbTexture2d>> {
-		self.image_texture.clone().map(|t| t.texture)
+	pub fn image_texture(&self) -> Option<AnimationFrameTexture> {
+		self.image_texture.clone()
 	}
 
 	pub fn update_image(
