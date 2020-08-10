@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
-use gelatin::glium::{texture::SrgbTexture2d, Display};
+use gelatin::glium::Display;
 use gelatin::window::Window;
 
 use crate::image_cache::{self, AnimationFrameTexture, ImageCache};

@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use gelatin::cgmath::{Matrix4, Rad, Vector3};
 use gelatin::glium::glutin::event::{ElementState, ModifiersState, MouseButton};
-use gelatin::glium::{program, texture::SrgbTexture2d, uniform, Display, Frame, Program, Surface};
+use gelatin::glium::{program, uniform, Display, Frame, Program, Surface};
 
 use gelatin::add_common_widget_functions;
 use gelatin::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};

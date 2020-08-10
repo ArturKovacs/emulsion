@@ -127,7 +127,7 @@ fn load_animation(
 ) -> Result<impl Iterator<Item = Result<LoadResult>>> {
 	let frames = decoder.into_frames();
 
-	Ok(frames.into_iter().map(move |frame| {
+	Ok(frames.map(move |frame| {
 		Ok(frame.map(|frame| {
 			let (numerator_ms, denom_ms) = frame.delay().numer_denom_ms();
 			let numerator_nano = numerator_ms as u64 * 1_000_000;
@@ -337,7 +337,12 @@ impl ImageLoader {
 					let buf = fs::read(&request.path)?;
 					let image = libavif_image::read(&buf)?.to_rgba();
 					img_sender
-						.send(LoadResult::Frame { req_id: request.req_id, image, delay_nano: 0 })
+						.send(LoadResult::Frame {
+							req_id: request.req_id,
+							image,
+							delay_nano: 0,
+							angle,
+						})
 						.unwrap();
 				}
 			}
