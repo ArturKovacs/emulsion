@@ -22,6 +22,7 @@ pub mod errors {
 			Io(io::Error) #[doc = "Error during IO"];
 			TextureCreationError(texture::TextureCreationError);
 			ImageLoadError(image::ImageError);
+			ExifError(exif::Error);
 		}
 	}
 }
@@ -64,6 +65,50 @@ pub fn detect_format(path: &Path) -> Result<ImgFormat> {
 	Ok(ImgFormat::Image(ImageFormat::from_path(path)?))
 }
 
+fn detect_orientation(path: &Path) -> Result<f32> {
+	let file = std::fs::File::open(path)?;
+	let mut bufreader = std::io::BufReader::new(&file);
+	let exifreader = exif::Reader::new();
+	let exif = exifreader.read_from_container(&mut bufreader)?;
+	if let Some(orientation) = exif.get_field(exif::Tag::Orientation, exif::In::PRIMARY) {
+		if let exif::Value::Short(ref shorts) = orientation.value {
+			if let Some(&exif_orientation) = shorts.get(0) {
+				use std::f32::consts::PI;
+				// According to page 30 of http://www.cipa.jp/std/documents/e/DC-008-2012_E.pdf
+				match exif_orientation {
+					1 => Ok(0.0),
+					2 => {
+						eprintln!("Image is flipped according to the exif data. This is not yet supported.");
+						Ok(0.0)
+					}
+					3 => Ok(PI),
+					4 => {
+						eprintln!("Image is flipped according to the exif data. This is not yet supported.");
+						Ok(PI)
+					}
+					5 => {
+						eprintln!("Image is flipped according to the exif data. This is not yet supported.");
+						Ok(PI * 0.5)
+					}
+					6 => Ok(PI * -0.5),
+					7 => {
+						eprintln!("Image is flipped according to the exif data. This is not yet supported.");
+						Ok(PI * -0.5)
+					}
+					8 => Ok(PI * 0.5),
+					_ => unreachable!(),
+				}
+			} else {
+				Ok(0.0)
+			}
+		} else {
+			Err("EXIF orientation was expected to be of type 'short' but it wasn't".into())
+		}
+	} else {
+		Ok(0.0)
+	}
+}
+
 pub fn load_image(path: &Path, image_format: ImageFormat) -> Result<image::RgbaImage> {
 	let reader = BufReader::new(fs::File::open(path)?);
 	Ok(image::load(reader, image_format)?.to_rgba())
@@ -82,14 +127,14 @@ fn load_animation(
 ) -> Result<impl Iterator<Item = Result<LoadResult>>> {
 	let frames = decoder.into_frames();
 
-	Ok(frames.into_iter().map(move |frame| {
+	Ok(frames.map(move |frame| {
 		Ok(frame.map(|frame| {
 			let (numerator_ms, denom_ms) = frame.delay().numer_denom_ms();
 			let numerator_nano = numerator_ms as u64 * 1_000_000;
 			let denom_nano = denom_ms as u64;
 			let delay_nano = numerator_nano / denom_nano;
 			let image = frame.into_buffer();
-			LoadResult::Frame { req_id, image, delay_nano }
+			LoadResult::Frame { req_id, image, delay_nano, angle: 0.0 }
 		})?)
 	}))
 }
@@ -140,10 +185,24 @@ pub struct LoadRequest {
 }
 
 pub enum LoadResult {
-	Start { req_id: u32, metadata: fs::Metadata },
-	Frame { req_id: u32, image: image::RgbaImage, delay_nano: u64 },
-	Done { req_id: u32 },
-	Failed { req_id: u32 },
+	Start {
+		req_id: u32,
+		metadata: fs::Metadata,
+	},
+	Frame {
+		req_id: u32,
+		image: image::RgbaImage,
+		delay_nano: u64,
+
+		/// the angle of the orientation in radians (right handed rotation)
+		angle: f32,
+	},
+	Done {
+		req_id: u32,
+	},
+	Failed {
+		req_id: u32,
+	},
 }
 
 impl LoadResult {
@@ -233,6 +292,7 @@ impl ImageLoader {
 		fn try_load_and_send(img_sender: &Sender<LoadResult>, request: &LoadRequest) -> Result<()> {
 			let metadata = fs::metadata(&request.path)?;
 			let image_format = detect_format(&request.path)?;
+			let angle = detect_orientation(&request.path)?;
 			img_sender.send(LoadResult::Start { req_id: request.req_id, metadata }).unwrap();
 
 			match image_format {
@@ -256,6 +316,7 @@ impl ImageLoader {
 								req_id: request.req_id,
 								image,
 								delay_nano: 0,
+								angle,
 							})
 							.unwrap();
 					}
@@ -263,7 +324,12 @@ impl ImageLoader {
 				ImgFormat::Image(image_format) => {
 					let image = load_image(&request.path, image_format)?;
 					img_sender
-						.send(LoadResult::Frame { req_id: request.req_id, image, delay_nano: 0 })
+						.send(LoadResult::Frame {
+							req_id: request.req_id,
+							image,
+							delay_nano: 0,
+							angle,
+						})
 						.unwrap();
 				}
 				#[cfg(feature = "avif")]
@@ -271,7 +337,12 @@ impl ImageLoader {
 					let buf = fs::read(&request.path)?;
 					let image = libavif_image::read(&buf)?.to_rgba();
 					img_sender
-						.send(LoadResult::Frame { req_id: request.req_id, image, delay_nano: 0 })
+						.send(LoadResult::Frame {
+							req_id: request.req_id,
+							image,
+							delay_nano: 0,
+							angle,
+						})
 						.unwrap();
 				}
 			}

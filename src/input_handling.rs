@@ -76,7 +76,7 @@ pub fn execute_triggered_commands(
 		var_map.insert("${img}", img_path);
 		var_map.insert("${folder}", folder_path);
 		for command in commands.iter() {
-			if keys_triggered(&command.input, input_key.as_ref(), modifiers) {
+			if keys_triggered(&command.input, input_key, modifiers) {
 				let mut cmd = Command::new(&command.program);
 				if let Some(ref args) = command.args {
 					cmd.args(args.iter().map(|arg| substitute_command_parameters(arg, &var_map)));

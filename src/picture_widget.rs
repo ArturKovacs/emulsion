@@ -4,9 +4,9 @@ use std::rc::{Rc, Weak};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use gelatin::cgmath::{Matrix4, Vector3};
+use gelatin::cgmath::{Matrix4, Rad, Vector3};
 use gelatin::glium::glutin::event::{ElementState, ModifiersState, MouseButton};
-use gelatin::glium::{program, texture::SrgbTexture2d, uniform, Display, Frame, Program, Surface};
+use gelatin::glium::{program, uniform, Display, Frame, Program, Surface};
 
 use gelatin::add_common_widget_functions;
 use gelatin::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
@@ -23,6 +23,7 @@ use crate::{
 	bottom_bar::BottomBar,
 	configuration::{Cache, Configuration},
 	help_screen::HelpScreen,
+	image_cache::AnimationFrameTexture,
 	playback_manager::*,
 };
 
@@ -90,11 +91,11 @@ impl PictureWidgetData {
 		let size = self.drawn_bounds.size.vec;
 		if let Some(texture) = self.get_texture() {
 			let panel_aspect = size.x / size.y;
-			let img_phys_w = texture.width() as f32;
-			let img_pyhs_h = texture.height() as f32;
+			let img_phys_w = texture.texture.width() as f32;
+			let img_pyhs_h = texture.texture.height() as f32;
 			let img_aspect = img_phys_w / img_pyhs_h;
 
-			let texel_size_to_fit_width = size.x / texture.width() as f32;
+			let texel_size_to_fit_width = size.x / texture.texture.width() as f32;
 			let img_texel_size = if img_aspect > panel_aspect {
 				// The image is relatively wider than the panel
 				texel_size_to_fit_width
@@ -175,7 +176,7 @@ impl PictureWidgetData {
 		display.gl_window().window().set_title(title.as_str());
 	}
 
-	fn get_texture(&self) -> Option<Rc<SrgbTexture2d>> {
+	fn get_texture(&self) -> Option<AnimationFrameTexture> {
 		self.playback_manager.image_texture()
 	}
 
@@ -199,8 +200,8 @@ impl PictureWidgetData {
 	/// Ensures that the image is within the widget, or at least touches an edge of the widget
 	fn apply_img_bounds(&mut self, dpi_scale: f32) {
 		if let Some(texture) = self.get_texture() {
-			let img_phys_w = texture.width() as f32 * self.img_texel_size;
-			let img_phys_h = texture.height() as f32 * self.img_texel_size;
+			let img_phys_w = texture.texture.width() as f32 * self.img_texel_size;
+			let img_phys_h = texture.texture.height() as f32 * self.img_texel_size;
 			let img_w = img_phys_w / dpi_scale;
 			let img_h = img_phys_h / dpi_scale;
 
@@ -441,7 +442,7 @@ impl Widget for PictureWidget {
 			data.render_validity.invalidate();
 		} else {
 			if let (Some(prev_tex), Some(new_tex)) = (prev_texture, new_texture) {
-				if !Rc::ptr_eq(&prev_tex, &new_tex) {
+				if !Rc::ptr_eq(&prev_tex.texture, &new_tex.texture) {
 					data.render_validity.invalidate();
 				}
 			}
@@ -472,13 +473,14 @@ impl Widget for PictureWidget {
 			};
 
 			if let Some(texture) = texture {
-				let img_w = texture.width() as f32;
-				let img_h = texture.height() as f32;
+				let img_w = texture.texture.width() as f32;
+				let img_h = texture.texture.height() as f32;
 
 				let img_height_over_width = img_h / img_w;
 				let image_display_width = data.img_texel_size * img_w / context.dpi_scale_factor;
 
 				// Model tranform
+
 				let image_display_height = image_display_width * img_height_over_width;
 				let img_pyhs_pos = data.img_pos.vec * context.dpi_scale_factor;
 				let img_phys_siz;
@@ -493,13 +495,29 @@ impl Widget for PictureWidget {
 					(img_pyhs_pos.y - img_phys_siz.vec.y * 0.5).floor() / context.dpi_scale_factor;
 				let adjusted_w = img_phys_siz.vec.x / context.dpi_scale_factor;
 				let adjusted_h = img_phys_siz.vec.y / context.dpi_scale_factor;
-				let transform = Matrix4::from_nonuniform_scale(adjusted_w, adjusted_h, 1.0);
-				let transform =
-					Matrix4::from_translation(Vector3::new(corner_x, corner_y, 0.0)) * transform;
+				let scaling = Matrix4::from_nonuniform_scale(adjusted_w, adjusted_h, 1.0);
+				let orientation;
+				{
+					let to_center = Matrix4::from_translation(Vector3::new(
+						-0.5 * adjusted_w,
+						-0.5 * adjusted_h,
+						0.0,
+					));
+					let rotate = Matrix4::from_angle_z(Rad(-texture.angle));
+					let to_corner = Matrix4::from_translation(Vector3::new(
+						0.5 * adjusted_w,
+						0.5 * adjusted_h,
+						0.0,
+					));
+					orientation = to_corner * rotate * to_center;
+				}
+				let translation = Matrix4::from_translation(Vector3::new(corner_x, corner_y, 0.0));
+				let transform = translation * orientation * scaling;
 				// Projection tranform
 				let transform = projection_transform * transform;
 
 				let sampler = texture
+					.texture
 					.sampled()
 					.minify_filter(
 						gelatin::glium::uniforms::MinifySamplerFilter::LinearMipmapLinear,
@@ -587,7 +605,7 @@ impl Widget for PictureWidget {
 					borrowed.render_validity.invalidate();
 				}
 				MouseButton::Right => {
-					let mut borrowed = self.data.borrow_mut();
+					let borrowed = self.data.borrow();
 					let pressed = state == ElementState::Pressed;
 					borrowed.left_to_pan_hint.set_visible(pressed);
 				}

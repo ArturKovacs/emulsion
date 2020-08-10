@@ -91,6 +91,7 @@ struct OngoingRequest {
 pub struct AnimationFrameTexture {
 	pub texture: Rc<SrgbTexture2d>,
 	pub delay_nano: u64,
+	pub angle: f32,
 }
 
 struct CachedTexture {
@@ -580,7 +581,7 @@ impl ImageCache {
 				}
 				Ok(None)
 			}
-			LoadResult::Frame { req_id, image, delay_nano } => {
+			LoadResult::Frame { req_id, image, delay_nano, angle } => {
 				if let Some(request) = self.ongoing_requests.get(&req_id) {
 					if request.cancelled {
 						return Ok(None);
@@ -591,7 +592,7 @@ impl ImageCache {
 				let size_estimate = get_image_size_estimate(image.width(), image.height());
 				if let Some(entry) = self.texture_cache.get_mut(&req_id) {
 					let texture = Rc::new(texture_from_image(display, image)?);
-					let anim_frame = AnimationFrameTexture { texture, delay_nano };
+					let anim_frame = AnimationFrameTexture { texture, delay_nano, angle };
 					entry.frames.push(anim_frame.clone());
 					self.remaining_capacity -= size_estimate;
 					return Ok(Some(anim_frame));
