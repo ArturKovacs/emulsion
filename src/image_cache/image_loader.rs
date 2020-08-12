@@ -292,7 +292,7 @@ impl ImageLoader {
 		fn try_load_and_send(img_sender: &Sender<LoadResult>, request: &LoadRequest) -> Result<()> {
 			let metadata = fs::metadata(&request.path)?;
 			let image_format = detect_format(&request.path)?;
-			let angle = detect_orientation(&request.path)?;
+			let angle = detect_orientation(&request.path).unwrap_or(0.0);
 			img_sender.send(LoadResult::Start { req_id: request.req_id, metadata }).unwrap();
 
 			match image_format {
