@@ -65,6 +65,7 @@ jobs:
         cargo build --release --features=networking,avif
     - name: Copy executable to distributable folder
       working-directory: ./distribution/windows/
+      shell: cmd
       run: |
         mkdir program
         copy /y ..\..\target\release\emulsion.exe program\emulsion.exe
@@ -118,7 +119,7 @@ jobs:
 
   linux:
     needs: create_release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     env:
       INSTALLER_NAME: ${{ format('Emulsion-Linux.deb-{0}.deb', needs.create_release.outputs.version) }}
     steps:
