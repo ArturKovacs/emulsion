@@ -1,7 +1,7 @@
 name: Draft New Release with Distributables
 
 on:
-  workflow_dispatch
+  workflow_dispatch:
   push:
     # Sequence of patterns matched against refs/tags
     tags:
