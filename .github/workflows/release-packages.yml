@@ -48,9 +48,25 @@ jobs:
     - name: Fetch Prerequisites
       working-directory: ./distribution/windows/prerequisites
       run: (New-Object System.Net.WebClient).DownloadFile('https://aka.ms/vs/16/release/vc_redist.x64.exe', 'vc_redist.x64.exe')
+    - name: Install avif build dependencies (Windows)
+      run: |
+        choco install -y ninja
+        pip install meson
+        $NASM_VERSION="2.15.02"
+        $LINK="https://www.nasm.us/pub/nasm/releasebuilds/$NASM_VERSION/win64"
+        curl -LO "$LINK/nasm-$NASM_VERSION-win64.zip"
+        7z e -y "nasm-$NASM_VERSION-win64.zip" -o"C:\nasm"
+        echo "::add-path::C:\nasm"
     - name: Build executable
+      shell: cmd
+      run: |
+        call "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
+        cargo build --release --features=networking,avif
+    - name: Copy executable to distributable folder
       working-directory: ./distribution/windows/
-      run: ./update_files.bat
+      run: |
+        mkdir program
+        copy /y ..\..\target\release\emulsion.exe program\emulsion.exe
     - name: Create installer
       working-directory: ./distribution/windows/
       run: |
@@ -77,8 +93,11 @@ jobs:
       uses: actions/checkout@v2
     - name: Install cargo bundle
       run: cargo install cargo-bundle
+    - name: Install avif build dependencies (macOS)
+      run: |
+        brew install ninja nasm meson
     - name: Create osx app
-      run: cargo bundle --release
+      run: cargo bundle --release --features=avif
     - name: Install create-dmg
       run: npm install --global create-dmg
     - name: Create .dmg file
@@ -106,8 +125,12 @@ jobs:
       uses: actions/checkout@v2
     - name: Install cargo bundle
       run: cargo install cargo-bundle
+    - name: Install avif build dependencies (linux)
+      run: |
+        DEBIAN_FRONTEND=noninteractive sudo apt-get update
+        DEBIAN_FRONTEND=noninteractive sudo apt-get install -y ninja-build nasm meson
     - name: Create deb package
-      run: cargo bundle --release
+      run: cargo bundle --release --features=avif
     - name: Rename .deb
       run: mv target/release/bundle/deb/*.deb $INSTALLER_NAME
     - name: Upload Release Asset
