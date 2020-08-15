@@ -44,6 +44,7 @@ linux_mime_types = [
 	"image/webp",
 	"image/tiff",
 	"image/bmp",
+	"image/avif",
 	"image/x-png",
 	"image/x-tga",
 	"image/x-targa",
