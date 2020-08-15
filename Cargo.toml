@@ -34,6 +34,28 @@ resources = ["LICENSE.txt"]
 short_description = "A lightweight and minimalistic image viewer"
 copyright = "Copyright (c) 2020 The Emulsion Contributors"
 linux_exec_args = "%f"
+linux_mime_types = [
+    "image/jpeg",
+	"image/jpg",
+	"image/pjpeg",
+	"image/png",
+	"image/apng",
+	"image/gif",
+	"image/webp",
+	"image/tiff",
+	"image/bmp",
+	"image/avif",
+	"image/x-png",
+	"image/x-tga",
+	"image/x-targa",
+	"image/x-bmp",
+	"image/x-icon",
+	"image/vnd.radiance",
+	"image/x‑portable‑bitmap",
+	"image/x‑portable‑graymap",
+	"image/x‑portable‑pixmap",
+	"image/x‑portable‑anymap"
+]
 
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1"
