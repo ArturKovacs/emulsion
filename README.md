@@ -8,9 +8,11 @@ To build the software, obtain the latest stable release of [Rust](https://www.ru
 
 Contribution is welcome. Feel free to post feature requests, bug reports, and make pull requests.
 
-## Notes on Networking
+## Notes on cargo features
 
-When installing Emulsion through the Windows installer, Emulsion will have networking enabled and will by default check for updates. However none of the other versions have networking and neither does default feature-set. This also means that Emulsion will not have networking dependent capabilities when invoking
+All packages on the website come with avif support; however it is not a default feature as the dependecies are not trivial to set up. If you are bulding from source (eg using `cargo install`) and would like emulsion to open avif files, I recommend taking a look at the [release workflow](.github/workflows/release-packages.yml) for steps to install the avif development dependencies.
+
+When installing Emulsion through the Windows installer, Emulsion will have networking enabled and will by default check for updates. However none of the other versions have networking and neither does the default feature-set. This also means that Emulsion will not have networking dependent capabilities when invoking
 ```
 cargo install emulsion
 ```
