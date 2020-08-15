@@ -126,6 +126,7 @@ Section /o "Associate supported files" SecAssociate
     !insertmacro EmulsionRegisterExtension "bmp" "BMP Image"
     !insertmacro EmulsionRegisterExtension "gif" "GIF Image"
     !insertmacro EmulsionRegisterExtension "tga" "TGA Image"
+    !insertmacro EmulsionRegisterExtension "avif" "AVIF Image"
     !insertmacro EmulsionRegisterExtension "webp" "WEBP Image"
     !insertmacro EmulsionRegisterExtension "tif" "TIF Image"
     !insertmacro EmulsionRegisterExtension "tiff" "TIFF Image"
@@ -154,7 +155,7 @@ SectionEnd
 ;Descriptions
     ;Language strings
     LangString DESC_SecEmulsion ${LANG_ENGLISH} "The program itself."
-    LangString DESC_SecAssociate ${LANG_ENGLISH} "Associate jpg, jpeg, png, bmp, gif, tga, webp, tif, tiff, hdr, pbm, pam, ppm, and pgm files with Emulsion"
+    LangString DESC_SecAssociate ${LANG_ENGLISH} "Associate jpg, jpeg, png, bmp, gif, tga, avif, webp, tif, tiff, hdr, pbm, pam, ppm, and pgm files with Emulsion"
 
     ;Assign language strings to sections
     !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
