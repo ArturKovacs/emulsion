@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::mem;
@@ -11,8 +11,11 @@ use gelatin::glium;
 
 use glium::texture::SrgbTexture2d;
 
-mod image_loader;
+pub mod image_loader;
 use self::image_loader::*;
+
+mod pending_requests;
+use pending_requests::PendingRequests;
 
 pub mod errors {
 	use crate::image_cache::image_loader;
@@ -73,18 +76,22 @@ impl ImageDescriptor {
 	}
 }
 
-/// This struct is used in a map to determine the appropriate file when
-/// a load result comes in. (Load results identify the file with the request id only)
-/// See: `ImageCache::ongoing_requests`
-struct OngoingRequest {
-	path: PathBuf,
-	cancelled: bool,
-	// mod_time: Option<SystemTime>,
+/// The request sender function must process all prefetched requests to avoid
+/// hitting the pending request limit (MAX_PENDING_REQUESTS). The display is needed
+/// for this processing but it would be incorrect to require the dispaly for prefetch
+/// requests
+enum RequestKind<'a> {
+	NonPriority,
+	Priority { display: &'a glium::Display },
+}
 
-	// /// The index of this file within the sorted folder.
-	// /// indexing `ImageCache::dir_files` with this will return the corresponding
-	// /// file.
-	// index: usize,
+impl<'a> RequestKind<'a> {
+	pub fn priority(self) -> bool {
+		match self {
+			RequestKind::Priority { .. } => true,
+			RequestKind::NonPriority => false,
+		}
+	}
 }
 
 #[derive(Clone)]
@@ -145,10 +152,7 @@ pub struct ImageCache {
 	/// each load request
 	current_req_id: u32,
 
-	/// Keeps track of all requests that have been sent
-	/// but for which no response has been received
-	ongoing_requests: HashMap<u32, OngoingRequest>,
-	prefetched: HashMap<PathBuf, Vec<LoadResult>>,
+	pending_requests: PendingRequests,
 	texture_cache: BTreeMap<u32, CachedTexture>,
 	loader: ImageLoader,
 }
@@ -173,8 +177,7 @@ impl ImageCache {
 			curr_est_size: 1000, // 1 kb, an optimistic estimate for the image size before anything is loaded
 
 			current_req_id: 0,
-			ongoing_requests: HashMap::new(),
-			prefetched: HashMap::new(),
+			pending_requests: PendingRequests::new(),
 			texture_cache: BTreeMap::new(),
 			loader: ImageLoader::new(threads),
 		}
@@ -320,7 +323,7 @@ impl ImageCache {
 			new_file_index = 0;
 		}
 		if self.dir_path != parent {
-			self.send_request_for_index(self.current_file_idx, true);
+			self.send_request_for_index(self.current_file_idx, RequestKind::Priority { display });
 			return Err(errors::Error::from_kind(errors::ErrorKind::WaitingOnLoader));
 		}
 		let requested_frame_id = match frame_id {
@@ -408,27 +411,11 @@ impl ImageCache {
 	}
 
 	fn receive_prefetched(&mut self) {
-		use std::collections::hash_map::Entry;
 		use std::sync::mpsc::TryRecvError;
 		loop {
 			match self.loader.try_recv_prefetched() {
 				Ok(load_result) => {
-					let request;
-					if let Some(req) = self.ongoing_requests.get(&load_result.req_id()) {
-						request = req;
-					} else {
-						continue;
-					}
-					match self.prefetched.entry(request.path.clone()) {
-						Entry::Vacant(entry) => {
-							let mut result_vec = Vec::with_capacity(3);
-							result_vec.push(load_result);
-							entry.insert(result_vec);
-						}
-						Entry::Occupied(mut entry) => {
-							entry.get_mut().push(load_result);
-						}
-					}
+					self.pending_requests.add_load_result(load_result);
 				}
 				Err(TryRecvError::Disconnected) => panic!("Channel disconnected unexpectidly."),
 				Err(TryRecvError::Empty) => break,
@@ -438,18 +425,29 @@ impl ImageCache {
 
 	pub fn process_prefetched(&mut self, display: &glium::Display) -> Result<()> {
 		self.receive_prefetched();
-		// Prefetched are NOT ordered but for now this is better than nothing.
-		let first_key = self.prefetched.iter().nth(0).map(|v| v.0.clone());
-		if let Some(first_key) = first_key {
-			if let Some(result_vec) = self.prefetched.remove(&first_key) {
-				for result in result_vec {
+		let mut uploaded_one = false;
+		let req_ids = self.pending_requests.get_all_ids();
+		let mut retval = Ok(());
+		for id in req_ids {
+			if let Some(results) = self.pending_requests.take_results(id) {
+				for result in results {
 					match self.upload_to_texture(display, result) {
+						Ok(_) => uploaded_one = true,
 						// it's okay to ignore if the image falied to load here, this is just pre-fetch.
 						Err(Error(ErrorKind::FailedToLoadImage(..), ..)) => {}
-						Err(e) => return Err(e),
-						_ => {}
+						Err(e) => {
+							retval = Err(e);
+							break;
+						}
 					}
 				}
+			}
+
+			if retval.is_err() {
+				return retval;
+			}
+			if uploaded_one {
+				break;
 			}
 		}
 		Ok(())
@@ -474,9 +472,10 @@ impl ImageCache {
 		} else {
 			bail!("Index {} was not in the folder.", file_index);
 		}
+
 		// Check if it's among the prefetched, and upload it, if it is
-		if let Some(result_vec) = self.prefetched.remove(&path) {
-			for load_result in result_vec.into_iter() {
+		if let Some(results) = self.pending_requests.take_results(req_id) {
+			for load_result in results {
 				self.upload_to_texture(display, load_result)?;
 			}
 			// And just let the next blok deal with locating the appropriate frame.
@@ -515,19 +514,11 @@ impl ImageCache {
 			}
 			return Err(Error::from_kind(ErrorKind::WaitingOnLoader));
 		}
-		// Check if it's been requested
-		if let Some(img_desc) = self.dir_files.get(self.current_file_idx) {
-			let req_id = img_desc.request_id;
-			if self.ongoing_requests.contains_key(&req_id) {
-				FOCUSED_REQUEST_ID.store(req_id, Ordering::Relaxed);
-				return Err(Error::from_kind(ErrorKind::WaitingOnLoader));
-			}
-		} else {
-			// If it's not among the dir files then maybe there's no directory open
-			// or some other error occured
-			bail!("Not found in directory.");
+		if self.pending_requests.contains(&req_id) {
+			PRIORITY_REQUEST_ID.store(req_id, Ordering::SeqCst);
+			return Err(Error::from_kind(ErrorKind::WaitingOnLoader));
 		}
-		self.send_request_for_index(self.current_file_idx, true);
+		self.send_request_for_index(self.current_file_idx, RequestKind::Priority { display });
 		// If the texture is not in the cache just throw our hands in the air
 		// and tell the caller that we gotta wait for the loader to load this texture.
 		Err(Error::from_kind(ErrorKind::WaitingOnLoader))
@@ -542,8 +533,8 @@ impl ImageCache {
 		match load_result {
 			LoadResult::Start { req_id, metadata } => {
 				let curr_mod_time = metadata.modified().ok();
-				if let Some(request) = self.ongoing_requests.get(&req_id) {
-					if request.cancelled {
+				if let Some(cancelled) = self.pending_requests.cancelled(&req_id) {
+					if cancelled {
 						return Ok(None);
 					}
 				} else {
@@ -582,8 +573,8 @@ impl ImageCache {
 				Ok(None)
 			}
 			LoadResult::Frame { req_id, image, delay_nano, angle } => {
-				if let Some(request) = self.ongoing_requests.get(&req_id) {
-					if request.cancelled {
+				if let Some(cancelled) = self.pending_requests.cancelled(&req_id) {
+					if cancelled {
 						return Ok(None);
 					}
 				} else {
@@ -603,8 +594,12 @@ impl ImageCache {
 				if let Some(tex) = self.texture_cache.get_mut(&req_id) {
 					tex.fully_loaded = true;
 				}
-				FOCUSED_REQUEST_ID.compare_and_swap(req_id, NO_FOCUSED_REQUEST, Ordering::Relaxed);
-				self.ongoing_requests.remove(&req_id);
+				PRIORITY_REQUEST_ID.compare_and_swap(
+					req_id,
+					NON_EXISTENT_REQUEST_ID,
+					Ordering::SeqCst,
+				);
+				self.pending_requests.set_finished(&req_id);
 				Ok(None)
 			}
 			LoadResult::Failed { req_id } => {
@@ -612,8 +607,12 @@ impl ImageCache {
 					tex.fully_loaded = true;
 					tex.failed = true;
 				}
-				FOCUSED_REQUEST_ID.compare_and_swap(req_id, NO_FOCUSED_REQUEST, Ordering::Relaxed);
-				self.ongoing_requests.remove(&req_id);
+				PRIORITY_REQUEST_ID.compare_and_swap(
+					req_id,
+					NON_EXISTENT_REQUEST_ID,
+					Ordering::SeqCst,
+				);
+				self.pending_requests.set_finished(&req_id);
 				Err(errors::Error::from_kind(errors::ErrorKind::FailedToLoadImage(req_id)))
 			}
 		}
@@ -626,9 +625,6 @@ impl ImageCache {
 		let mut estimated_remaining_cap = self.remaining_capacity;
 
 		while estimated_remaining_cap > self.curr_est_size {
-			if self.ongoing_requests.len() >= Self::MAX_PENDING_REQUESTS {
-				break;
-			}
 			// Send a load request for the closest file not in the cache or outdated
 			index += 1;
 			if self.prefetch_at_index(index) {
@@ -640,27 +636,28 @@ impl ImageCache {
 	}
 
 	pub fn prefetch_at_index(&mut self, index: usize) -> bool {
-		if self.ongoing_requests.len() >= Self::MAX_PENDING_REQUESTS {
-			return false;
-		}
 		if self.remaining_capacity > self.curr_est_size {
-			return self.send_request_for_index(index, false);
+			return self.send_request_for_index(index, RequestKind::NonPriority);
 		}
 		false
 	}
 
 	/// This is almost identical to `prefetch_at_index` but this function
 	/// does not check the `remaining_capacity`.
-	fn send_request_for_index(&mut self, index: usize, important: bool) -> bool {
-		if self.ongoing_requests.len() >= Self::MAX_PENDING_REQUESTS {
+	fn send_request_for_index(&mut self, index: usize, kind: RequestKind) -> bool {
+		if let RequestKind::Priority { display } = kind {
+			if self.pending_requests.len() >= Self::MAX_PENDING_REQUESTS {
+				if let Err(e) = self.process_prefetched(display) {
+					eprintln!("Error while processing prefetched images:\n{}", e);
+				}
+			}
+		}
+		if self.pending_requests.len() >= Self::MAX_PENDING_REQUESTS {
 			return false;
 		}
 		if let Some(desc) = self.dir_files.get(index) {
 			let file = &desc.dir_entry;
 			let file_path = file.path();
-			if self.ongoing_requests.contains_key(&desc.request_id) {
-				return false;
-			}
 			let mut cache_enty_invalid = false;
 			if let Some(texture) = self.texture_cache.get_mut(&desc.request_id) {
 				if !texture.needs_update {
@@ -683,13 +680,16 @@ impl ImageCache {
 			if cache_enty_invalid {
 				self.texture_cache.remove(&desc.request_id);
 			}
-			let req_id = desc.request_id;
-			if important {
-				FOCUSED_REQUEST_ID.store(req_id, Ordering::Relaxed);
+			if kind.priority() {
+				PRIORITY_REQUEST_ID.store(desc.request_id, Ordering::SeqCst);
 			}
-			self.ongoing_requests
-				.insert(req_id, OngoingRequest { path: file_path.clone(), cancelled: false });
-			self.loader.send_load_request(LoadRequest { req_id, path: file_path });
+			if self.pending_requests.contains(&desc.request_id) {
+				return false;
+			}
+			let req_id = desc.request_id;
+			let request = LoadRequest { req_id, path: file_path };
+			self.pending_requests.add_request(request.clone());
+			self.loader.send_load_request(request);
 			return true;
 		}
 		false
@@ -697,12 +697,11 @@ impl ImageCache {
 
 	fn change_directory(&mut self, dir_path: &Path) -> Result<()> {
 		self.texture_cache.clear();
-		self.prefetched.clear();
 		self.remaining_capacity = self.total_capacity;
 
 		// Cancel all pending load requests
-		for (_id, request) in self.ongoing_requests.iter_mut() {
-			request.cancelled = true;
+		for (_, request) in self.pending_requests.iter_mut() {
+			request.cancel();
 		}
 
 		self.dir_path = dir_path.to_owned();
