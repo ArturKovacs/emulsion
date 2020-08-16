@@ -32,9 +32,9 @@ use self::errors::*;
 /// We want to prevent prefetch operations taking place when the target image is not yet loaded.
 /// To implement this we define a variable that is read by the loader threads and
 /// which will only carry out the request if the focused request id matches their request or
-/// if the focused is set to `NO_FOCUSED_REQUEST`
-pub static FOCUSED_REQUEST_ID: AtomicU32 = AtomicU32::new(0); // The first request usually
-pub const NO_FOCUSED_REQUEST: u32 = std::u32::MAX;
+/// if the focused is set to `NON_EXISTENT_REQUEST_ID`
+pub static PRIORITY_REQUEST_ID: AtomicU32 = AtomicU32::new(0); // The first request usually
+pub const NON_EXISTENT_REQUEST_ID: u32 = std::u32::MAX;
 
 pub enum ImgFormat {
 	Image(ImageFormat),
@@ -179,6 +179,7 @@ pub fn is_file_supported(filename: &Path) -> bool {
 	false
 }
 
+#[derive(Debug, Clone)]
 pub struct LoadRequest {
 	pub req_id: u32,
 	pub path: PathBuf,
@@ -262,15 +263,20 @@ impl ImageLoader {
 		// The size was an arbitrary choice made with the argument that this should be
 		// enough to fit enough image file info to determine the format.
 
+		//let mut DEBUG_FAIL_COUNT = 0;
 		while running.load(Ordering::Acquire) {
 			let request;
 			{
 				// It is very important that we release the mutex before starting to load the image
 				let load_request = request_recv.lock().unwrap();
-				let focused = FOCUSED_REQUEST_ID.load(Ordering::Relaxed);
+				let priority = PRIORITY_REQUEST_ID.load(Ordering::SeqCst);
 				request = load_request.recv().unwrap();
-				let focus_test_passed = focused == request.req_id || focused == NO_FOCUSED_REQUEST;
+				let focus_test_passed =
+					priority == request.req_id || priority == NON_EXISTENT_REQUEST_ID;
 				if !focus_test_passed {
+					//println!("Priority test failed, priority was {}", priority);
+					//DEBUG_FAIL_COUNT += 1;
+					//if DEBUG_FAIL_COUNT > 4 { panic!("DEBUG_FAIL_COUNT > 4"); }
 					// Just place the request neatly back to the request queue.
 					request_send.send(request).unwrap();
 					continue;
