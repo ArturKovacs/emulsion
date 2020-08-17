@@ -1,4 +1,19 @@
 
+## 5.0 on 2020-08-17
+
+### Added
+
+- AVIF support
+- Supported MIME types are now added to the `.destkop` file for the linux release; so the file manager should offer up Emulsion for any supported filetype before applications that don't support said filetype.
+
+### Changed
+
+- Panning can now be done with Left Click (instead of Right Click)
+- Now there are limits on panning and zooming to avoid getting the image "too far from the view area"
+- Some images that were shown with an incorrect orientation are now shown corrently.
+- Opening a file through the CLI in the current folder does not need a leading dot-slash (./) anymore
+- Fixed an issue where sometimes one image would get stuck preventing the user from switching to another image from the folder.
+
 ## 4.0 on 2020-06-23
 
 ### Changed
