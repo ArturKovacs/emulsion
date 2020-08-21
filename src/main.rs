@@ -52,7 +52,9 @@ mod utils;
 mod version;
 
 lazy_static! {
-	pub static ref PROJECT_DIRS: Option<ProjectDirs> = ProjectDirs::from("", "", "emulsion");
+	// The program name will be 'emulsion'
+	// (i.e. starting with a lower-case letter) on Linux
+	pub static ref PROJECT_DIRS: Option<ProjectDirs> = ProjectDirs::from("", "", "Emulsion");
 }
 
 static NEW_VERSION: &[u8] = include_bytes!("../resource/new-version-available.png");
