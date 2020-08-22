@@ -6,7 +6,9 @@ use std::time::{Duration, Instant};
 
 use gelatin::cgmath::{Matrix4, Rad, Vector3};
 use gelatin::glium::glutin::event::{ElementState, ModifiersState, MouseButton};
-use gelatin::glium::{program, uniform, Display, Frame, Program, Surface};
+use gelatin::glium::{
+	program, uniform, uniforms::MagnifySamplerFilter, Display, Frame, Program, Surface,
+};
 
 use gelatin::add_common_widget_functions;
 use gelatin::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
@@ -21,7 +23,7 @@ use crate::shaders;
 use crate::utils::{virtual_keycode_is_char, virtual_keycode_to_string};
 use crate::{
 	bottom_bar::BottomBar,
-	configuration::{Cache, Configuration},
+	configuration::{Antialias, Cache, Configuration},
 	help_screen::HelpScreen,
 	image_cache::AnimationFrameTexture,
 	playback_manager::*,
@@ -194,6 +196,23 @@ impl PictureWidgetData {
 		}
 		self.scaling = if stretch { ScalingMode::FitStretch } else { ScalingMode::FitMin };
 		self.update_scaling_buttons();
+		self.render_validity.invalidate();
+	}
+
+	pub fn toggle_antialias(&mut self) {
+		let mut cache = self.cache.lock().unwrap();
+		let aa = match cache.image.antialiasing {
+			Antialias::Auto if self.img_texel_size < 4f32 => Antialias::Never,
+			Antialias::Auto | Antialias::Never => Antialias::Always,
+			Antialias::Always => Antialias::Never,
+		};
+		cache.image.antialiasing = aa;
+		self.render_validity.invalidate();
+	}
+
+	pub fn set_automatic_antialias(&mut self) {
+		let mut cache = self.cache.lock().unwrap();
+		cache.image.antialiasing = Antialias::Auto;
 		self.render_validity.invalidate();
 	}
 
@@ -371,6 +390,12 @@ impl PictureWidget {
 		if triggered!(IMG_ORIG_NAME) {
 			borrowed.set_img_size_to_orig();
 		}
+		if triggered!(TOGGLE_ANTIALIAS) {
+			borrowed.toggle_antialias();
+		}
+		if triggered!(SET_AUTOMATIC_ANTIALIAS) {
+			borrowed.set_automatic_antialias();
+		}
 		if triggered!(PLAY_PRESENT_NAME) {
 			match borrowed.playback_manager.playback_state() {
 				PlaybackState::Present => borrowed.playback_manager.pause_playback(),
@@ -523,11 +548,14 @@ impl Widget for PictureWidget {
 						gelatin::glium::uniforms::MinifySamplerFilter::LinearMipmapLinear,
 					)
 					.wrap_function(gelatin::glium::uniforms::SamplerWrapFunction::Clamp);
-				let sampler = if data.img_texel_size >= 4f32 {
-					sampler.magnify_filter(gelatin::glium::uniforms::MagnifySamplerFilter::Nearest)
-				} else {
-					sampler.magnify_filter(gelatin::glium::uniforms::MagnifySamplerFilter::Linear)
+
+				let filter = match data.cache.lock().unwrap().image.antialiasing {
+					Antialias::Auto if data.img_texel_size < 4f32 => MagnifySamplerFilter::Linear,
+					Antialias::Auto | Antialias::Never => MagnifySamplerFilter::Nearest,
+					Antialias::Always => MagnifySamplerFilter::Linear,
 				};
+				let sampler = sampler.magnify_filter(filter);
+
 				// building the uniforms
 				let lod_level = ((1.0 / data.img_texel_size).log2().max(0.0) + 0.125).floor();
 				let uniforms = uniform! {

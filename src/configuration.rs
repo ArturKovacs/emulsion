@@ -21,9 +21,26 @@ impl Theme {
 	}
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Antialias {
+	#[serde(rename = "auto")]
+	Auto,
+	#[serde(rename = "always")]
+	Always,
+	#[serde(rename = "never")]
+	Never,
+}
+
+impl Default for Antialias {
+	fn default() -> Self {
+		Antialias::Auto
+	}
+}
+
 #[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
 pub struct CacheImageSection {
 	pub fit_stretches: bool,
+	pub antialiasing: Antialias,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
