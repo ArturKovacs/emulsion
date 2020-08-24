@@ -65,6 +65,7 @@ struct PictureWidgetData {
 	img_texel_size: f32,
 	scaling: ScalingMode,
 	img_pos: LogicalVector,
+	antialiasing: Antialias,
 
 	last_click_time: Instant,
 	last_mouse_pos: LogicalVector,
@@ -200,19 +201,17 @@ impl PictureWidgetData {
 	}
 
 	pub fn toggle_antialias(&mut self) {
-		let mut cache = self.cache.lock().unwrap();
-		let aa = match cache.image.antialiasing {
+		let aa = match self.antialiasing {
 			Antialias::Auto if self.img_texel_size < 4f32 => Antialias::Never,
 			Antialias::Auto | Antialias::Never => Antialias::Always,
 			Antialias::Always => Antialias::Never,
 		};
-		cache.image.antialiasing = aa;
+		self.antialiasing = aa;
 		self.render_validity.invalidate();
 	}
 
 	pub fn set_automatic_antialias(&mut self) {
-		let mut cache = self.cache.lock().unwrap();
-		cache.image.antialiasing = Antialias::Auto;
+		self.antialiasing = Antialias::Auto;
 		self.render_validity.invalidate();
 	}
 
@@ -282,6 +281,14 @@ impl PictureWidget {
 			}
 		}
 
+		let antialiasing = configuration
+			.borrow()
+			.image
+			.as_ref()
+			.map(|s| s.antialiasing)
+			.flatten()
+			.unwrap_or_default();
+
 		let mut data = PictureWidgetData {
 			placement: Default::default(),
 			drawn_bounds: Default::default(),
@@ -299,6 +306,7 @@ impl PictureWidget {
 			img_texel_size: 0.0,
 			scaling,
 			img_pos: Default::default(),
+			antialiasing,
 			last_click_time: Instant::now() - Duration::from_secs(10),
 			last_mouse_pos: Default::default(),
 			panning: false,
@@ -549,7 +557,7 @@ impl Widget for PictureWidget {
 					)
 					.wrap_function(gelatin::glium::uniforms::SamplerWrapFunction::Clamp);
 
-				let filter = match data.cache.lock().unwrap().image.antialiasing {
+				let filter = match data.antialiasing {
 					Antialias::Auto if data.img_texel_size < 4f32 => MagnifySamplerFilter::Linear,
 					Antialias::Auto | Antialias::Never => MagnifySamplerFilter::Nearest,
 					Antialias::Always => MagnifySamplerFilter::Linear,

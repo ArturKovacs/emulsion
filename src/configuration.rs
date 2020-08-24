@@ -40,7 +40,11 @@ impl Default for Antialias {
 #[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
 pub struct CacheImageSection {
 	pub fit_stretches: bool,
-	pub antialiasing: Antialias,
+}
+
+#[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
+pub struct ConfigImageSection {
+	pub antialiasing: Option<Antialias>,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
@@ -213,6 +217,7 @@ pub struct Configuration {
 	pub commands: Option<Vec<Command>>,
 	pub updates: Option<ConfigUpdateSection>,
 	pub title: Option<TitleSection>,
+	pub image: Option<ConfigImageSection>,
 }
 
 impl Configuration {
