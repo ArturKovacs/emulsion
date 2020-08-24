@@ -207,11 +207,13 @@ impl PictureWidgetData {
 			Antialias::Always => Antialias::Never,
 		};
 		self.antialiasing = aa;
+		self.cache.lock().unwrap().image.antialiasing = aa;
 		self.render_validity.invalidate();
 	}
 
 	pub fn set_automatic_antialias(&mut self) {
 		self.antialiasing = Antialias::Auto;
+		self.cache.lock().unwrap().image.antialiasing = Antialias::Auto;
 		self.render_validity.invalidate();
 	}
 
@@ -285,9 +287,21 @@ impl PictureWidget {
 			.borrow()
 			.image
 			.as_ref()
-			.map(|s| s.antialiasing)
+			.map(|s| s.antialiasing.clone())
 			.flatten()
-			.unwrap_or_default();
+			.unwrap_or_else(|| "auto".into());
+
+		let antialiasing = match antialiasing.as_str() {
+			"auto" => Antialias::Auto,
+			"always" => Antialias::Always,
+			"never" => Antialias::Never,
+			"previous" => cache.lock().unwrap().image.antialiasing,
+			val => {
+				eprintln!("Illegal configuration value {:?} for antialiasing!", val);
+				eprintln!(r#"Allowed values are "auto", "always", "never" and "previous"."#);
+				Antialias::default()
+			}
+		};
 
 		let mut data = PictureWidgetData {
 			placement: Default::default(),
