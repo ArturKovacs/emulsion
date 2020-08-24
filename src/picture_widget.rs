@@ -6,7 +6,9 @@ use std::time::{Duration, Instant};
 
 use gelatin::cgmath::{Matrix4, Rad, Vector3};
 use gelatin::glium::glutin::event::{ElementState, ModifiersState, MouseButton};
-use gelatin::glium::{program, uniform, Display, Frame, Program, Surface};
+use gelatin::glium::{
+	program, uniform, uniforms::MagnifySamplerFilter, Display, Frame, Program, Surface,
+};
 
 use gelatin::add_common_widget_functions;
 use gelatin::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
@@ -21,7 +23,7 @@ use crate::shaders;
 use crate::utils::{virtual_keycode_is_char, virtual_keycode_to_string};
 use crate::{
 	bottom_bar::BottomBar,
-	configuration::{Cache, Configuration},
+	configuration::{Antialias, Cache, Configuration},
 	help_screen::HelpScreen,
 	image_cache::AnimationFrameTexture,
 	playback_manager::*,
@@ -29,6 +31,7 @@ use crate::{
 
 const MIN_ZOOM_FACTOR: f32 = 0.0001;
 const MAX_ZOOM_FACTOR: f32 = 10000.0;
+const AA_TEXEL_SIZE_THRESHOLD: f32 = 4f32;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ScalingMode {
@@ -63,6 +66,7 @@ struct PictureWidgetData {
 	img_texel_size: f32,
 	scaling: ScalingMode,
 	img_pos: LogicalVector,
+	antialiasing: Antialias,
 
 	last_click_time: Instant,
 	last_mouse_pos: LogicalVector,
@@ -197,6 +201,23 @@ impl PictureWidgetData {
 		self.render_validity.invalidate();
 	}
 
+	pub fn toggle_antialias(&mut self) {
+		let aa = match self.antialiasing {
+			Antialias::Auto if self.img_texel_size < AA_TEXEL_SIZE_THRESHOLD => Antialias::Never,
+			Antialias::Auto | Antialias::Never => Antialias::Always,
+			Antialias::Always => Antialias::Never,
+		};
+		self.antialiasing = aa;
+		self.cache.lock().unwrap().image.antialiasing = aa;
+		self.render_validity.invalidate();
+	}
+
+	pub fn set_automatic_antialias(&mut self) {
+		self.antialiasing = Antialias::Auto;
+		self.cache.lock().unwrap().image.antialiasing = Antialias::Auto;
+		self.render_validity.invalidate();
+	}
+
 	/// Ensures that the image is within the widget, or at least touches an edge of the widget
 	fn apply_img_bounds(&mut self, dpi_scale: f32) {
 		if let Some(texture) = self.get_texture() {
@@ -263,6 +284,26 @@ impl PictureWidget {
 			}
 		}
 
+		let antialiasing = configuration
+			.borrow()
+			.image
+			.as_ref()
+			.map(|s| s.antialiasing.clone())
+			.flatten()
+			.unwrap_or_else(|| "auto".into());
+
+		let antialiasing = match antialiasing.as_str() {
+			"auto" => Antialias::Auto,
+			"always" => Antialias::Always,
+			"never" => Antialias::Never,
+			"previous" => cache.lock().unwrap().image.antialiasing,
+			val => {
+				eprintln!("Illegal configuration value {:?} for antialiasing!", val);
+				eprintln!(r#"Allowed values are "auto", "always", "never" and "previous"."#);
+				Antialias::default()
+			}
+		};
+
 		let mut data = PictureWidgetData {
 			placement: Default::default(),
 			drawn_bounds: Default::default(),
@@ -280,6 +321,7 @@ impl PictureWidget {
 			img_texel_size: 0.0,
 			scaling,
 			img_pos: Default::default(),
+			antialiasing,
 			last_click_time: Instant::now() - Duration::from_secs(10),
 			last_mouse_pos: Default::default(),
 			panning: false,
@@ -370,6 +412,12 @@ impl PictureWidget {
 		}
 		if triggered!(IMG_ORIG_NAME) {
 			borrowed.set_img_size_to_orig();
+		}
+		if triggered!(TOGGLE_ANTIALIAS) {
+			borrowed.toggle_antialias();
+		}
+		if triggered!(SET_AUTOMATIC_ANTIALIAS) {
+			borrowed.set_automatic_antialias();
 		}
 		if triggered!(PLAY_PRESENT_NAME) {
 			match borrowed.playback_manager.playback_state() {
@@ -523,11 +571,16 @@ impl Widget for PictureWidget {
 						gelatin::glium::uniforms::MinifySamplerFilter::LinearMipmapLinear,
 					)
 					.wrap_function(gelatin::glium::uniforms::SamplerWrapFunction::Clamp);
-				let sampler = if data.img_texel_size >= 4f32 {
-					sampler.magnify_filter(gelatin::glium::uniforms::MagnifySamplerFilter::Nearest)
-				} else {
-					sampler.magnify_filter(gelatin::glium::uniforms::MagnifySamplerFilter::Linear)
+
+				let filter = match data.antialiasing {
+					Antialias::Auto if data.img_texel_size < AA_TEXEL_SIZE_THRESHOLD => {
+						MagnifySamplerFilter::Linear
+					}
+					Antialias::Auto | Antialias::Never => MagnifySamplerFilter::Nearest,
+					Antialias::Always => MagnifySamplerFilter::Linear,
 				};
+				let sampler = sampler.magnify_filter(filter);
+
 				// building the uniforms
 				let lod_level = ((1.0 / data.img_texel_size).log2().max(0.0) + 0.125).floor();
 				let uniforms = uniform! {
