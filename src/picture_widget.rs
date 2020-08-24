@@ -31,6 +31,7 @@ use crate::{
 
 const MIN_ZOOM_FACTOR: f32 = 0.0001;
 const MAX_ZOOM_FACTOR: f32 = 10000.0;
+const AA_TEXEL_SIZE_THRESHOLD: f32 = 4f32;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ScalingMode {
@@ -202,7 +203,7 @@ impl PictureWidgetData {
 
 	pub fn toggle_antialias(&mut self) {
 		let aa = match self.antialiasing {
-			Antialias::Auto if self.img_texel_size < 4f32 => Antialias::Never,
+			Antialias::Auto if self.img_texel_size < AA_TEXEL_SIZE_THRESHOLD => Antialias::Never,
 			Antialias::Auto | Antialias::Never => Antialias::Always,
 			Antialias::Always => Antialias::Never,
 		};
@@ -572,7 +573,9 @@ impl Widget for PictureWidget {
 					.wrap_function(gelatin::glium::uniforms::SamplerWrapFunction::Clamp);
 
 				let filter = match data.antialiasing {
-					Antialias::Auto if data.img_texel_size < 4f32 => MagnifySamplerFilter::Linear,
+					Antialias::Auto if data.img_texel_size < AA_TEXEL_SIZE_THRESHOLD => {
+						MagnifySamplerFilter::Linear
+					}
 					Antialias::Auto | Antialias::Never => MagnifySamplerFilter::Nearest,
 					Antialias::Always => MagnifySamplerFilter::Linear,
 				};
