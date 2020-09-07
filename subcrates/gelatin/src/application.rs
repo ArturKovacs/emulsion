@@ -98,7 +98,7 @@ impl Application {
 	}
 
 	pub fn start_event_loop(self) -> ! {
-		let windows = self.windows;
+		let mut windows = self.windows;
 		let mut at_exit = self.at_exit;
 		let mut global_handlers = self.global_handlers;
 		let mut control_flow_source = *windows.keys().next().unwrap();
@@ -107,17 +107,26 @@ impl Application {
 				aggregate_control_flow(control_flow, handler(&event).into());
 			}
 			match event {
-				Event::WindowEvent { event, window_id } => match event {
-					WindowEvent::CloseRequested => {
+				Event::WindowEvent { event, window_id } => {
+					if let WindowEvent::Resized { .. } = event {
+						windows.get(&window_id).unwrap().request_redraw();
+					}
+					if let WindowEvent::CloseRequested = event {
+						// This actually wouldn't be okay for a general pupose ui toolkit,
+						// but gelatin is specifically made for emulsion so this is fine hehe
 						request_exit();
 					}
-					event => {
-						if let WindowEvent::Resized { .. } = event {
-							windows.get(&window_id).unwrap().request_redraw();
-						}
-						windows.get(&window_id).unwrap().process_event(event);
+					let destroyed;
+					if let WindowEvent::Destroyed = event {
+						destroyed = true;
+					} else {
+						destroyed = false;
 					}
-				},
+					windows.get(&window_id).unwrap().process_event(event);
+					if destroyed {
+						windows.remove(&window_id);
+					}
+				}
 				Event::MainEventsCleared => {
 					if !EXIT_REQUESTED.load(Ordering::Relaxed) {
 						let mut should_sleep = match control_flow {
@@ -180,6 +189,8 @@ impl Application {
 				if let Some(at_exit) = at_exit.take() {
 					at_exit();
 				}
+				// Drop 'em all!
+				//windows.clear();
 			}
 		});
 	}

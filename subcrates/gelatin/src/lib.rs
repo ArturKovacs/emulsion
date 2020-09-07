@@ -165,6 +165,7 @@ pub enum NextUpdate {
 }
 
 impl NextUpdate {
+	/// Returns the next update that's sooner
 	pub fn aggregate(self, other: NextUpdate) -> NextUpdate {
 		match other {
 			NextUpdate::Soonest => other,
@@ -336,6 +337,7 @@ pub enum EventKind {
 	HoveredFile(PathBuf),
 	HoveredFileCancelled,
 	Focused(bool),
+	CloseRequested,
 }
 
 #[derive(Copy, Clone)]

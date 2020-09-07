@@ -1,9 +1,13 @@
 use std::path::PathBuf;
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{
+	atomic::{AtomicBool, Ordering},
+	Arc, Condvar, Mutex,
+};
 
 use arboard;
+use gelatin::image::imageops::{rotate180_in_place, rotate270, rotate90};
 
-use crate::image_cache::image_loader::{complex_load_image, LoadResult};
+use crate::image_cache::image_loader::{complex_load_image, LoadResult, Orientation};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum ClipboardState {
@@ -13,6 +17,7 @@ enum ClipboardState {
 }
 
 struct ClipboardRequestHandle {
+	run_thread: AtomicBool,
 	condvar: Condvar,
 	state: Mutex<ClipboardState>,
 }
@@ -21,17 +26,17 @@ pub struct ClipboardHandler {
 	prev_state: ClipboardState,
 	request_handle: Arc<ClipboardRequestHandle>,
 
-	thread_handle: std::thread::JoinHandle<()>,
+	thread_handle: Option<std::thread::JoinHandle<()>>,
 }
 
 impl ClipboardHandler {
 	pub fn new() -> ClipboardHandler {
 		let prev_state = ClipboardState::Succeeded;
 		let request_handle = Arc::new(ClipboardRequestHandle {
+			run_thread: AtomicBool::new(true),
 			condvar: Condvar::new(),
 			state: Mutex::new(prev_state.clone()),
 		});
-
 		let handle = {
 			let request_handle = request_handle.clone();
 			std::thread::spawn(move || {
@@ -39,7 +44,7 @@ impl ClipboardHandler {
 			})
 		};
 
-		ClipboardHandler { prev_state, request_handle, thread_handle: handle }
+		ClipboardHandler { prev_state, request_handle, thread_handle: Some(handle) }
 	}
 
 	pub fn request_copy(&mut self, target: PathBuf) -> bool {
@@ -56,8 +61,13 @@ impl ClipboardHandler {
 		true
 	}
 
+	fn request_stop_thread(&self) {
+		self.request_handle.run_thread.store(false, Ordering::Release);
+		self.request_handle.condvar.notify_one();
+	}
+
 	pub fn requests_pending(&self) -> bool {
-		let mut state = self.request_handle.state.lock().unwrap();
+		let state = self.request_handle.state.lock().unwrap();
 		if let ClipboardState::Pending(..) = &*state {
 			true
 		} else {
@@ -75,12 +85,12 @@ impl ClipboardHandler {
 	}
 
 	fn request_handler_thread(request_handle: Arc<ClipboardRequestHandle>) {
+		const WAIT_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(50);
 		let mut clipboard = arboard::Clipboard::new();
 		if let Err(e) = &clipboard {
 			eprintln!("The clipboard could not be created, error was: {}", e);
 		}
-		//let mut prev_state = request_handle.state.lock().unwrap().clone();
-		loop {
+		while request_handle.run_thread.load(Ordering::Acquire) {
 			let request_path;
 			{
 				let mut state_guard = request_handle.state.lock().unwrap();
@@ -89,8 +99,11 @@ impl ClipboardHandler {
 						request_path = path;
 						break 'wait_for_request;
 					} else {
-						match request_handle.condvar.wait(state_guard) {
-							Ok(guard) => {
+						if !request_handle.run_thread.load(Ordering::Acquire) {
+							return;
+						}
+						match request_handle.condvar.wait_timeout(state_guard, WAIT_TIMEOUT) {
+							Ok((guard, _)) => {
 								state_guard = guard;
 							}
 							Err(e) => {
@@ -100,12 +113,20 @@ impl ClipboardHandler {
 					}
 				}
 			}
-			if request_path.as_os_str().is_empty() {
-				return;
-			}
 			let result = complex_load_image(&request_path, false, 0, |frame| {
-				if let LoadResult::Frame { image, angle, .. } = frame {
+				if let LoadResult::Frame { mut image, orientation, .. } = frame {
 					if let Ok(clipboard) = &mut clipboard {
+						// Note: the imageops functions use clockwise rotation whereas the
+						// `Orientation` type describes counter-clockwise rotation.
+						image = match orientation {
+							Orientation::Deg0 => image,
+							Orientation::Deg90 => rotate270(&image),
+							Orientation::Deg180 => {
+								rotate180_in_place(&mut image);
+								image
+							}
+							Orientation::Deg270 => rotate90(&image),
+						};
 						let (w, h) = image.dimensions();
 						let cb_image = arboard::ImageData {
 							width: w as usize,
@@ -131,5 +152,14 @@ impl ClipboardHandler {
 impl Default for ClipboardHandler {
 	fn default() -> Self {
 		ClipboardHandler::new()
+	}
+}
+
+impl Drop for ClipboardHandler {
+	fn drop(&mut self) {
+		if let Some(handle) = self.thread_handle.take() {
+			self.request_stop_thread();
+			handle.join().unwrap();
+		}
 	}
 }

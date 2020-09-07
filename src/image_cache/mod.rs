@@ -572,7 +572,7 @@ impl ImageCache {
 				}
 				Ok(None)
 			}
-			LoadResult::Frame { req_id, image, delay_nano, angle } => {
+			LoadResult::Frame { req_id, image, delay_nano, orientation } => {
 				if let Some(cancelled) = self.pending_requests.cancelled(&req_id) {
 					if cancelled {
 						return Ok(None);
@@ -583,7 +583,8 @@ impl ImageCache {
 				let size_estimate = get_image_size_estimate(image.width(), image.height());
 				if let Some(entry) = self.texture_cache.get_mut(&req_id) {
 					let texture = Rc::new(texture_from_image(display, image)?);
-					let anim_frame = AnimationFrameTexture { texture, delay_nano, angle };
+					let anim_frame =
+						AnimationFrameTexture { texture, delay_nano, angle: orientation.to_rad() };
 					entry.frames.push(anim_frame.clone());
 					self.remaining_capacity -= size_estimate;
 					return Ok(Some(anim_frame));

@@ -16,6 +16,7 @@ struct LabelData {
 	drawn_bounds: LogicalRect,
 	visible: bool,
 
+	shadow_size: f32,
 	icon: Option<Rc<Picture>>,
 
 	render_validity: RenderValidity,
@@ -43,6 +44,7 @@ impl Label {
 				placement: Default::default(),
 				drawn_bounds: Default::default(),
 				visible: true,
+				shadow_size: 0.0,
 				icon: None,
 				render_validity: Default::default(),
 			}),
@@ -56,6 +58,12 @@ impl Label {
 		borrowed.icon = img;
 		borrowed.render_validity.invalidate();
 	}
+
+	pub fn set_shadow_size(&self, shadow_size: f32) {
+		let mut borrowed = self.data.borrow_mut();
+		borrowed.shadow_size = shadow_size;
+		borrowed.render_validity.invalidate();
+	}
 }
 
 impl Widget for Label {
@@ -63,6 +71,9 @@ impl Widget for Label {
 		use glium::{Blend, BlendingFunction, LinearBlendingFactor};
 		{
 			let borrowed = self.data.borrow();
+			if !borrowed.visible {
+				return Ok(NextUpdate::Latest);
+			}
 
 			let aligned_bounds = borrowed.drawn_bounds.align_to_pixels(context.dpi_scale_factor);
 
@@ -103,7 +114,7 @@ impl Widget for Label {
 					//brighten: if self.hover { 0.15f32 } else { 0.0f32 },
 					brighten: 0.0f32,
 					shadow_color: Into::<[f32; 3]>::into(Vector3::<f32>::new(0.0, 0.0, 0.0)),
-					shadow_offset: 1.0f32,
+					shadow_offset: 1.0 - borrowed.shadow_size,
 				};
 				target
 					.draw(
@@ -122,7 +133,7 @@ impl Widget for Label {
 					//brighten: if self.hover { 0.15f32 } else { 0.0f32 },
 					brighten: 0.0f32,
 					shadow_color: Into::<[f32; 3]>::into(Vector3::<f32>::new(0.0, 0.0, 0.0)),
-					shadow_offset: 1.0f32,
+					shadow_offset: 1.0 - borrowed.shadow_size,
 				};
 				target
 					.draw(
