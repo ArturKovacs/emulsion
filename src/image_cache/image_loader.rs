@@ -65,7 +65,7 @@ pub fn detect_format(path: &Path) -> Result<ImgFormat> {
 	Ok(ImgFormat::Image(ImageFormat::from_path(path)?))
 }
 
-fn detect_orientation(path: &Path) -> Result<f32> {
+pub fn detect_orientation(path: &Path) -> Result<f32> {
 	let file = std::fs::File::open(path)?;
 	let mut bufreader = std::io::BufReader::new(&file);
 	let exifreader = exif::Reader::new();
@@ -109,7 +109,7 @@ fn detect_orientation(path: &Path) -> Result<f32> {
 	}
 }
 
-pub fn load_image(path: &Path, image_format: ImageFormat) -> Result<image::RgbaImage> {
+pub fn simple_load_image(path: &Path, image_format: ImageFormat) -> Result<image::RgbaImage> {
 	let reader = BufReader::new(fs::File::open(path)?);
 	Ok(image::load(reader, image_format)?.to_rgba())
 }
@@ -119,6 +119,65 @@ pub fn load_gif(path: &Path, req_id: u32) -> Result<impl Iterator<Item = Result<
 	let file = fs::File::open(path)?;
 	let decoder = GifDecoder::new(file)?;
 	load_animation(req_id, decoder)
+}
+
+pub fn complex_load_image<F>(
+	path: &Path,
+	allow_animation: bool,
+	req_id: u32,
+	mut process_image: F,
+) -> Result<()>
+where
+	F: FnMut(LoadResult) -> Result<()>,
+{
+	let image_format = detect_format(path)?;
+	let angle = detect_orientation(path).unwrap_or(0.0);
+
+	match image_format {
+		ImgFormat::Image(ImageFormat::Gif) => {
+			let mut frames = load_gif(path, req_id)?;
+			if allow_animation {
+				for frame in frames {
+					process_image(frame?)?;
+				}
+			} else {
+				if let Some(frame) = frames.next() {
+					process_image(frame?)?;
+				}
+			}
+		}
+		ImgFormat::Image(ImageFormat::Png) => {
+			let file = fs::File::open(path)?;
+			let decoder = PngDecoder::new(file)?;
+			if decoder.is_apng() {
+				let mut animation = load_animation(req_id, decoder.apng())?;
+				if allow_animation {
+					for frame in animation {
+						process_image(frame?)?;
+					}
+				} else {
+					if let Some(frame) = animation.next() {
+						process_image(frame?)?;
+					}
+				}
+			} else {
+				let image = simple_load_image(path, ImageFormat::Png)?;
+				process_image(LoadResult::Frame { req_id, image, delay_nano: 0, angle })?;
+			}
+		}
+		ImgFormat::Image(image_format) => {
+			let image = simple_load_image(path, image_format)?;
+			process_image(LoadResult::Frame { req_id, image, delay_nano: 0, angle })?;
+		}
+		#[cfg(feature = "avif")]
+		ImgFormat::Avif => {
+			let buf = fs::read(&request.path)?;
+			let image = libavif_image::read(&buf)?.to_rgba();
+			process_image(LoadResult::Frame { req_id, image, delay_nano: 0, angle })?;
+		}
+	}
+
+	Ok(())
 }
 
 fn load_animation(
@@ -297,61 +356,11 @@ impl ImageLoader {
 	fn load_and_send(img_sender: &Sender<LoadResult>, request: LoadRequest) {
 		fn try_load_and_send(img_sender: &Sender<LoadResult>, request: &LoadRequest) -> Result<()> {
 			let metadata = fs::metadata(&request.path)?;
-			let image_format = detect_format(&request.path)?;
-			let angle = detect_orientation(&request.path).unwrap_or(0.0);
 			img_sender.send(LoadResult::Start { req_id: request.req_id, metadata }).unwrap();
-
-			match image_format {
-				ImgFormat::Image(ImageFormat::Gif) => {
-					let frames = load_gif(&request.path, request.req_id)?;
-					for frame in frames {
-						img_sender.send(frame?).unwrap();
-					}
-				}
-				ImgFormat::Image(ImageFormat::Png) => {
-					let file = fs::File::open(&request.path)?;
-					let decoder = PngDecoder::new(file)?;
-					if decoder.is_apng() {
-						for frame in load_animation(request.req_id, decoder.apng())? {
-							img_sender.send(frame?).unwrap();
-						}
-					} else {
-						let image = load_image(&request.path, ImageFormat::Png)?;
-						img_sender
-							.send(LoadResult::Frame {
-								req_id: request.req_id,
-								image,
-								delay_nano: 0,
-								angle,
-							})
-							.unwrap();
-					}
-				}
-				ImgFormat::Image(image_format) => {
-					let image = load_image(&request.path, image_format)?;
-					img_sender
-						.send(LoadResult::Frame {
-							req_id: request.req_id,
-							image,
-							delay_nano: 0,
-							angle,
-						})
-						.unwrap();
-				}
-				#[cfg(feature = "avif")]
-				ImgFormat::Avif => {
-					let buf = fs::read(&request.path)?;
-					let image = libavif_image::read(&buf)?.to_rgba();
-					img_sender
-						.send(LoadResult::Frame {
-							req_id: request.req_id,
-							image,
-							delay_nano: 0,
-							angle,
-						})
-						.unwrap();
-				}
-			}
+			complex_load_image(&request.path, true, request.req_id, |frame| {
+				img_sender.send(frame).unwrap();
+				Ok(())
+			})?;
 			Ok(())
 		}
 

@@ -1,7 +1,8 @@
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
-use std::sync::{Arc, Mutex};
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use gelatin::cgmath::{Matrix4, Rad, Vector3};
@@ -23,9 +24,13 @@ use crate::shaders;
 use crate::utils::{virtual_keycode_is_char, virtual_keycode_to_string};
 use crate::{
 	bottom_bar::BottomBar,
+	clipboard_handler::ClipboardHandler,
 	configuration::{Antialias, Cache, Configuration},
 	help_screen::HelpScreen,
-	image_cache::AnimationFrameTexture,
+	image_cache::{
+		image_loader::{complex_load_image, LoadResult},
+		AnimationFrameTexture,
+	},
 	playback_manager::*,
 };
 
@@ -59,6 +64,7 @@ struct PictureWidgetData {
 	configuration: Rc<RefCell<Configuration>>,
 	cache: Arc<Mutex<Cache>>,
 	playback_manager: PlaybackManager,
+	clipboard_handler: ClipboardHandler,
 
 	program: Program,
 	bright_shade: f32,
@@ -314,6 +320,7 @@ impl PictureWidget {
 			configuration,
 			cache,
 			playback_manager: PlaybackManager::new(),
+			clipboard_handler: ClipboardHandler::new(),
 			render_validity: Default::default(),
 
 			program,
@@ -413,10 +420,10 @@ impl PictureWidget {
 		if triggered!(IMG_ORIG_NAME) {
 			borrowed.set_img_size_to_orig();
 		}
-		if triggered!(TOGGLE_ANTIALIAS) {
+		if triggered!(TOGGLE_ANTIALIAS_NAME) {
 			borrowed.toggle_antialias();
 		}
-		if triggered!(SET_AUTOMATIC_ANTIALIAS) {
+		if triggered!(SET_AUTOMATIC_ANTIALIAS_NAME) {
 			borrowed.set_automatic_antialias();
 		}
 		if triggered!(PLAY_PRESENT_NAME) {
@@ -442,6 +449,10 @@ impl PictureWidget {
 				eprintln!("Error while updating directory {:?}", e);
 			}
 			borrowed.render_validity.invalidate();
+		}
+		if triggered!(IMG_COPY_NAME) {
+			let path = borrowed.playback_manager.current_file_path();
+			borrowed.clipboard_handler.request_copy(path);
 		}
 		let img_path = borrowed.playback_manager.current_file_path();
 		if let Some(folder_path) = img_path.parent() {
@@ -674,13 +685,23 @@ impl Widget for PictureWidget {
 				borrowed.zoom_image(event.cursor_pos, new_image_texel_size);
 			}
 			EventKind::ReceivedCharacter(ch) => {
-				let input_key = char_to_input_key(ch);
-				self.handle_key_input(input_key.as_str(), event.modifiers);
+				println!("Got char {}", ch);
+				// When the control key is held down, this character is going to be the keycode
+				// of an ascii control character
+				// See https://en.wikipedia.org/wiki/Caret_notation
+				if !event.modifiers.ctrl() {
+					println!("triggering for char {}", ch);
+					let input_key = char_to_input_key(ch);
+					self.handle_key_input(input_key.as_str(), event.modifiers);
+				}
 			}
 			EventKind::KeyInput { input } => {
 				if let Some(key) = input.virtual_keycode {
+					println!("Got input for {:?}", key);
 					let input_key_str = virtual_keycode_to_string(key).to_lowercase();
-					if !virtual_keycode_is_char(key) && input.state == ElementState::Pressed {
+					let printable = !event.modifiers.ctrl() && virtual_keycode_is_char(key);
+					if !printable && input.state == ElementState::Pressed {
+						println!("Triggering for input {:?}", key);
 						self.handle_key_input(input_key_str.as_str(), event.modifiers);
 					}
 					// Panning is a special snowflake

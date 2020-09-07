@@ -39,6 +39,7 @@ use crate::picture_widget::*;
 use crate::version::Version;
 
 mod bottom_bar;
+mod clipboard_handler;
 mod cmd_line;
 mod configuration;
 mod handle_panic;
