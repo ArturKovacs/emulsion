@@ -55,11 +55,8 @@ impl CopyNotifications {
 
 	pub fn set_finished(&mut self, succeeded: bool) {
 		let widget = self.widget.upgrade().unwrap();
-		let icon = if succeeded {
-			self.copy_ready_img.clone()
-		} else {
-			self.copy_failed_img.clone()
-		};
+		let icon =
+			if succeeded { self.copy_ready_img.clone() } else { self.copy_failed_img.clone() };
 		widget.set_icon(Some(icon));
 		self.finished_time = Instant::now();
 		self.finished = true;

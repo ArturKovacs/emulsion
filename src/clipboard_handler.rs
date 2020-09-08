@@ -133,7 +133,8 @@ impl ClipboardHandler {
 				Err("Could not set the clipboard image.".into())
 			});
 			let mut state = request_handle.state.lock().unwrap();
-			*state = if result.is_ok() { ClipboardState::Succeeded } else { ClipboardState::Failed };
+			*state =
+				if result.is_ok() { ClipboardState::Succeeded } else { ClipboardState::Failed };
 		}
 	}
 }
