@@ -23,7 +23,6 @@ struct ClipboardRequestHandle {
 }
 
 pub struct ClipboardHandler {
-	prev_state: ClipboardState,
 	request_handle: Arc<ClipboardRequestHandle>,
 
 	thread_handle: Option<std::thread::JoinHandle<()>>,
@@ -44,7 +43,7 @@ impl ClipboardHandler {
 			})
 		};
 
-		ClipboardHandler { prev_state, request_handle, thread_handle: Some(handle) }
+		ClipboardHandler { request_handle, thread_handle: Some(handle) }
 	}
 
 	pub fn request_copy(&mut self, target: PathBuf) -> bool {
@@ -66,17 +65,8 @@ impl ClipboardHandler {
 		self.request_handle.condvar.notify_one();
 	}
 
-	pub fn requests_pending(&self) -> bool {
-		let state = self.request_handle.state.lock().unwrap();
-		if let ClipboardState::Pending(..) = &*state {
-			true
-		} else {
-			false
-		}
-	}
-
 	pub fn try_get_result(&self) -> Option<bool> {
-		let mut state = self.request_handle.state.lock().unwrap();
+		let state = self.request_handle.state.lock().unwrap();
 		match &*state {
 			ClipboardState::Pending(..) => None,
 			ClipboardState::Succeeded => Some(true),
@@ -142,9 +132,8 @@ impl ClipboardHandler {
 				}
 				Err("Could not set the clipboard image.".into())
 			});
-			let mut state_guard = request_handle.state.lock().unwrap();
-			*state_guard =
-				if result.is_ok() { ClipboardState::Succeeded } else { ClipboardState::Failed };
+			let mut state = request_handle.state.lock().unwrap();
+			*state = if result.is_ok() { ClipboardState::Succeeded } else { ClipboardState::Failed };
 		}
 	}
 }

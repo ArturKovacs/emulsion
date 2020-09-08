@@ -523,12 +523,12 @@ impl Widget for PictureWidget {
 			}
 		}
 		if let Some(clipboard_handler) = &data.clipboard_handler {
-			let request_pending = clipboard_handler.requests_pending();
+			let clipboard_result = clipboard_handler.try_get_result();
+			let request_pending = clipboard_result.is_none();
 			if data.clipboard_request_was_pending != request_pending {
-				if request_pending {
-					data.copy_notifications.set_started();
-				} else {
-					data.copy_notifications.set_finished();
+				match clipboard_result {
+					Some(succeeded) => data.copy_notifications.set_finished(succeeded),
+					None => data.copy_notifications.set_started(),
 				}
 				data.clipboard_request_was_pending = request_pending;
 			} else if request_pending {
