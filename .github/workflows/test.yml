@@ -13,9 +13,9 @@ jobs:
     steps:
       - uses: actions-rs/toolchain@v1
         with:
-            toolchain: stable
-            override: true
-            components: rustfmt
+          toolchain: stable
+          override: true
+          components: rustfmt
       - uses: actions/checkout@v2
       - name: Run `cargo fmt`
         uses: actions-rs/cargo@v1
@@ -29,9 +29,9 @@ jobs:
     steps:
       - uses: actions-rs/toolchain@v1
         with:
-            toolchain: stable
-            override: true
-            components: clippy
+          toolchain: stable
+          override: true
+          components: clippy
       - uses: actions/checkout@v2
       - name: Run `cargo clippy`
         uses: actions-rs/cargo@v1
@@ -48,8 +48,8 @@ jobs:
     steps:
       - uses: actions-rs/toolchain@v1
         with:
-            toolchain: stable
-            override: true
+          toolchain: stable
+          override: true
       - name: Checkout
         uses: actions/checkout@v2
       - name: Install avif build dependencies (linux)
