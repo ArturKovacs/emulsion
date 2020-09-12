@@ -76,7 +76,7 @@ lexical-sort = "0.3"
 trash = "1.1"
 clap = { version = "2.33", default-features = false }
 kamadak-exif = "0.5.1"
-arboard = "1.0"
+arboard = "1.0.1"
 
 [dependencies.libavif-image]
 version = "0.4"
