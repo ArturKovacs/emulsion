@@ -196,7 +196,7 @@ where
 		}
 		#[cfg(feature = "avif")]
 		ImgFormat::Avif => {
-			let buf = fs::read(&request.path)?;
+			let buf = fs::read(path)?;
 			let image = libavif_image::read(&buf)?.to_rgba();
 			process_image(LoadResult::Frame { req_id, image, delay_nano: 0, orientation })?;
 		}
