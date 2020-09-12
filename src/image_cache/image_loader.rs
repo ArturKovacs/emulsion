@@ -42,6 +42,31 @@ pub enum ImgFormat {
 	Avif,
 }
 
+#[derive(Debug, Copy, Clone)]
+pub enum Orientation {
+	Deg0,
+	Deg90,
+	Deg180,
+	Deg270,
+}
+impl Default for Orientation {
+	fn default() -> Self {
+		Orientation::Deg0
+	}
+}
+
+impl Orientation {
+	pub fn to_rad(self) -> f32 {
+		use std::f32::consts::PI;
+		match self {
+			Orientation::Deg0 => 0.0,
+			Orientation::Deg90 => PI * 0.5,
+			Orientation::Deg180 => PI,
+			Orientation::Deg270 => PI * 1.5,
+		}
+	}
+}
+
 /// Detects the format of an image file. It looks at the first 512 bytes;
 /// if that fails, it uses the file ending.
 pub fn detect_format(path: &Path) -> Result<ImgFormat> {
@@ -65,7 +90,7 @@ pub fn detect_format(path: &Path) -> Result<ImgFormat> {
 	Ok(ImgFormat::Image(ImageFormat::from_path(path)?))
 }
 
-fn detect_orientation(path: &Path) -> Result<f32> {
+pub fn detect_orientation(path: &Path) -> Result<Orientation> {
 	let file = std::fs::File::open(path)?;
 	let mut bufreader = std::io::BufReader::new(&file);
 	let exifreader = exif::Reader::new();
@@ -73,43 +98,43 @@ fn detect_orientation(path: &Path) -> Result<f32> {
 	if let Some(orientation) = exif.get_field(exif::Tag::Orientation, exif::In::PRIMARY) {
 		if let exif::Value::Short(ref shorts) = orientation.value {
 			if let Some(&exif_orientation) = shorts.get(0) {
-				use std::f32::consts::PI;
 				// According to page 30 of http://www.cipa.jp/std/documents/e/DC-008-2012_E.pdf
 				match exif_orientation {
-					1 => Ok(0.0),
+					1 => Ok(Orientation::Deg0),
 					2 => {
 						eprintln!("Image is flipped according to the exif data. This is not yet supported.");
-						Ok(0.0)
+						Ok(Orientation::Deg0)
 					}
-					3 => Ok(PI),
+					3 => Ok(Orientation::Deg180),
 					4 => {
 						eprintln!("Image is flipped according to the exif data. This is not yet supported.");
-						Ok(PI)
+						Ok(Orientation::Deg180)
 					}
 					5 => {
 						eprintln!("Image is flipped according to the exif data. This is not yet supported.");
-						Ok(PI * 0.5)
+						//Ok(PI * 0.5)
+						Ok(Orientation::Deg90)
 					}
-					6 => Ok(PI * -0.5),
+					6 => Ok(Orientation::Deg270),
 					7 => {
 						eprintln!("Image is flipped according to the exif data. This is not yet supported.");
-						Ok(PI * -0.5)
+						Ok(Orientation::Deg270)
 					}
-					8 => Ok(PI * 0.5),
+					8 => Ok(Orientation::Deg90),
 					_ => unreachable!(),
 				}
 			} else {
-				Ok(0.0)
+				Ok(Orientation::Deg0)
 			}
 		} else {
 			Err("EXIF orientation was expected to be of type 'short' but it wasn't".into())
 		}
 	} else {
-		Ok(0.0)
+		Ok(Orientation::Deg0)
 	}
 }
 
-pub fn load_image(path: &Path, image_format: ImageFormat) -> Result<image::RgbaImage> {
+pub fn simple_load_image(path: &Path, image_format: ImageFormat) -> Result<image::RgbaImage> {
 	let reader = BufReader::new(fs::File::open(path)?);
 	Ok(image::load(reader, image_format)?.to_rgba())
 }
@@ -119,6 +144,65 @@ pub fn load_gif(path: &Path, req_id: u32) -> Result<impl Iterator<Item = Result<
 	let file = fs::File::open(path)?;
 	let decoder = GifDecoder::new(file)?;
 	load_animation(req_id, decoder)
+}
+
+pub fn complex_load_image<F>(
+	path: &Path,
+	allow_animation: bool,
+	req_id: u32,
+	mut process_image: F,
+) -> Result<()>
+where
+	F: FnMut(LoadResult) -> Result<()>,
+{
+	let image_format = detect_format(path)?;
+	let orientation = detect_orientation(path).unwrap_or(Orientation::Deg0);
+
+	match image_format {
+		ImgFormat::Image(ImageFormat::Gif) => {
+			let mut frames = load_gif(path, req_id)?;
+			if allow_animation {
+				for frame in frames {
+					process_image(frame?)?;
+				}
+			} else {
+				if let Some(frame) = frames.next() {
+					process_image(frame?)?;
+				}
+			}
+		}
+		ImgFormat::Image(ImageFormat::Png) => {
+			let file = fs::File::open(path)?;
+			let decoder = PngDecoder::new(file)?;
+			if decoder.is_apng() {
+				let mut animation = load_animation(req_id, decoder.apng())?;
+				if allow_animation {
+					for frame in animation {
+						process_image(frame?)?;
+					}
+				} else {
+					if let Some(frame) = animation.next() {
+						process_image(frame?)?;
+					}
+				}
+			} else {
+				let image = simple_load_image(path, ImageFormat::Png)?;
+				process_image(LoadResult::Frame { req_id, image, delay_nano: 0, orientation })?;
+			}
+		}
+		ImgFormat::Image(image_format) => {
+			let image = simple_load_image(path, image_format)?;
+			process_image(LoadResult::Frame { req_id, image, delay_nano: 0, orientation })?;
+		}
+		#[cfg(feature = "avif")]
+		ImgFormat::Avif => {
+			let buf = fs::read(path)?;
+			let image = libavif_image::read(&buf)?.to_rgba();
+			process_image(LoadResult::Frame { req_id, image, delay_nano: 0, orientation })?;
+		}
+	}
+
+	Ok(())
 }
 
 fn load_animation(
@@ -134,7 +218,7 @@ fn load_animation(
 			let denom_nano = denom_ms as u64;
 			let delay_nano = numerator_nano / denom_nano;
 			let image = frame.into_buffer();
-			LoadResult::Frame { req_id, image, delay_nano, angle: 0.0 }
+			LoadResult::Frame { req_id, image, delay_nano, orientation: Orientation::Deg0 }
 		})?)
 	}))
 }
@@ -195,8 +279,8 @@ pub enum LoadResult {
 		image: image::RgbaImage,
 		delay_nano: u64,
 
-		/// the angle of the orientation in radians (right handed rotation)
-		angle: f32,
+		/// How much does the image need to be rotated counter-clockwise to be shown correctly
+		orientation: Orientation,
 	},
 	Done {
 		req_id: u32,
@@ -297,61 +381,11 @@ impl ImageLoader {
 	fn load_and_send(img_sender: &Sender<LoadResult>, request: LoadRequest) {
 		fn try_load_and_send(img_sender: &Sender<LoadResult>, request: &LoadRequest) -> Result<()> {
 			let metadata = fs::metadata(&request.path)?;
-			let image_format = detect_format(&request.path)?;
-			let angle = detect_orientation(&request.path).unwrap_or(0.0);
 			img_sender.send(LoadResult::Start { req_id: request.req_id, metadata }).unwrap();
-
-			match image_format {
-				ImgFormat::Image(ImageFormat::Gif) => {
-					let frames = load_gif(&request.path, request.req_id)?;
-					for frame in frames {
-						img_sender.send(frame?).unwrap();
-					}
-				}
-				ImgFormat::Image(ImageFormat::Png) => {
-					let file = fs::File::open(&request.path)?;
-					let decoder = PngDecoder::new(file)?;
-					if decoder.is_apng() {
-						for frame in load_animation(request.req_id, decoder.apng())? {
-							img_sender.send(frame?).unwrap();
-						}
-					} else {
-						let image = load_image(&request.path, ImageFormat::Png)?;
-						img_sender
-							.send(LoadResult::Frame {
-								req_id: request.req_id,
-								image,
-								delay_nano: 0,
-								angle,
-							})
-							.unwrap();
-					}
-				}
-				ImgFormat::Image(image_format) => {
-					let image = load_image(&request.path, image_format)?;
-					img_sender
-						.send(LoadResult::Frame {
-							req_id: request.req_id,
-							image,
-							delay_nano: 0,
-							angle,
-						})
-						.unwrap();
-				}
-				#[cfg(feature = "avif")]
-				ImgFormat::Avif => {
-					let buf = fs::read(&request.path)?;
-					let image = libavif_image::read(&buf)?.to_rgba();
-					img_sender
-						.send(LoadResult::Frame {
-							req_id: request.req_id,
-							image,
-							delay_nano: 0,
-							angle,
-						})
-						.unwrap();
-				}
-			}
+			complex_load_image(&request.path, true, request.req_id, |frame| {
+				img_sender.send(frame).unwrap();
+				Ok(())
+			})?;
 			Ok(())
 		}
 

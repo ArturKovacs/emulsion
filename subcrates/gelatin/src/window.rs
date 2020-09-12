@@ -253,6 +253,13 @@ impl Window {
 				handler(&native_event);
 			}
 			match native_event {
+				WindowEvent::CloseRequested => {
+					event = Some(Event {
+						cursor_pos: borrowed.cursor_pos,
+						modifiers: borrowed.modifiers,
+						kind: EventKind::CloseRequested,
+					});
+				}
 				WindowEvent::KeyboardInput { input, .. } => {
 					event = Some(Event {
 						cursor_pos: borrowed.cursor_pos,

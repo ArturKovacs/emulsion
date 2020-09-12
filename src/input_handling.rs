@@ -15,12 +15,13 @@ pub static IMG_ORIG_NAME: &str = "img_orig";
 pub static IMG_FIT_NAME: &str = "img_fit";
 pub static IMG_FIT_BEST_NAME: &str = "img_fit_best";
 pub static IMG_DEL_NAME: &str = "img_del";
+pub static IMG_COPY_NAME: &str = "img_copy";
 pub static PAN_NAME: &str = "pan";
 pub static PLAY_ANIM_NAME: &str = "play_anim";
 pub static PLAY_PRESENT_NAME: &str = "play_present";
 pub static PLAY_PRESENT_RND_NAME: &str = "play_present_rnd";
-pub static TOGGLE_ANTIALIAS: &str = "toggle_antialias";
-pub static SET_AUTOMATIC_ANTIALIAS: &str = "automatic_antialias";
+pub static TOGGLE_ANTIALIAS_NAME: &str = "toggle_antialias";
+pub static SET_AUTOMATIC_ANTIALIAS_NAME: &str = "automatic_antialias";
 
 lazy_static! {
 	pub static ref DEFAULT_BINDINGS: HashMap<&'static str, Vec<&'static str>> = {
@@ -33,12 +34,13 @@ lazy_static! {
 		m.insert(IMG_FIT_NAME, vec!["F"]);
 		m.insert(IMG_FIT_BEST_NAME, vec!["E"]);
 		m.insert(IMG_DEL_NAME, vec!["Delete"]);
+		m.insert(IMG_COPY_NAME, vec!["CmdCtrl+C"]);
 		m.insert(PAN_NAME, vec!["Space"]);
 		m.insert(PLAY_ANIM_NAME, vec!["Alt+A", "Alt+V"]);
 		m.insert(PLAY_PRESENT_NAME, vec!["P"]);
 		m.insert(PLAY_PRESENT_RND_NAME, vec!["Alt+P"]);
-		m.insert(TOGGLE_ANTIALIAS, vec!["S"]);
-		m.insert(SET_AUTOMATIC_ANTIALIAS, vec!["Alt+S"]);
+		m.insert(TOGGLE_ANTIALIAS_NAME, vec!["S"]);
+		m.insert(SET_AUTOMATIC_ANTIALIAS_NAME, vec!["Alt+S"]);
 		m
 	};
 }
@@ -121,6 +123,13 @@ pub fn keys_triggered<S: AsRef<str>>(
 				"alt" => has_alt = true,
 				"ctrl" => has_ctrl = true,
 				"logo" => has_logo = true,
+				"cmdctrl" => {
+					if cfg!(target_os = "macos") {
+						has_logo = true;
+					} else {
+						has_ctrl = true;
+					}
+				}
 				_ => (),
 			}
 		}

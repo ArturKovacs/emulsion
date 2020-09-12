@@ -1,0 +1,3 @@
+The odt uses the Fira Sans and DejaVu sans fonts. These are
+provided here, but make sure these are installed on your system
+before editing the "Emulsion Usage.odt" file.
