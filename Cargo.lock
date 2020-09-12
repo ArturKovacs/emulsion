@@ -58,9 +58,9 @@ dependencies = [
 
 [[package]]
 name = "arboard"
-version = "0.1.1"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19317f38450b0cfb0b9c7184b245e5aa4f2a429ff044f06dfbea078e9c17ab2c"
+checksum = "d8565dc3fa272ba10bfdf1e985bf8e68b3666d9dd60de8b37ee1de7bfdc1f888"
 dependencies = [
  "byteorder",
  "clipboard-win",
