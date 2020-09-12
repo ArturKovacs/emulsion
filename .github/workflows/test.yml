@@ -11,17 +11,33 @@ jobs:
   rustfmt:
     runs-on: ubuntu-20.04
     steps:
+      - uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
+            components: rustfmt
       - uses: actions/checkout@v2
-      - name: rustfmt
-        run: cargo fmt --all -- --check
+      - name: Run `cargo fmt`
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
 
   clippy:
     needs: rustfmt
     runs-on: ubuntu-20.04
     steps:
+      - uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
+            components: clippy
       - uses: actions/checkout@v2
-      - name: clippy
-        run: cargo clippy --verbose
+      - name: Run `cargo clippy`
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --verbose
 
   build:
     needs: clippy
@@ -30,9 +46,12 @@ jobs:
       matrix:
         os: [ubuntu-20.04, macos-latest, windows-latest]
     steps:
+      - uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
       - name: Checkout
         uses: actions/checkout@v2
-
       - name: Install avif build dependencies (linux)
         if: matrix.os == 'ubuntu-20.04'
         run: |
@@ -55,6 +74,9 @@ jobs:
           7z e -y "nasm-$NASM_VERSION-win64.zip" -o"C:\nasm"
           echo "::add-path::C:\nasm"
 
+      # According to https://github.com/actions-rs/cargo
+      # it's okay to simply just run `cargo` once the toolchain is set up
+      # so there's no need to use actions-rs/cargo@v1
       - name: Build and run tests (linux/macOS)
         if: matrix.os != 'windows-latest'
         run: |
