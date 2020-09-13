@@ -42,28 +42,41 @@ pub enum ImgFormat {
 	Avif,
 }
 
+/// These values define the transformation for a pixel array which is to be displayed.
+///
+/// The default case is when the 0th row is at the top and the 0th column is at the left side of the
+/// image. This is represented by the value `Deg0`. All other cases must be interpreted as relative
+/// to this. The rotation part is counter-clockwise. When there's a flip it's always interpreted as
+/// if it happened after the rotation.
 #[derive(Debug, Copy, Clone)]
 pub enum Orientation {
+	/// Exif 1
 	Deg0,
-	Deg90,
+
+	/// Exif 2
+	Deg0HorFlip,
+
+	/// Exif 3
 	Deg180,
+
+	/// Exif 4
+	Deg180HorFlip,
+
+	/// Exif 5
+	Deg90VerFlip,
+
+	/// Exif 6
 	Deg270,
+
+	/// Exif 7
+	Deg270VerFlip,
+
+	/// Exif 8
+	Deg90,
 }
 impl Default for Orientation {
 	fn default() -> Self {
 		Orientation::Deg0
-	}
-}
-
-impl Orientation {
-	pub fn to_rad(self) -> f32 {
-		use std::f32::consts::PI;
-		match self {
-			Orientation::Deg0 => 0.0,
-			Orientation::Deg90 => PI * 0.5,
-			Orientation::Deg180 => PI,
-			Orientation::Deg270 => PI * 1.5,
-		}
 	}
 }
 
@@ -101,25 +114,12 @@ pub fn detect_orientation(path: &Path) -> Result<Orientation> {
 				// According to page 30 of http://www.cipa.jp/std/documents/e/DC-008-2012_E.pdf
 				match exif_orientation {
 					1 => Ok(Orientation::Deg0),
-					2 => {
-						eprintln!("Image is flipped according to the exif data. This is not yet supported.");
-						Ok(Orientation::Deg0)
-					}
+					2 => Ok(Orientation::Deg0HorFlip),
 					3 => Ok(Orientation::Deg180),
-					4 => {
-						eprintln!("Image is flipped according to the exif data. This is not yet supported.");
-						Ok(Orientation::Deg180)
-					}
-					5 => {
-						eprintln!("Image is flipped according to the exif data. This is not yet supported.");
-						//Ok(PI * 0.5)
-						Ok(Orientation::Deg90)
-					}
+					4 => Ok(Orientation::Deg180HorFlip),
+					5 => Ok(Orientation::Deg90VerFlip),
 					6 => Ok(Orientation::Deg270),
-					7 => {
-						eprintln!("Image is flipped according to the exif data. This is not yet supported.");
-						Ok(Orientation::Deg270)
-					}
+					7 => Ok(Orientation::Deg270VerFlip),
 					8 => Ok(Orientation::Deg90),
 					_ => unreachable!(),
 				}
