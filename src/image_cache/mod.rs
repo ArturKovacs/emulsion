@@ -725,6 +725,7 @@ impl ImageCache {
 	}
 
 	fn collect_directory(&mut self) -> Result<Vec<ImageDescriptor>> {
+		let start = std::time::Instant::now();
 		let mut dir_files: Vec<_> = fs::read_dir(&self.dir_path)?
 			.filter_map(|x| match x {
 				Ok(entry) => match entry.file_type() {
@@ -746,6 +747,8 @@ impl ImageCache {
 			})
 			.collect();
 
+		let total_time = start.elapsed();
+		println!("Collected directory in: {} ms", total_time.as_millis());
 		dir_files.sort_unstable_by(|a, b| {
 			lexical_sort::natural_lexical_cmp(
 				&a.dir_entry.file_name().to_string_lossy(),
