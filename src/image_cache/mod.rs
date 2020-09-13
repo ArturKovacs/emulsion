@@ -98,7 +98,19 @@ impl<'a> RequestKind<'a> {
 pub struct AnimationFrameTexture {
 	pub texture: Rc<SrgbTexture2d>,
 	pub delay_nano: u64,
-	pub angle: f32,
+	pub orientation: Orientation,
+}
+impl AnimationFrameTexture {
+	pub fn oriented_dimensions(&self) -> (u32, u32) {
+		use Orientation::*;
+		match self.orientation {
+			Deg0 | Deg0HorFlip | Deg180 | Deg180HorFlip => self.texture.dimensions(),
+			Deg90 | Deg90VerFlip | Deg270 | Deg270VerFlip => {
+				let (w, h) = self.texture.dimensions();
+				(h, w)
+			}
+		}
+	}
 }
 
 struct CachedTexture {
@@ -583,8 +595,7 @@ impl ImageCache {
 				let size_estimate = get_image_size_estimate(image.width(), image.height());
 				if let Some(entry) = self.texture_cache.get_mut(&req_id) {
 					let texture = Rc::new(texture_from_image(display, image)?);
-					let anim_frame =
-						AnimationFrameTexture { texture, delay_nano, angle: orientation.to_rad() };
+					let anim_frame = AnimationFrameTexture { texture, delay_nano, orientation };
 					entry.frames.push(anim_frame.clone());
 					self.remaining_capacity -= size_estimate;
 					return Ok(Some(anim_frame));
