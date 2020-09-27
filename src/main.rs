@@ -44,6 +44,7 @@ mod configuration;
 mod handle_panic;
 mod image_cache;
 mod input_handling;
+mod parallel_action;
 mod playback_manager;
 mod shaders;
 mod utils;

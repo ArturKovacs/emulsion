@@ -246,22 +246,21 @@ pub fn texture_from_image(
 }
 
 pub fn is_file_supported(filename: &Path) -> bool {
+	if let Some(ext) = filename.extension() {
+		if let Some(ext) = ext.to_str() {
+			let ext = ext.to_lowercase();
+			match ext.as_str() {
+				"jpg" | "jpeg" | "png" | "apng" | "gif" | "webp" | "tif" | "tiff" | "tga"
+				| "bmp" | "ico" | "hdr" | "pbm" | "pam" | "ppm" | "pgm" => {
+					return true;
+				}
+				#[cfg(feature = "avif")]
+				"avif" => return true,
+				_ => (),
+			}
+		}
+	}
 	detect_format(filename).is_ok()
-	// if let Some(ext) = filename.extension() {
-	// 	if let Some(ext) = ext.to_str() {
-	// 		let ext = ext.to_lowercase();
-	// 		match ext.as_str() {
-	// 			"jpg" | "jpeg" | "png" | "apng" | "gif" | "webp" | "tif" | "tiff" | "tga"
-	// 			| "bmp" | "ico" | "hdr" | "pbm" | "pam" | "ppm" | "pgm" => {
-	// 				return true;
-	// 			}
-	// 			#[cfg(feature = "avif")]
-	// 			"avif" => return true,
-	// 			_ => (),
-	// 		}
-	// 	}
-	// }
-	// false
 }
 
 #[derive(Debug, Clone)]

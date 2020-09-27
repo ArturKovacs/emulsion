@@ -1,8 +1,7 @@
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use gelatin::cgmath::{Matrix4, Rad, Vector3};
@@ -25,10 +24,7 @@ use crate::utils::{virtual_keycode_is_char, virtual_keycode_to_string};
 use crate::{
 	clipboard_handler::ClipboardHandler,
 	configuration::{Antialias, Cache, Configuration},
-	image_cache::{
-		image_loader::{complex_load_image, LoadResult},
-		AnimationFrameTexture,
-	},
+	image_cache::AnimationFrameTexture,
 	playback_manager::*,
 };
 
@@ -507,9 +503,11 @@ impl Widget for PictureWidget {
 		let prev_texture = data.playback_manager.image_texture();
 		data.next_update = data.playback_manager.update_image(window);
 		let new_texture = data.playback_manager.image_texture();
-		let curr_file_index = data.playback_manager.current_file_index() as u32;
-		let curr_dir_len = data.playback_manager.current_dir_len() as u32;
-		data.bottom_bar.slider.set_steps(curr_dir_len, curr_file_index);
+		let curr_file_index = data.playback_manager.current_file_index();
+		let curr_dir_len = data.playback_manager.current_dir_len();
+		if let (Some(curr_file_index), Some(curr_dir_len)) = (curr_file_index, curr_dir_len) {
+			data.bottom_bar.slider.set_steps(curr_dir_len as u32, curr_file_index as u32);
+		}
 		//data.slider.set_step_bg(data.playback_manager.cached_from_dir());
 		let playback_state = data.playback_manager.playback_state();
 		data.set_window_title_filename(window, playback_state, data.playback_manager.file_path());
