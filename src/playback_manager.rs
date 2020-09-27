@@ -107,7 +107,13 @@ impl Playback for AnimPlayback {
 		display: &Display,
 		index: usize,
 	) -> FrameLoadResult {
-		image_cache.load_at_index(display, image_cache.current_file_index(), Some(index as isize))
+		if let Some(curr_index) = image_cache.current_file_index() {
+			image_cache.load_at_index(display, curr_index, Some(index as isize))
+		} else {
+			Err(image_cache::errors::Error::from_kind(
+				image_cache::errors::ErrorKind::WaitingOnDirFilter,
+			))
+		}
 	}
 
 	fn delay_nanos(player: &ImgSequencePlayer<Self>) -> u64 {
@@ -174,7 +180,7 @@ impl PlaybackManager {
 	}
 
 	pub fn start_random_presentation(&mut self) {
-		self.folder_player.start_random_presentation(&self.image_cache);
+		self.folder_player.start_random_presentation(&mut self.image_cache);
 		//self.playback_start_time = Instant::now();
 		//self.frame_count_since_playback_start = 0;
 		//self.playback_state = PlaybackState::RandomPresent;
@@ -192,11 +198,13 @@ impl PlaybackManager {
 		self.image_cache.current_file_path()
 	}
 
-	pub fn current_file_index(&self) -> usize {
+	/// Returns None when the folder hasn't finished filtering
+	pub fn current_file_index(&mut self) -> Option<usize> {
 		self.image_cache.current_file_index()
 	}
 
-	pub fn current_dir_len(&self) -> usize {
+	/// Returns None when the folder hasn't finished filtering
+	pub fn current_dir_len(&mut self) -> Option<usize> {
 		self.image_cache.current_dir_len()
 	}
 
@@ -206,8 +214,8 @@ impl PlaybackManager {
 				let curr_path = self.image_cache.current_file_path();
 				if !curr_path.to_string_lossy().is_empty() {
 					self.image_cache.update_directory()?;
-					let index = self.current_file_index();
-					self.request_load(LoadRequest::LoadAtIndex(index));
+					let path = self.current_file_path();
+					self.request_load(LoadRequest::FilePath(path));
 				}
 			}
 			_ => (),
@@ -297,12 +305,13 @@ impl<P: Playback> ImgSequencePlayer<P> {
 		self.playback_state = PlaybackState::Paused;
 	}
 
-	pub fn start_random_presentation(&mut self, image_cache: &ImageCache) {
+	// Returns false if the directory hasn't finished filtering
+	pub fn start_random_presentation(&mut self, image_cache: &mut ImageCache) -> bool {
 		self.last_frame_change_time = Instant::now();
 		self.frametime_drift_offset = 0;
 		//self.frame_count_since_playback_start = 0;
 		self.playback_state = PlaybackState::RandomPresent;
-		self.fill_present_remainig_with_random(image_cache);
+		self.fill_present_remainig_with_random(image_cache)
 	}
 
 	pub fn start_presentation(&mut self) {
@@ -389,6 +398,8 @@ impl<P: Playback> ImgSequencePlayer<P> {
 							target = self.present_remaining.pop();
 							if target == None {
 								// Restart
+								// WARNING we silently assume that the folder is fully
+								// filtered at this point.
 								self.fill_present_remainig_with_random(image_cache);
 								target = self.present_remaining.pop();
 							}
@@ -425,7 +436,7 @@ impl<P: Playback> ImgSequencePlayer<P> {
 		match load_request {
 			LoadRequest::None | LoadRequest::FilePath(..) => (),
 			_ => {
-				if image_cache.current_dir_len() == 0 {
+				if image_cache.current_dir_len() == Some(0) {
 					return gelatin::NextUpdate::Latest;
 				}
 			}
@@ -475,12 +486,17 @@ impl<P: Playback> ImgSequencePlayer<P> {
 		next_update
 	}
 
-	fn fill_present_remainig_with_random(&mut self, image_cache: &ImageCache) {
+	fn fill_present_remainig_with_random(&mut self, image_cache: &mut ImageCache) -> bool {
 		self.present_remaining.clear();
-		for i in 0..image_cache.current_dir_len() {
-			self.present_remaining.push(i);
+		if let Some(dir_len) = image_cache.current_dir_len() {
+			for i in 0..dir_len {
+				self.present_remaining.push(i);
+			}
+			let mut rng = thread_rng();
+			self.present_remaining.as_mut_slice().shuffle(&mut rng);
+			true
+		} else {
+			false
 		}
-		let mut rng = thread_rng();
-		self.present_remaining.as_mut_slice().shuffle(&mut rng);
 	}
 }

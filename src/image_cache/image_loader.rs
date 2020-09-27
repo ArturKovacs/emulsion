@@ -260,7 +260,7 @@ pub fn is_file_supported(filename: &Path) -> bool {
 			}
 		}
 	}
-	false
+	detect_format(filename).is_ok()
 }
 
 #[derive(Debug, Clone)]

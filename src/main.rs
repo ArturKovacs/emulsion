@@ -1,4 +1,4 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+//#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 #[macro_use]
 extern crate error_chain;
@@ -44,6 +44,7 @@ mod configuration;
 mod handle_panic;
 mod image_cache;
 mod input_handling;
+mod parallel_action;
 mod playback_manager;
 mod shaders;
 mod utils;
