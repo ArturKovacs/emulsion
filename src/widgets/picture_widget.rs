@@ -24,7 +24,7 @@ use crate::utils::{virtual_keycode_is_char, virtual_keycode_to_string};
 use crate::{
 	clipboard_handler::ClipboardHandler,
 	configuration::{Antialias, Cache, Configuration},
-	image_cache::AnimationFrameTexture,
+	image_cache::{image_loader::Orientation, AnimationFrameTexture},
 	playback_manager::*,
 };
 
@@ -45,6 +45,56 @@ pub enum ScalingMode {
 enum HoverState {
 	None,
 	ItemHovered { prev_path: PathBuf },
+}
+
+fn orientation_to_matrix(orientation: Orientation) -> Matrix4<f32> {
+	#[rustfmt::skip]
+	let result = match orientation {
+		Orientation::Deg0 => Matrix4::from_scale(1.0),
+		Orientation::Deg0HorFlip => Matrix4::new(
+			-1.0, 0.0, 0.0, 0.0,
+			0.0, 1.0, 0.0, 0.0,
+			0.0, 0.0, 1.0, 0.0,
+			0.0, 0.0, 0.0, 1.0
+		),
+		Orientation::Deg180 => Matrix4::new(
+			-1.0, 0.0, 0.0, 0.0,
+			0.0, -1.0, 0.0, 0.0,
+			0.0, 0.0, 1.0, 0.0,
+			0.0, 0.0, 0.0, 1.0
+		),
+		Orientation::Deg180HorFlip => Matrix4::new(
+			1.0, 0.0, 0.0, 0.0,
+			0.0, -1.0, 0.0, 0.0,
+			0.0, 0.0, 1.0, 0.0,
+			0.0, 0.0, 0.0, 1.0
+		),
+		Orientation::Deg90 => Matrix4::new(
+			0.0, -1.0, 0.0, 0.0,
+			1.0, 0.0, 0.0, 0.0,
+			0.0, 0.0, 1.0, 0.0,
+			0.0, 0.0, 0.0, 1.0
+		),
+		Orientation::Deg90VerFlip => Matrix4::new(
+			0.0, -1.0, 0.0, 0.0,
+			-1.0, 0.0, 0.0, 0.0,
+			0.0, 0.0, 1.0, 0.0,
+			0.0, 0.0, 0.0, 1.0
+		),
+		Orientation::Deg270 => Matrix4::new(
+			0.0, 1.0, 0.0, 0.0,
+			-1.0, 0.0, 0.0, 0.0,
+			0.0, 0.0, 1.0, 0.0,
+			0.0, 0.0, 0.0, 1.0
+		),
+		Orientation::Deg270VerFlip => Matrix4::new(
+			0.0, 1.0, 0.0, 0.0,
+			1.0, 0.0, 0.0, 0.0,
+			0.0, 0.0, 1.0, 0.0,
+			0.0, 0.0, 0.0, 1.0
+		),
+	};
+	result
 }
 
 struct PictureWidgetData {
@@ -100,11 +150,13 @@ impl PictureWidgetData {
 		let size = self.drawn_bounds.size.vec;
 		if let Some(texture) = self.get_texture() {
 			let panel_aspect = size.x / size.y;
-			let img_phys_w = texture.texture.width() as f32;
-			let img_pyhs_h = texture.texture.height() as f32;
+			let (img_phys_w, img_pyhs_h) = {
+				let (w, h) = texture.oriented_dimensions();
+				(w as f32, h as f32)
+			};
 			let img_aspect = img_phys_w / img_pyhs_h;
 
-			let texel_size_to_fit_width = size.x / texture.texture.width() as f32;
+			let texel_size_to_fit_width = size.x / img_phys_w;
 			let img_texel_size = if img_aspect > panel_aspect {
 				// The image is relatively wider than the panel
 				texel_size_to_fit_width
@@ -226,8 +278,10 @@ impl PictureWidgetData {
 	/// Ensures that the image is within the widget, or at least touches an edge of the widget
 	fn apply_img_bounds(&mut self, dpi_scale: f32) {
 		if let Some(texture) = self.get_texture() {
-			let img_phys_w = texture.texture.width() as f32 * self.img_texel_size;
-			let img_phys_h = texture.texture.height() as f32 * self.img_texel_size;
+			let (img_phys_w, img_phys_h) = {
+				let (w, h) = texture.oriented_dimensions();
+				(w as f32 * self.img_texel_size, h as f32 * self.img_texel_size)
+			};
 			let img_w = img_phys_w / dpi_scale;
 			let img_h = img_phys_h / dpi_scale;
 
@@ -565,24 +619,20 @@ impl Widget for PictureWidget {
 			if let Some(texture) = texture {
 				let img_w = texture.texture.width() as f32;
 				let img_h = texture.texture.height() as f32;
-
 				let img_height_over_width = img_h / img_w;
 				let image_display_width = data.img_texel_size * img_w / context.dpi_scale_factor;
-
-				// Model tranform
-
 				let image_display_height = image_display_width * img_height_over_width;
+				// Model tranform
 				let img_pyhs_pos = data.img_pos.vec * context.dpi_scale_factor;
-				let img_phys_siz;
-				{
+				let img_phys_siz = {
 					let img_phys_w = image_display_width * context.dpi_scale_factor;
 					let img_phys_h = image_display_height * context.dpi_scale_factor;
-					img_phys_siz = LogicalVector::new(img_phys_w.ceil(), img_phys_h.ceil());
-				}
+					LogicalVector::new(img_phys_w.ceil(), img_phys_h.ceil())
+				};
 				let corner_x =
-					(img_pyhs_pos.x - img_phys_siz.vec.x * 0.5).floor() / context.dpi_scale_factor;
+					(img_pyhs_pos.x - img_phys_siz.vec.x * 0.5).ceil() / context.dpi_scale_factor;
 				let corner_y =
-					(img_pyhs_pos.y - img_phys_siz.vec.y * 0.5).floor() / context.dpi_scale_factor;
+					(img_pyhs_pos.y - img_phys_siz.vec.y * 0.5).ceil() / context.dpi_scale_factor;
 				let adjusted_w = img_phys_siz.vec.x / context.dpi_scale_factor;
 				let adjusted_h = img_phys_siz.vec.y / context.dpi_scale_factor;
 				let scaling = Matrix4::from_nonuniform_scale(adjusted_w, adjusted_h, 1.0);
@@ -593,13 +643,13 @@ impl Widget for PictureWidget {
 						-0.5 * adjusted_h,
 						0.0,
 					));
-					let rotate = Matrix4::from_angle_z(Rad(-texture.angle));
+					let orient = orientation_to_matrix(texture.orientation);
 					let to_corner = Matrix4::from_translation(Vector3::new(
 						0.5 * adjusted_w,
 						0.5 * adjusted_h,
 						0.0,
 					));
-					orientation = to_corner * rotate * to_center;
+					orientation = to_corner * orient * to_center;
 				}
 				let translation = Matrix4::from_translation(Vector3::new(corner_x, corner_y, 0.0));
 				let transform = translation * orientation * scaling;
