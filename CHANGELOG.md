@@ -1,3 +1,13 @@
+## Current
+
+### Added
+- The currently shown image can now be copied to the clipboard with a keyboard shortcut.
+- Image files without a filename extension can now be opened.
+- The image antialiasing (filtering) mode can now be manually toggled.
+
+### Changed
+- Fixed an issue that caused the images to be loaded from the hard drive even if they were already loaded and avaiable in the cache.
+- Fixed an issue that prevented some images from correctly fitting inside the viewport.
 
 ## 5.0 on 2020-08-17
 
