@@ -1,4 +1,4 @@
-## Current
+## 6.0 on 2020-10-08
 
 ### Added
 - The currently shown image can now be copied to the clipboard with a keyboard shortcut.
