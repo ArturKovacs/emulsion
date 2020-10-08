@@ -23,6 +23,7 @@ pub mod errors {
 			TextureCreationError(texture::TextureCreationError);
 			ImageLoadError(image::ImageError);
 			ExifError(exif::Error);
+			AvifError(libavif_image::Error) #[cfg(feature = "avif")];
 		}
 	}
 }
