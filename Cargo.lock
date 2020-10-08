@@ -596,7 +596,7 @@ checksum = "cd56b59865bce947ac5958779cfa508f6c3b9497cc762b7e24a12d11ccde2c4f"
 
 [[package]]
 name = "emulsion"
-version = "5.0.0"
+version = "6.0.0"
 dependencies = [
  "arboard",
  "backtrace",
@@ -950,18 +950,18 @@ dependencies = [
 
 [[package]]
 name = "libavif"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f11c3ae0dcc448352f686fa058effd569fde1143c4878f1048bae0dd8e46b9f6"
+checksum = "6cd042b97f253b3a2e982fc68f07c7fb8baab9c3a24d7ba466beaf9988e19e8e"
 dependencies = [
  "libavif-sys",
 ]
 
 [[package]]
 name = "libavif-image"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f588cd6548e543a04c64575463b8eca903509f0f3ac7ebc314214a34603a738"
+checksum = "f9af895d40e9ad8d026f40b553464852fe9812353acf57e854544eec896100e5"
 dependencies = [
  "image",
  "libavif",
@@ -969,12 +969,13 @@ dependencies = [
 
 [[package]]
 name = "libavif-sys"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cfb7466223d6131922fbf7ee8327e1a610733479c65babbbfb629c49ae48f945"
+checksum = "d56e398d3926569bf1fe6299d013fee7261bd98dc93912ba1bf2e5ea2cd51d82"
 dependencies = [
  "cmake",
  "libc",
+ "libdav1d-sys",
 ]
 
 [[package]]
@@ -982,6 +983,12 @@ name = "libc"
 version = "0.2.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "755456fae044e6fa1ebbbd1b3e902ae19e73097ed4ed87bb79934a867c007bc3"
+
+[[package]]
+name = "libdav1d-sys"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c5d69c2a4aefad3de40561213851952995af63e0be690bf8e5b014a1074dbbf9"
 
 [[package]]
 name = "libloading"

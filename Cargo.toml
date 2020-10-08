@@ -1,6 +1,6 @@
 [package]
 name = "emulsion"
-version = "5.0.0"
+version = "6.0.0"
 description = "A fast and minimalistic image viewer"
 repository = "https://github.com/ArturKovacs/emulsion"
 authors = ["Artur Barnabas <kovacs.artur.barnabas@gmail.com>"]
@@ -79,7 +79,7 @@ kamadak-exif = "0.5.1"
 arboard = "1.0.1"
 
 [dependencies.libavif-image]
-version = "0.4"
+version = "0.5"
 default-features = false
 features = ["codec-dav1d"]
 optional = true
