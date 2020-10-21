@@ -122,7 +122,10 @@ pub fn detect_orientation(path: &Path) -> Result<Orientation> {
 					6 => Ok(Orientation::Deg270),
 					7 => Ok(Orientation::Deg270VerFlip),
 					8 => Ok(Orientation::Deg90),
-					_ => Err("Invalid Exif orientation".into()),
+					_ => {
+						eprintln!("Invalid Exif orientation. Using default orientation.");
+						Ok(Orientation::Deg0)
+					}
 				}
 			} else {
 				Ok(Orientation::Deg0)
