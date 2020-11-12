@@ -215,9 +215,9 @@ impl Directory {
 	}
 
 	pub fn update_directory(&mut self) -> Result<()> {
-		let (curr_filename, curr_index) = (self.curr_filename(), self.curr_file_idx);
+		let curr_filename = self.curr_filename();
+		let curr_index = self.curr_file_idx;
 		self.collect_directory()?;
-		// if possible preserve previous file_name
 		for (index, desc) in self.files.iter().enumerate() {
 			if desc.path.file_name().unwrap() == curr_filename {
 				self.curr_file_idx = index;
@@ -228,7 +228,7 @@ impl Directory {
 		}
 		// if is_file_supported, preserve index of previous file or its following files
 		for (index, desc) in self.files.iter().enumerate().skip(curr_index) {
-			if is_file_supported(&PathBuf::from(desc.path.file_name().unwrap())) {
+			if is_file_supported(&desc.path) {
 				self.curr_file_idx = index;
 				self.set_image_index_from_file_index();
 				self.check_filter_ready();
