@@ -4,7 +4,7 @@ use std::rc::{Rc, Weak};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use gelatin::cgmath::{Matrix4, Rad, Vector3};
+use gelatin::cgmath::{Matrix4, Vector3};
 use gelatin::glium::glutin::event::{ElementState, ModifiersState, MouseButton};
 use gelatin::glium::{
 	program, uniform, uniforms::MagnifySamplerFilter, Display, Frame, Program, Surface,
