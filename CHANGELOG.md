@@ -1,4 +1,4 @@
-## 7.0 on 2020-11-30
+## 7.2 on 2020-11-30
 
 ### Changed
 - Fixed the issue that the first image was shown from the folder after deleting an image instead of the next.
