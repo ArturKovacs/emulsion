@@ -1,3 +1,9 @@
+## 7.0 on 2020-11-30
+
+### Changed
+- Fixed the issue that the first image was shown from the folder after deleting an image instead of the next.
+- Fixed a crash for when trying to open an image with invalid EXIF orientation.
+
 ## 6.0 on 2020-10-08
 
 ### Added
