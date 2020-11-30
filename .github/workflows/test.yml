@@ -72,7 +72,7 @@ jobs:
           $LINK="https://www.nasm.us/pub/nasm/releasebuilds/$NASM_VERSION/win64"
           curl -LO "$LINK/nasm-$NASM_VERSION-win64.zip"
           7z e -y "nasm-$NASM_VERSION-win64.zip" -o"C:\nasm"
-          echo "::add-path::C:\nasm"
+          echo "C:\nasm" >> $env:GITHUB_PATH
 
       # According to https://github.com/actions-rs/cargo
       # it's okay to simply just run `cargo` once the toolchain is set up
