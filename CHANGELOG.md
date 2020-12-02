@@ -1,3 +1,8 @@
+## Unreleased
+
+### Changed
+- The original scale button now shows "1:1" instead of "1"
+
 ## 7.2 on 2020-11-30
 
 ### Changed
