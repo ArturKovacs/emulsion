@@ -1,4 +1,5 @@
-use crate::{picture_widget::ScalingMode, Theme};
+use super::picture_widget::ScalingMode;
+use crate::Theme;
 
 use gelatin::{
 	button::Button,
@@ -10,18 +11,18 @@ use gelatin::{
 use std::f32;
 use std::rc::Rc;
 
-static MOON: &[u8] = include_bytes!("../resource/moon.png");
-static LIGHT: &[u8] = include_bytes!("../resource/light.png");
-static QUESTION_BUTTON: &[u8] = include_bytes!("../resource/question_button.png");
-static QUESTION_BUTTON_LIGHT: &[u8] = include_bytes!("../resource/question_button_light.png");
-static QUESTION_NOTI: &[u8] = include_bytes!("../resource/question-noti.png");
-static QUESTION_LIGHT_NOTI: &[u8] = include_bytes!("../resource/question-light-noti.png");
-static ONE: &[u8] = include_bytes!("../resource/1.png");
-static ONE_LIGHT: &[u8] = include_bytes!("../resource/1-light.png");
-static FIT_STRETCH: &[u8] = include_bytes!("../resource/fit-stretch.png");
-static FIT_STRETCH_LIGHT: &[u8] = include_bytes!("../resource/fit-stretch-light.png");
-static FIT_BEST: &[u8] = include_bytes!("../resource/fit-min.png");
-static FIT_BEST_LIGHT: &[u8] = include_bytes!("../resource/fit-min-light.png");
+static MOON: &[u8] = include_bytes!("../../resource/moon.png");
+static LIGHT: &[u8] = include_bytes!("../../resource/light.png");
+static QUESTION_BUTTON: &[u8] = include_bytes!("../../resource/question_button.png");
+static QUESTION_BUTTON_LIGHT: &[u8] = include_bytes!("../../resource/question_button_light.png");
+static QUESTION_NOTI: &[u8] = include_bytes!("../../resource/question-noti.png");
+static QUESTION_LIGHT_NOTI: &[u8] = include_bytes!("../../resource/question-light-noti.png");
+static ONE: &[u8] = include_bytes!("../../resource/1.png");
+static ONE_LIGHT: &[u8] = include_bytes!("../../resource/1-light.png");
+static FIT_STRETCH: &[u8] = include_bytes!("../../resource/fit-stretch.png");
+static FIT_STRETCH_LIGHT: &[u8] = include_bytes!("../../resource/fit-stretch-light.png");
+static FIT_BEST: &[u8] = include_bytes!("../../resource/fit-min.png");
+static FIT_BEST_LIGHT: &[u8] = include_bytes!("../../resource/fit-min-light.png");
 
 const NO_BG_COLOR: [f32; 4] = [0.0, 0.0, 0.0, 0.0];
 const ACTIVE_BG_COLOR: [f32; 4] = [0.3, 0.3, 0.3, 0.5];

@@ -31,25 +31,25 @@ use gelatin::{
 	NextUpdate, Widget,
 };
 
-use crate::bottom_bar::BottomBar;
 use crate::configuration::Theme;
 use crate::configuration::{Cache, Configuration};
-use crate::help_screen::*;
-use crate::picture_widget::*;
 use crate::version::Version;
+use crate::widgets::{
+	bottom_bar::BottomBar, copy_notification::CopyNotifications, help_screen::*, picture_widget::*,
+};
 
-mod bottom_bar;
+mod clipboard_handler;
 mod cmd_line;
 mod configuration;
 mod handle_panic;
-mod help_screen;
 mod image_cache;
 mod input_handling;
-mod picture_widget;
+mod parallel_action;
 mod playback_manager;
 mod shaders;
 mod utils;
 mod version;
+mod widgets;
 
 lazy_static! {
 	// The program name will be 'emulsion'
@@ -120,11 +120,15 @@ fn main() {
 	let left_to_pan_img = Picture::from_encoded_bytes(LEFT_TO_PAN);
 	let left_to_pan_hint = Rc::new(HelpScreen::new(left_to_pan_img));
 
+	let copy_notifications_widget = Rc::new(Label::new());
+	let copy_notifications = CopyNotifications::new(&copy_notifications_widget);
+
 	let bottom_bar = Rc::new(BottomBar::new());
 	let picture_widget = make_picture_widget(
 		&window,
 		bottom_bar.clone(),
 		left_to_pan_hint.clone(),
+		copy_notifications,
 		config.clone(),
 		cache.clone(),
 	);
@@ -135,6 +139,7 @@ fn main() {
 
 	let picture_area_container = make_picture_area_container();
 	picture_area_container.add_child(picture_widget.clone());
+	picture_area_container.add_child(copy_notifications_widget);
 	picture_area_container.add_child(left_to_pan_hint);
 	picture_area_container.add_child(help_screen.clone());
 	picture_area_container.add_child(update_notification.clone());
@@ -356,6 +361,7 @@ fn make_picture_widget(
 	window: &Rc<Window>,
 	bottom_bar: Rc<BottomBar>,
 	left_to_pan_hint: Rc<HelpScreen>,
+	copy_notifications: CopyNotifications,
 	config: Rc<RefCell<Configuration>>,
 	cache: Arc<Mutex<Cache>>,
 ) -> Rc<PictureWidget> {
@@ -364,6 +370,7 @@ fn make_picture_widget(
 		window,
 		bottom_bar,
 		left_to_pan_hint,
+		copy_notifications,
 		config,
 		cache,
 	));

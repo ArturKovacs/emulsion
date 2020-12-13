@@ -1,6 +1,6 @@
 [package]
 name = "emulsion"
-version = "5.0.0"
+version = "7.2.0"
 description = "A fast and minimalistic image viewer"
 repository = "https://github.com/ArturKovacs/emulsion"
 authors = ["Artur Barnabas <kovacs.artur.barnabas@gmail.com>"]
@@ -61,7 +61,7 @@ linux_mime_types = [
 winres = "0.1"
 
 [dependencies]
-gelatin = { path = "./subcrates/gelatin", version = "0.4" }
+gelatin = { path = "./subcrates/gelatin", version = "0.5" }
 ureq = { version = "1", features = ["json"], optional = true }
 lazy_static = "1.4.0"
 directories-next = "1.0"
@@ -73,12 +73,13 @@ serde = { version = "1.0", features = ["derive"] }
 toml = "0.5"
 rand = "0.7"
 lexical-sort = "0.3"
-trash = "1.0"
+trash = "1.1"
 clap = { version = "2.33", default-features = false }
 kamadak-exif = "0.5.1"
+arboard = "1.0.1"
 
 [dependencies.libavif-image]
-version = "0.4"
+version = "0.5"
 default-features = false
 features = ["codec-dav1d"]
 optional = true

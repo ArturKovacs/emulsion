@@ -4,7 +4,7 @@ use std::rc::{Rc, Weak};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use gelatin::cgmath::{Matrix4, Rad, Vector3};
+use gelatin::cgmath::{Matrix4, Vector3};
 use gelatin::glium::glutin::event::{ElementState, ModifiersState, MouseButton};
 use gelatin::glium::{
 	program, uniform, uniforms::MagnifySamplerFilter, Display, Frame, Program, Surface,
@@ -22,12 +22,13 @@ use crate::input_handling::*;
 use crate::shaders;
 use crate::utils::{virtual_keycode_is_char, virtual_keycode_to_string};
 use crate::{
-	bottom_bar::BottomBar,
+	clipboard_handler::ClipboardHandler,
 	configuration::{Antialias, Cache, Configuration},
-	help_screen::HelpScreen,
-	image_cache::AnimationFrameTexture,
+	image_cache::{image_loader::Orientation, AnimationFrameTexture},
 	playback_manager::*,
 };
+
+use super::{bottom_bar::BottomBar, copy_notification::CopyNotifications, help_screen::HelpScreen};
 
 const MIN_ZOOM_FACTOR: f32 = 0.0001;
 const MAX_ZOOM_FACTOR: f32 = 10000.0;
@@ -46,6 +47,56 @@ enum HoverState {
 	ItemHovered { prev_path: PathBuf },
 }
 
+fn orientation_to_matrix(orientation: Orientation) -> Matrix4<f32> {
+	#[rustfmt::skip]
+	let result = match orientation {
+		Orientation::Deg0 => Matrix4::from_scale(1.0),
+		Orientation::Deg0HorFlip => Matrix4::new(
+			-1.0, 0.0, 0.0, 0.0,
+			0.0, 1.0, 0.0, 0.0,
+			0.0, 0.0, 1.0, 0.0,
+			0.0, 0.0, 0.0, 1.0
+		),
+		Orientation::Deg180 => Matrix4::new(
+			-1.0, 0.0, 0.0, 0.0,
+			0.0, -1.0, 0.0, 0.0,
+			0.0, 0.0, 1.0, 0.0,
+			0.0, 0.0, 0.0, 1.0
+		),
+		Orientation::Deg180HorFlip => Matrix4::new(
+			1.0, 0.0, 0.0, 0.0,
+			0.0, -1.0, 0.0, 0.0,
+			0.0, 0.0, 1.0, 0.0,
+			0.0, 0.0, 0.0, 1.0
+		),
+		Orientation::Deg90 => Matrix4::new(
+			0.0, -1.0, 0.0, 0.0,
+			1.0, 0.0, 0.0, 0.0,
+			0.0, 0.0, 1.0, 0.0,
+			0.0, 0.0, 0.0, 1.0
+		),
+		Orientation::Deg90VerFlip => Matrix4::new(
+			0.0, -1.0, 0.0, 0.0,
+			-1.0, 0.0, 0.0, 0.0,
+			0.0, 0.0, 1.0, 0.0,
+			0.0, 0.0, 0.0, 1.0
+		),
+		Orientation::Deg270 => Matrix4::new(
+			0.0, 1.0, 0.0, 0.0,
+			-1.0, 0.0, 0.0, 0.0,
+			0.0, 0.0, 1.0, 0.0,
+			0.0, 0.0, 0.0, 1.0
+		),
+		Orientation::Deg270VerFlip => Matrix4::new(
+			0.0, 1.0, 0.0, 0.0,
+			1.0, 0.0, 0.0, 0.0,
+			0.0, 0.0, 1.0, 0.0,
+			0.0, 0.0, 0.0, 1.0
+		),
+	};
+	result
+}
+
 struct PictureWidgetData {
 	placement: WidgetPlacement,
 	drawn_bounds: LogicalRect,
@@ -59,6 +110,9 @@ struct PictureWidgetData {
 	configuration: Rc<RefCell<Configuration>>,
 	cache: Arc<Mutex<Cache>>,
 	playback_manager: PlaybackManager,
+	// It's an option to allow manual destruction.
+	clipboard_handler: Option<ClipboardHandler>,
+	clipboard_request_was_pending: bool,
 
 	program: Program,
 	bright_shade: f32,
@@ -77,6 +131,7 @@ struct PictureWidgetData {
 	next_update: NextUpdate,
 	bottom_bar: Rc<BottomBar>,
 	left_to_pan_hint: Rc<HelpScreen>,
+	copy_notifications: CopyNotifications,
 	window: Weak<Window>,
 }
 impl WidgetData for PictureWidgetData {
@@ -95,11 +150,13 @@ impl PictureWidgetData {
 		let size = self.drawn_bounds.size.vec;
 		if let Some(texture) = self.get_texture() {
 			let panel_aspect = size.x / size.y;
-			let img_phys_w = texture.texture.width() as f32;
-			let img_pyhs_h = texture.texture.height() as f32;
+			let (img_phys_w, img_pyhs_h) = {
+				let (w, h) = texture.oriented_dimensions();
+				(w as f32, h as f32)
+			};
 			let img_aspect = img_phys_w / img_pyhs_h;
 
-			let texel_size_to_fit_width = size.x / texture.texture.width() as f32;
+			let texel_size_to_fit_width = size.x / img_phys_w;
 			let img_texel_size = if img_aspect > panel_aspect {
 				// The image is relatively wider than the panel
 				texel_size_to_fit_width
@@ -221,8 +278,10 @@ impl PictureWidgetData {
 	/// Ensures that the image is within the widget, or at least touches an edge of the widget
 	fn apply_img_bounds(&mut self, dpi_scale: f32) {
 		if let Some(texture) = self.get_texture() {
-			let img_phys_w = texture.texture.width() as f32 * self.img_texel_size;
-			let img_phys_h = texture.texture.height() as f32 * self.img_texel_size;
+			let (img_phys_w, img_phys_h) = {
+				let (w, h) = texture.oriented_dimensions();
+				(w as f32 * self.img_texel_size, h as f32 * self.img_texel_size)
+			};
 			let img_w = img_phys_w / dpi_scale;
 			let img_h = img_phys_h / dpi_scale;
 
@@ -259,6 +318,7 @@ impl PictureWidget {
 		window: &Rc<Window>,
 		bottom_bar: Rc<BottomBar>,
 		left_to_pan_hint: Rc<HelpScreen>,
+		copy_notifications: CopyNotifications,
 		configuration: Rc<RefCell<Configuration>>,
 		cache: Arc<Mutex<Cache>>,
 	) -> PictureWidget {
@@ -314,6 +374,8 @@ impl PictureWidget {
 			configuration,
 			cache,
 			playback_manager: PlaybackManager::new(),
+			clipboard_handler: Some(ClipboardHandler::new()),
+			clipboard_request_was_pending: false,
 			render_validity: Default::default(),
 
 			program,
@@ -330,6 +392,7 @@ impl PictureWidget {
 			next_update: NextUpdate::Latest,
 			bottom_bar,
 			left_to_pan_hint,
+			copy_notifications,
 			window: Rc::downgrade(window),
 		};
 		data.update_scaling_buttons();
@@ -413,10 +476,10 @@ impl PictureWidget {
 		if triggered!(IMG_ORIG_NAME) {
 			borrowed.set_img_size_to_orig();
 		}
-		if triggered!(TOGGLE_ANTIALIAS) {
+		if triggered!(TOGGLE_ANTIALIAS_NAME) {
 			borrowed.toggle_antialias();
 		}
-		if triggered!(SET_AUTOMATIC_ANTIALIAS) {
+		if triggered!(SET_AUTOMATIC_ANTIALIAS_NAME) {
 			borrowed.set_automatic_antialias();
 		}
 		if triggered!(PLAY_PRESENT_NAME) {
@@ -442,6 +505,20 @@ impl PictureWidget {
 				eprintln!("Error while updating directory {:?}", e);
 			}
 			borrowed.render_validity.invalidate();
+		}
+		if triggered!(IMG_COPY_NAME) {
+			let path = borrowed.playback_manager.current_file_path();
+			let request_started;
+			if let Some(clipboard_handler) = &mut borrowed.clipboard_handler {
+				request_started = true;
+				clipboard_handler.request_copy(path);
+				borrowed.copy_notifications.set_started();
+			} else {
+				request_started = false;
+			}
+			if request_started {
+				borrowed.clipboard_request_was_pending = true;
+			}
 		}
 		let img_path = borrowed.playback_manager.current_file_path();
 		if let Some(folder_path) = img_path.parent() {
@@ -480,9 +557,11 @@ impl Widget for PictureWidget {
 		let prev_texture = data.playback_manager.image_texture();
 		data.next_update = data.playback_manager.update_image(window);
 		let new_texture = data.playback_manager.image_texture();
-		let curr_file_index = data.playback_manager.current_file_index() as u32;
-		let curr_dir_len = data.playback_manager.current_dir_len() as u32;
-		data.bottom_bar.slider.set_steps(curr_dir_len, curr_file_index);
+		let curr_file_index = data.playback_manager.current_file_index();
+		let curr_dir_len = data.playback_manager.current_dir_len();
+		if let (Some(curr_file_index), Some(curr_dir_len)) = (curr_file_index, curr_dir_len) {
+			data.bottom_bar.slider.set_steps(curr_dir_len as u32, curr_file_index as u32);
+		}
 		//data.slider.set_step_bg(data.playback_manager.cached_from_dir());
 		let playback_state = data.playback_manager.playback_state();
 		data.set_window_title_filename(window, playback_state, data.playback_manager.file_path());
@@ -495,6 +574,23 @@ impl Widget for PictureWidget {
 				}
 			}
 		}
+		if let Some(clipboard_handler) = &data.clipboard_handler {
+			let clipboard_result = clipboard_handler.try_get_result();
+			let request_pending = clipboard_result.is_none();
+			if data.clipboard_request_was_pending != request_pending {
+				match clipboard_result {
+					Some(succeeded) => data.copy_notifications.set_finished(succeeded),
+					None => data.copy_notifications.set_started(),
+				}
+				data.clipboard_request_was_pending = request_pending;
+			} else if request_pending {
+				let now = Instant::now();
+				let next_update = now + Duration::from_millis(100);
+				data.next_update = data.next_update.aggregate(NextUpdate::WaitUntil(next_update));
+			}
+		}
+		let next_copy_noti_update = data.copy_notifications.update();
+		data.next_update = data.next_update.aggregate(next_copy_noti_update);
 		data.next_update
 	}
 
@@ -523,24 +619,20 @@ impl Widget for PictureWidget {
 			if let Some(texture) = texture {
 				let img_w = texture.texture.width() as f32;
 				let img_h = texture.texture.height() as f32;
-
 				let img_height_over_width = img_h / img_w;
 				let image_display_width = data.img_texel_size * img_w / context.dpi_scale_factor;
-
-				// Model tranform
-
 				let image_display_height = image_display_width * img_height_over_width;
+				// Model tranform
 				let img_pyhs_pos = data.img_pos.vec * context.dpi_scale_factor;
-				let img_phys_siz;
-				{
+				let img_phys_siz = {
 					let img_phys_w = image_display_width * context.dpi_scale_factor;
 					let img_phys_h = image_display_height * context.dpi_scale_factor;
-					img_phys_siz = LogicalVector::new(img_phys_w.ceil(), img_phys_h.ceil());
-				}
+					LogicalVector::new(img_phys_w.ceil(), img_phys_h.ceil())
+				};
 				let corner_x =
-					(img_pyhs_pos.x - img_phys_siz.vec.x * 0.5).floor() / context.dpi_scale_factor;
+					(img_pyhs_pos.x - img_phys_siz.vec.x * 0.5).ceil() / context.dpi_scale_factor;
 				let corner_y =
-					(img_pyhs_pos.y - img_phys_siz.vec.y * 0.5).floor() / context.dpi_scale_factor;
+					(img_pyhs_pos.y - img_phys_siz.vec.y * 0.5).ceil() / context.dpi_scale_factor;
 				let adjusted_w = img_phys_siz.vec.x / context.dpi_scale_factor;
 				let adjusted_h = img_phys_siz.vec.y / context.dpi_scale_factor;
 				let scaling = Matrix4::from_nonuniform_scale(adjusted_w, adjusted_h, 1.0);
@@ -551,13 +643,13 @@ impl Widget for PictureWidget {
 						-0.5 * adjusted_h,
 						0.0,
 					));
-					let rotate = Matrix4::from_angle_z(Rad(-texture.angle));
+					let orient = orientation_to_matrix(texture.orientation);
 					let to_corner = Matrix4::from_translation(Vector3::new(
 						0.5 * adjusted_w,
 						0.5 * adjusted_h,
 						0.0,
 					));
-					orientation = to_corner * rotate * to_center;
+					orientation = to_corner * orient * to_center;
 				}
 				let translation = Matrix4::from_translation(Vector3::new(corner_x, corner_y, 0.0));
 				let transform = translation * orientation * scaling;
@@ -674,13 +766,23 @@ impl Widget for PictureWidget {
 				borrowed.zoom_image(event.cursor_pos, new_image_texel_size);
 			}
 			EventKind::ReceivedCharacter(ch) => {
-				let input_key = char_to_input_key(ch);
-				self.handle_key_input(input_key.as_str(), event.modifiers);
+				//println!("Got char {}", ch);
+				// When the control key is held down, this character is going to be the keycode
+				// of an ascii control character
+				// See https://en.wikipedia.org/wiki/Caret_notation
+				if !event.modifiers.ctrl() {
+					//println!("triggering for char {}", ch);
+					let input_key = char_to_input_key(ch);
+					self.handle_key_input(input_key.as_str(), event.modifiers);
+				}
 			}
 			EventKind::KeyInput { input } => {
 				if let Some(key) = input.virtual_keycode {
+					//println!("Got input for {:?}", key);
 					let input_key_str = virtual_keycode_to_string(key).to_lowercase();
-					if !virtual_keycode_is_char(key) && input.state == ElementState::Pressed {
+					let printable = !event.modifiers.ctrl() && virtual_keycode_is_char(key);
+					if !printable && input.state == ElementState::Pressed {
+						//println!("Triggering for input {:?}", key);
 						self.handle_key_input(input_key_str.as_str(), event.modifiers);
 					}
 					// Panning is a special snowflake
@@ -736,6 +838,11 @@ impl Widget for PictureWidget {
 					borrowed.render_validity.invalidate();
 				}
 			}
+			EventKind::CloseRequested => {
+				let mut borrowed = self.data.borrow_mut();
+				// Just let it drop.
+				borrowed.clipboard_handler.take();
+			}
 		}
 	}
 
@@ -752,5 +859,13 @@ impl Widget for PictureWidget {
 
 	fn set_valid_ref(&self, render_validity: RenderValidity) {
 		self.data.borrow_mut().render_validity = render_validity;
+	}
+}
+
+impl Drop for PictureWidget {
+	fn drop(&mut self) {
+		// This doesn't work. Would be nice to fix at some point. I think I managed to create a
+		// circular reference with my `Rc`s
+		//println!("Called drop for the picture widget.");
 	}
 }
