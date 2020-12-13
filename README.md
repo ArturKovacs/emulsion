@@ -6,6 +6,8 @@ Emulsion is targeting Windows, Mac, and Linux although it is currently only bein
 
 To build the software, obtain the latest stable release of [Rust](https://www.rust-lang.org/) and after navigating to the source directory simply run the command `cargo build --release` using your preferred command line interface.
 
+Planned releases are represented with Milestones (under Issues). I try making a new release every other month or so, but don't take the deadline too seriously. If there's a feature or bugfix that's particularly interesting to you, please indicate this at the issue - a reaction like a thumbs up might just be enough but sometimes it's better to leave a comment because that's what I get a notification about.
+
 Contribution is welcome. Feel free to post feature requests, bug reports, and make pull requests.
 
 ## Notes on cargo features
