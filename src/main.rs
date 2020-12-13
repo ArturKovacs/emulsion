@@ -32,7 +32,7 @@ use gelatin::{
 };
 
 use crate::configuration::Theme;
-use crate::configuration::{Cache, Configuration};
+use crate::configuration::{Cache, ConfigWindowSection, Configuration};
 use crate::version::Version;
 use crate::widgets::{
 	bottom_bar::BottomBar, copy_notification::CopyNotifications, help_screen::*, picture_widget::*,
@@ -88,24 +88,50 @@ fn main() {
 
 	let mut application = Application::new();
 	let window: Rc<Window> = {
-		let window = &mut cache.lock().unwrap().window;
+		let window_cache = &mut cache.lock().unwrap().window;
+		let window_cfg = &config.borrow().window;
+		let window_defaults = configuration::CacheWindowSection::default();
 
-		let window_defaults = configuration::WindowSection::default();
-		let right = window.win_x as i64 + window.win_w as i64;
-		if right < 20 {
-			window.win_w = window_defaults.win_w;
-			window.win_x = window_defaults.win_x;
+		if let Some(ConfigWindowSection {
+			use_last_window_area: Some(false),
+			win_x,
+			win_y,
+			win_w,
+			win_h,
+			..
+		}) = window_cfg
+		{
+			window_cache.win_x = if let Some(x) = win_x { *x } else { window_defaults.win_x };
+			window_cache.win_y = if let Some(y) = win_y { *y } else { window_defaults.win_y };
+			window_cache.win_w = if let Some(w) = win_w { *w } else { window_defaults.win_w };
+			window_cache.win_h = if let Some(h) = win_h { *h } else { window_defaults.win_h };
+		} else {
+			let right = window_cache.win_x as i64 + window_cache.win_w as i64;
+			if right < 20 {
+				window_cache.win_w = window_defaults.win_w;
+				window_cache.win_x = window_defaults.win_x;
+			}
+			if window_cache.win_y < 20 {
+				window_cache.win_y = window_defaults.win_y;
+			}
 		}
-		if window.win_y < 20 {
-			window.win_y = window_defaults.win_y;
-		}
+		let pos = PhysicalPosition::new(window_cache.win_x, window_cache.win_y);
+		let size = PhysicalSize::new(window_cache.win_w, window_cache.win_h);
 		let window_desc = WindowDescriptorBuilder::default()
 			.icon(Some(make_icon()))
-			.size(PhysicalSize::new(window.win_w, window.win_h))
-			.position(Some(PhysicalPosition::new(window.win_x, window.win_y)))
+			.size(size)
+			.position(Some(pos))
 			.build()
 			.unwrap();
-		Window::new(&mut application, window_desc)
+		let window = Window::new(&mut application, window_desc);
+		// This is just to fix the bug on Linux that the window doesn't start up at
+		// the specified position when the position is specified during initialization
+		window.display_mut().gl_window().window().set_outer_position(pos);
+
+		if let Some(ConfigWindowSection { start_fullscreen: Some(true), .. }) = window_cfg {
+			window.set_fullscreen(true);
+		}
+		window
 	};
 	add_window_movement_listener(&window, cache.clone());
 
@@ -123,7 +149,7 @@ fn main() {
 	let copy_notifications_widget = Rc::new(Label::new());
 	let copy_notifications = CopyNotifications::new(&copy_notifications_widget);
 
-	let bottom_bar = Rc::new(BottomBar::new());
+	let bottom_bar = Rc::new(BottomBar::new(&config.borrow()));
 	let picture_widget = make_picture_widget(
 		&window,
 		bottom_bar.clone(),

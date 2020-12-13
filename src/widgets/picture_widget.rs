@@ -440,14 +440,14 @@ impl PictureWidget {
 			if let Some(window) = borrowed.window.upgrade() {
 				let fullscreen = !window.fullscreen();
 				window.set_fullscreen(fullscreen);
-				borrowed.bottom_bar.set_visible(!fullscreen);
+				borrowed.bottom_bar.set_visible_if_should_show(!fullscreen);
 			}
 		}
 		if triggered!(ESCAPE_NAME) {
 			if let Some(window) = borrowed.window.upgrade() {
 				if window.fullscreen() {
 					window.set_fullscreen(false);
-					borrowed.bottom_bar.set_visible(true);
+					borrowed.bottom_bar.set_visible_if_should_show(true);
 				} else {
 					request_exit();
 				}
@@ -740,7 +740,7 @@ impl Widget for PictureWidget {
 									Some(window) => {
 										let fullscreen = !window.fullscreen();
 										window.set_fullscreen(fullscreen);
-										borrowed.bottom_bar.set_visible(!fullscreen);
+										borrowed.bottom_bar.set_visible_if_should_show(!fullscreen);
 									}
 									None => unreachable!(),
 								}
