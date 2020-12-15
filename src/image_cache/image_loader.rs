@@ -140,7 +140,7 @@ pub fn detect_orientation(path: &Path) -> Result<Orientation> {
 
 pub fn simple_load_image(path: &Path, image_format: ImageFormat) -> Result<image::RgbaImage> {
 	let reader = BufReader::new(fs::File::open(path)?);
-	Ok(image::load(reader, image_format)?.to_rgba())
+	Ok(image::load(reader, image_format)?.into_rgba8())
 }
 
 /// Returns an iterator over the animation frames of a GIF file
@@ -201,7 +201,7 @@ where
 		#[cfg(feature = "avif")]
 		ImgFormat::Avif => {
 			let buf = fs::read(path)?;
-			let image = libavif_image::read(&buf)?.to_rgba();
+			let image = libavif_image::read(&buf)?.into_rgba8();
 			process_image(LoadResult::Frame { req_id, image, delay_nano: 0, orientation })?;
 		}
 	}
