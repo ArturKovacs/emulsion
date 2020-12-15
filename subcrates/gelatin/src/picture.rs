@@ -57,13 +57,13 @@ impl Picture {
 		match tmp_picture {
 			PictureData::Path(path) => {
 				let img = image::open(path)?;
-				let rgba = img.into_rgba();
+				let rgba = img.into_rgba8();
 				dimensions = rgba.dimensions();
 				*borrowed = PictureData::Cpu(rgba);
 			}
 			PictureData::EncodedBytes(bytes) => {
 				let img = image::load_from_memory(bytes)?;
-				let rgba = img.into_rgba();
+				let rgba = img.into_rgba8();
 				dimensions = rgba.dimensions();
 				*borrowed = PictureData::Cpu(rgba);
 			}
@@ -97,12 +97,12 @@ impl Picture {
 		match tmp_picture {
 			PictureData::Path(path) => {
 				let img = image::open(path)?;
-				let rgba = img.into_rgba();
+				let rgba = img.into_rgba8();
 				*borrowed = PictureData::Gpu(Self::cpu_to_texture(rgba, display));
 			}
 			PictureData::EncodedBytes(bytes) => {
 				let img = image::load_from_memory(bytes)?;
-				let rgba = img.into_rgba();
+				let rgba = img.into_rgba8();
 				*borrowed = PictureData::Gpu(Self::cpu_to_texture(rgba, display));
 			}
 			PictureData::Cpu(img) => {
