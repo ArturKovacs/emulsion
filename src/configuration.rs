@@ -1,3 +1,12 @@
+//! There are two files that store properties for Emulsion, the *cache* and the *config*.
+//!
+//! The most important distinction between these is that Emulsion never writes to the *config*
+//! but it does write to the *cache* to save portions of the state of the program (e.g. window size
+//! and position).
+//!
+//! Furthermore it's generally true that the user will only edit the *config* to specify their
+//! preferences.
+
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fs;
@@ -11,7 +20,6 @@ pub enum Theme {
 	Light,
 	Dark,
 }
-
 impl Theme {
 	pub fn switch_theme(self) -> Self {
 		match self {
@@ -30,7 +38,6 @@ pub enum Antialias {
 	#[serde(rename = "never")]
 	Never,
 }
-
 impl Default for Antialias {
 	fn default() -> Self {
 		Antialias::Auto
@@ -43,31 +50,40 @@ pub struct CacheImageSection {
 	pub antialiasing: Antialias,
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, PartialEq, Clone, Deserialize)]
 pub struct ConfigImageSection {
 	pub antialiasing: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub struct WindowSection {
+pub struct CacheWindowSection {
 	pub dark: bool,
 	pub win_w: u32,
 	pub win_h: u32,
 	pub win_x: i32,
 	pub win_y: i32,
 }
-
-impl Default for WindowSection {
+impl Default for CacheWindowSection {
 	fn default() -> Self {
 		Self { dark: false, win_w: 580, win_h: 558, win_x: 64, win_y: 64 }
 	}
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
+pub struct ConfigWindowSection {
+	pub start_fullscreen: Option<bool>,
+	pub show_bottom_bar: Option<bool>,
+	pub use_last_window_area: Option<bool>,
+	pub win_w: Option<u32>,
+	pub win_h: Option<u32>,
+	pub win_x: Option<i32>,
+	pub win_y: Option<i32>,
+}
+
+#[derive(Debug, PartialEq, Clone, Deserialize)]
 pub struct ConfigUpdateSection {
 	pub check_updates: bool,
 }
-
 impl Default for ConfigUpdateSection {
 	fn default() -> Self {
 		Self { check_updates: true }
@@ -78,13 +94,11 @@ impl Default for ConfigUpdateSection {
 pub struct CacheUpdateSection {
 	pub last_checked: u64,
 }
-
 impl Default for CacheUpdateSection {
 	fn default() -> Self {
 		Self { last_checked: 0 }
 	}
 }
-
 impl CacheUpdateSection {
 	pub fn update_check_needed(&self) -> bool {
 		let duration = SystemTime::now()
@@ -102,13 +116,28 @@ impl CacheUpdateSection {
 	}
 }
 
+#[derive(Deserialize)]
+struct IncompleteCache {
+	pub window: Option<CacheWindowSection>,
+	pub updates: Option<CacheUpdateSection>,
+	pub image: Option<CacheImageSection>,
+}
+
 #[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub struct Cache {
-	pub window: WindowSection,
+	pub window: CacheWindowSection,
 	pub updates: CacheUpdateSection,
 	pub image: CacheImageSection,
 }
-
+impl From<IncompleteCache> for Cache {
+	fn from(cache: IncompleteCache) -> Self {
+		Self {
+			window: cache.window.unwrap_or_default(),
+			updates: cache.updates.unwrap_or_default(),
+			image: cache.image.unwrap_or_default(),
+		}
+	}
+}
 impl Cache {
 	pub fn theme(&self) -> Theme {
 		if self.window.dark {
@@ -121,26 +150,7 @@ impl Cache {
 	pub fn set_theme(&mut self, theme: Theme) {
 		self.window.dark = theme == Theme::Dark;
 	}
-}
 
-#[derive(Deserialize)]
-struct IncompleteCache {
-	pub window: Option<WindowSection>,
-	pub updates: Option<CacheUpdateSection>,
-	pub image: Option<CacheImageSection>,
-}
-
-impl From<IncompleteCache> for Cache {
-	fn from(cache: IncompleteCache) -> Self {
-		Self {
-			window: cache.window.unwrap_or_default(),
-			updates: cache.updates.unwrap_or_default(),
-			image: cache.image.unwrap_or_default(),
-		}
-	}
-}
-
-impl Cache {
 	pub fn load<P: AsRef<Path>>(file_path: P) -> Result<Cache, String> {
 		let file_path = file_path.as_ref();
 		let cfg_str = fs::read_to_string(file_path)
@@ -159,13 +169,13 @@ impl Cache {
 	}
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, PartialEq, Clone, Deserialize)]
 pub struct EnvVar {
 	pub name: String,
 	pub value: String,
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, PartialEq, Clone, Deserialize)]
 pub struct Command {
 	pub input: Vec<String>,
 	pub program: String,
@@ -173,12 +183,11 @@ pub struct Command {
 	pub envs: Option<Vec<EnvVar>>,
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, PartialEq, Clone, Deserialize)]
 pub struct TitleSection {
 	pub displayed_folders: Option<u32>,
 	pub show_program_name: Option<bool>,
 }
-
 impl TitleSection {
 	pub fn format_file_path<'a>(&self, file_path: &'a PathBuf) -> Cow<'a, str> {
 		match self.displayed_folders {
@@ -212,15 +221,15 @@ impl TitleSection {
 	}
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Deserialize)]
 pub struct Configuration {
 	pub bindings: Option<BTreeMap<String, Vec<String>>>,
 	pub commands: Option<Vec<Command>>,
 	pub updates: Option<ConfigUpdateSection>,
 	pub title: Option<TitleSection>,
 	pub image: Option<ConfigImageSection>,
+	pub window: Option<ConfigWindowSection>,
 }
-
 impl Configuration {
 	pub fn load<P: AsRef<Path>>(file_path: P) -> Result<Configuration, String> {
 		let file_path = file_path.as_ref();

@@ -1,5 +1,5 @@
 use super::picture_widget::ScalingMode;
-use crate::Theme;
+use crate::{ConfigWindowSection, Configuration, Theme};
 
 use gelatin::{
 	button::Button,
@@ -40,6 +40,10 @@ pub struct BottomBar {
 	pub theme_button: Rc<Button>,
 	pub help_button: Rc<Button>,
 
+	/// This is false if the configuration requires this to be invisible
+	// and true otherwise.
+	pub should_show: bool,
+
 	question: Rc<Picture>,
 	question_light: Rc<Picture>,
 	question_noti: Rc<Picture>,
@@ -55,7 +59,7 @@ pub struct BottomBar {
 }
 
 impl BottomBar {
-	pub fn new() -> Self {
+	pub fn new(config: &Configuration) -> Self {
 		let question = Rc::new(Picture::from_encoded_bytes(QUESTION_BUTTON));
 		let question_light = Rc::new(Picture::from_encoded_bytes(QUESTION_BUTTON_LIGHT));
 		let question_noti = Rc::new(Picture::from_encoded_bytes(QUESTION_NOTI));
@@ -95,6 +99,14 @@ impl BottomBar {
 		widget.add_child(theme_button.clone());
 		widget.add_child(help_button.clone());
 
+		let should_show;
+		if let Some(ConfigWindowSection { show_bottom_bar: Some(false), .. }) = config.window {
+			widget.set_visible(false);
+			should_show = false;
+		} else {
+			should_show = true;
+		}
+
 		Self {
 			widget,
 			orig_scale_button,
@@ -103,6 +115,7 @@ impl BottomBar {
 			slider,
 			theme_button,
 			help_button,
+			should_show,
 
 			question,
 			question_light,
@@ -152,8 +165,10 @@ impl BottomBar {
 		}
 	}
 
-	pub fn set_visible(&self, visible: bool) {
-		self.widget.set_visible(visible);
+	/// Sets this visible iff both the `visible` parameter is `true` and
+	/// the `should_show` property of this object is `true`
+	pub fn set_visible_if_should_show(&self, visible: bool) {
+		self.widget.set_visible(visible && self.should_show);
 	}
 
 	pub fn set_help_visible(&self, visible: bool) {
