@@ -936,13 +936,13 @@ impl Widget for PictureWidget {
 					movement_trigger!(
 						borrowed.hor_pan_input,
 						borrowed.hor_pan_vel,
-						PAN_RIGHT_NAME,
+						PAN_LEFT_NAME,
 						MovementDir::Positive
 					);
 					movement_trigger!(
 						borrowed.hor_pan_input,
 						borrowed.hor_pan_vel,
-						PAN_LEFT_NAME,
+						PAN_RIGHT_NAME,
 						MovementDir::Negative
 					);
 
