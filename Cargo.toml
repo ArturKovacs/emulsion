@@ -61,7 +61,7 @@ linux_mime_types = [
 winres = "0.1"
 
 [dependencies]
-gelatin = { path = "./subcrates/gelatin", version = "0.5" }
+gelatin = { path = "./subcrates/gelatin", version = "0.6" }
 ureq = { version = "1", features = ["json"], optional = true }
 lazy_static = "1.4.0"
 directories-next = "1.0"
