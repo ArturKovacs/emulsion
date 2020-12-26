@@ -243,6 +243,7 @@ impl PictureWidgetData {
 
 	fn apply_camera_movement(&mut self, dpi_scale: f32) {
 		fn animate_value(v: &mut f32, dir: f32, dt: f32, next_update: &mut NextUpdate) {
+			#[allow(clippy::float_cmp)]
 			if v.signum() != dir {
 				*v = 0.0;
 			}
@@ -797,7 +798,7 @@ impl Widget for PictureWidget {
 					.unwrap();
 			}
 		}
-		let mut borrowed = self.data.borrow_mut();
+		let borrowed = self.data.borrow();
 		Ok(borrowed.next_update)
 	}
 

@@ -80,6 +80,12 @@ impl Button {
 	}
 }
 
+impl Default for Button {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
 impl Widget for Button {
 	fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<NextUpdate, WidgetError> {
 		use glium::{Blend, BlendingFunction, LinearBlendingFactor};
