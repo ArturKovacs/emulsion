@@ -12,8 +12,8 @@ void main() {
     vec4 color = texture2D(tex, v_tex_coords);
     color = vec4(mix(color.rgb, vec3(1.0), max(0.0, brighten)), color.a);
     color = vec4(mix(color.rgb, vec3(0.0), -min(0.0, brighten)), color.a);
-	color.rgb *= color.a;
-	
+    color.rgb *= color.a;
+
     const float shadow_size = 8.0;
     float shadow_pixel_offset = shadow_size * shadow_offset;
     vec2 tex_cood_from_edge = vec2(0.5) - abs(v_tex_coords - vec2(0.5));
@@ -22,5 +22,5 @@ void main() {
 
     color = mix(bg_color, color, color.a);
     float shadow = shadow_along_axes.x + shadow_along_axes.y;
-    gl_FragColor = vec4(mix(color.rgb, shadow_color, min(1.0, 4*shadow)), mix(color.a, 1.0, shadow));
+    gl_FragColor = vec4(mix(color.rgb, shadow_color, min(1.0, 4.0*shadow)), mix(color.a, 1.0, shadow));
 }

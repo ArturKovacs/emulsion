@@ -52,17 +52,18 @@ let
 in
 rustPlatform.buildRustPackage rec {
   pname = "emulsion";
-  version = "7.2.0";
-  verArray = builtins.splitVersion version;
+  version = "0.0.0";
+  #version = "7.2.0";
+  #verArray = builtins.splitVersion version;
 
   src = fetchFromGitHub {
     owner = "ArturKovacs";
     repo = pname;
-    rev = "v${builtins.elemAt verArray 0}.${builtins.elemAt verArray 1}";
-    sha256 = "1king04p5j4gsvprrfppwaxa5jn4ga4nc0v63wl6fvq2ngwnkg4g";
+    rev = "897abfa08cf715b37fd157eb30bab2f4e0c0a55a";
+    sha256 = "17dcl2g2p12z8byh86iiph9by1w0h57ww2n97x2ixghw02scsssr";
   };
 
-  cargoSha256 = "0dg331v2wq0dwb1drrdpipb6gvc4kah6mli04y8pbakgfb0v6rbd";
+  cargoSha256 = "0jmh8gmvf1diq5vs1pnr8v27v77q00x2bi526j7rn5z61km2f1h9";
 
   nativeBuildInputs = [
     cmake
