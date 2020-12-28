@@ -3,17 +3,11 @@
 , fetchFromGitHub
 , rustPlatform
 
-, cmake
-, gzip
 , installShellFiles
 , makeWrapper
-, ncurses
 , pkgconfig
 , python3
 
-, expat
-, fontconfig
-, freetype
 , libGL
 , libX11
 , libXcursor
@@ -29,15 +23,11 @@
 , AppKit
 , CoreGraphics
 , CoreServices
-, CoreText
 , Foundation
 , OpenGL
 }:
 let
   rpathLibs = [
-    expat
-    fontconfig
-    freetype
     libGL
     libX11
     libXcursor
@@ -63,14 +53,11 @@ rustPlatform.buildRustPackage rec {
     sha256 = "08banc6qxdmjvkbl3cd6wyl110r3ji49ra0xx38y1xab28kakrga";
   };
 
-  cargoSha256 = "1msd7v8vfx2v4jwp9xx90m78k3awli4w5gmwshdf1jpq44f023s4";
+  cargoSha256 = "0jmh8gmvf1diq5vs1pnr8v27v77q00x2bi526j7rn5z61km2f1h9";
 
   nativeBuildInputs = [
-    cmake
-    gzip
     installShellFiles
     makeWrapper
-    ncurses
     pkgconfig
     python3
   ];
@@ -80,7 +67,6 @@ rustPlatform.buildRustPackage rec {
     AppKit
     CoreGraphics
     CoreServices
-    CoreText
     Foundation
     OpenGL
   ];
