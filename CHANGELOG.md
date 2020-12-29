@@ -2,6 +2,12 @@
 
 ### Changed
 - The original scale button now shows "1:1" instead of "1"
+- Changed the configuration folder on macOS (run `emulsion -h` to find where it's located)
+- The image copied to the clipboard can now be pasted into a wider range of programs on Windows
+
+### Added
+- The Windows installer now adds a Start menu entry.
+- Added multiple configuration fields: https://github.com/ArturKovacs/emulsion/pull/160
 
 ## 7.2 on 2020-11-30
 

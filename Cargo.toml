@@ -64,7 +64,7 @@ winres = "0.1"
 gelatin = { path = "./subcrates/gelatin", version = "0.5" }
 ureq = { version = "1", features = ["json"], optional = true }
 lazy_static = "1.4.0"
-directories-next = "1.0"
+directories-next = "2.0"
 open = "1.4.0"
 sys-info = "0.7"
 error-chain = "0.12"
@@ -73,10 +73,10 @@ serde = { version = "1.0", features = ["derive"] }
 toml = "0.5"
 rand = "0.7"
 lexical-sort = "0.3"
-trash = "1.1"
+trash = "1.2"
 clap = { version = "2.33", default-features = false }
 kamadak-exif = "0.5.1"
-arboard = "1.0.1"
+arboard = "1.1"
 
 [dependencies.libavif-image]
 version = "0.5"

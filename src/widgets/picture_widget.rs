@@ -498,7 +498,7 @@ impl PictureWidget {
 		}
 		if triggered!(IMG_DEL_NAME) {
 			let path = borrowed.playback_manager.current_file_path();
-			if let Err(e) = trash::remove(&path) {
+			if let Err(e) = trash::delete(&path) {
 				eprintln!("Error while moving file '{:?}' to trash: {:?}", path, e);
 			}
 			if let Err(e) = borrowed.playback_manager.update_directory() {
