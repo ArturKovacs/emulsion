@@ -102,6 +102,10 @@ Section "Emulsion" SecEmulsion
     ;ADD YOUR OWN FILES HERE...
     File /r "program\*"
 
+    ; Start Menu
+    createDirectory "$SMPROGRAMS\${PROGRAM_NAME}"
+    createShortCut "$SMPROGRAMS\${PROGRAM_NAME}\${PROGRAM_NAME}.lnk" "$INSTDIR\${PROGRAM_NAME}.exe"
+    
     ;Store installation folder
     WriteRegStr SHCTX "${REG_PROG_PATH}" "Install Directory" "$INSTDIR"
     
