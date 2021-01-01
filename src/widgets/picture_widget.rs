@@ -873,8 +873,8 @@ impl Widget for PictureWidget {
 				// of an ascii control character
 				// See https://en.wikipedia.org/wiki/Caret_notation
 				if !event.modifiers.ctrl() {
-					//println!("triggering for char {}", ch);
 					let input_key = char_to_input_key(ch);
+					//println!("triggering for char {}, input str: {}", ch, input_key);
 					self.handle_key_input(input_key.as_str(), event.modifiers);
 				}
 			}

@@ -52,11 +52,13 @@ lazy_static! {
 }
 
 pub fn char_to_input_key(ch: char) -> String {
-	let mut input_key = String::with_capacity(5);
+	let mut input_key = String::with_capacity(8);
 	if ch == ' ' {
 		input_key.push_str("space");
 	} else if ch == '+' {
 		input_key.push_str("add");
+	} else if ch == '-' {
+		input_key.push_str("subtract");
 	} else {
 		input_key.push(ch);
 	}
