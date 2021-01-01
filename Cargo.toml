@@ -7,7 +7,7 @@ authors = ["Artur Barnabas <kovacs.artur.barnabas@gmail.com>"]
 license = "MIT"
 readme = "README.md"
 edition = "2018"
-build = "build.rs"
+build = "build_script/build.rs"
 
 [workspace]
 members = [
@@ -56,6 +56,10 @@ linux_mime_types = [
 	"image/x‑portable‑pixmap",
 	"image/x‑portable‑anymap"
 ]
+
+[build-dependencies]
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.5"
 
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1"
