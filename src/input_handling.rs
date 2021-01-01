@@ -22,6 +22,12 @@ pub static PLAY_PRESENT_NAME: &str = "play_present";
 pub static PLAY_PRESENT_RND_NAME: &str = "play_present_rnd";
 pub static TOGGLE_ANTIALIAS_NAME: &str = "toggle_antialias";
 pub static SET_AUTOMATIC_ANTIALIAS_NAME: &str = "automatic_antialias";
+pub static ZOOM_IN_NAME: &str = "zoom_in";
+pub static ZOOM_OUT_NAME: &str = "zoom_out";
+pub static PAN_LEFT_NAME: &str = "pan_left";
+pub static PAN_RIGHT_NAME: &str = "pan_right";
+pub static PAN_UP_NAME: &str = "pan_up";
+pub static PAN_DOWN_NAME: &str = "pan_down";
 
 lazy_static! {
 	pub static ref DEFAULT_BINDINGS: HashMap<&'static str, Vec<&'static str>> = {
@@ -46,11 +52,13 @@ lazy_static! {
 }
 
 pub fn char_to_input_key(ch: char) -> String {
-	let mut input_key = String::with_capacity(5);
+	let mut input_key = String::with_capacity(8);
 	if ch == ' ' {
 		input_key.push_str("space");
 	} else if ch == '+' {
 		input_key.push_str("add");
+	} else if ch == '-' {
+		input_key.push_str("subtract");
 	} else {
 		input_key.push(ch);
 	}
@@ -154,7 +162,8 @@ pub fn action_triggered(
 	if let Some(Some(keys)) = bindings.map(|b| b.get(action_name)) {
 		keys_triggered(keys.as_slice(), input_key, modifiers)
 	} else {
-		let keys = DEFAULT_BINDINGS.get(action_name).unwrap();
+		let empty = Vec::new();
+		let keys = DEFAULT_BINDINGS.get(action_name).unwrap_or(&empty);
 		keys_triggered(keys.as_slice(), input_key, modifiers)
 	}
 }

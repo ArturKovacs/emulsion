@@ -1,6 +1,6 @@
 [package]
 name = "gelatin"
-version = "0.5.0"
+version = "0.6.0"
 description = "A basic UI framework"
 repository = "https://github.com/ArturKovacs/emulsion"
 authors = ["Artur Barnabas <kovacs.artur.barnabas@gmail.com>"]

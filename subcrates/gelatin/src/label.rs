@@ -66,6 +66,12 @@ impl Label {
 	}
 }
 
+impl Default for Label {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
 impl Widget for Label {
 	fn draw(&self, target: &mut Frame, context: &DrawContext) -> Result<NextUpdate, WidgetError> {
 		use glium::{Blend, BlendingFunction, LinearBlendingFactor};

@@ -4,7 +4,7 @@ use std::rc::{Rc, Weak};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use gelatin::cgmath::{Matrix4, Vector3};
+use gelatin::cgmath::{Matrix4, Vector2, Vector3};
 use gelatin::glium::glutin::event::{ElementState, ModifiersState, MouseButton};
 use gelatin::glium::{
 	program, uniform, uniforms::MagnifySamplerFilter, Display, Frame, Program, Surface,
@@ -39,6 +39,22 @@ pub enum ScalingMode {
 	Fixed,
 	FitStretch,
 	FitMin,
+}
+
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub enum MovementDir {
+	None,
+	Positive,
+	Negative,
+}
+
+impl MovementDir {
+	fn moving(self) -> bool {
+		match self {
+			MovementDir::None => false,
+			_ => true,
+		}
+	}
 }
 
 #[derive(Debug, Clone)]
@@ -122,12 +138,23 @@ struct PictureWidgetData {
 	img_pos: LogicalVector,
 	antialiasing: Antialias,
 
+	hor_pan_input: MovementDir,
+	ver_pan_input: MovementDir,
+	zoom_input: MovementDir,
+	/// The velocity of horizontal panning
+	hor_pan_vel: f32,
+	/// The velocity of vertical panning
+	ver_pan_vel: f32,
+	/// The velocity of zooming
+	zoom_vel: f32,
+
 	last_click_time: Instant,
 	last_mouse_pos: LogicalVector,
 	panning: bool,
 	hover_state: HoverState,
 
 	first_draw: bool,
+	last_cam_move_time: Instant,
 	next_update: NextUpdate,
 	bottom_bar: Rc<BottomBar>,
 	left_to_pan_hint: Rc<HelpScreen>,
@@ -146,7 +173,7 @@ impl WidgetData for PictureWidgetData {
 	}
 }
 impl PictureWidgetData {
-	fn fit_image_to_panel(&mut self, _display: &Display, dpi_scale: f32, stretch: bool) {
+	fn fit_image_to_panel(&mut self, dpi_scale: f32, stretch: bool) {
 		let size = self.drawn_bounds.size.vec;
 		if let Some(texture) = self.get_texture() {
 			let panel_aspect = size.x / size.y;
@@ -180,7 +207,9 @@ impl PictureWidgetData {
 		}
 	}
 
-	fn zoom_image(&mut self, anchor: LogicalVector, mut image_texel_size: f32) {
+	fn zoom_image(&mut self, anchor: LogicalVector, mut delta: f32) {
+		delta = if delta > 0.0 { delta + 1.0 } else { 1.0 / (delta.abs() + 1.0) };
+		let mut image_texel_size = (self.img_texel_size * delta).max(0.0);
 		if (image_texel_size - 1.0).abs() < 0.01 {
 			image_texel_size = 1.0;
 		} else if image_texel_size < MIN_ZOOM_FACTOR {
@@ -195,7 +224,7 @@ impl PictureWidgetData {
 		self.render_validity.invalidate();
 	}
 
-	fn update_image_transform(&mut self, display: &Display, dpi_scale: f32) {
+	fn update_image_transform(&mut self, dpi_scale: f32) {
 		match self.scaling {
 			ScalingMode::Fixed => {
 				let center_offset = (self.drawn_bounds.size - self.prev_draw_size) * 0.5f32;
@@ -203,13 +232,78 @@ impl PictureWidgetData {
 				self.apply_img_bounds(dpi_scale);
 			}
 			ScalingMode::FitStretch => {
-				self.fit_image_to_panel(display, dpi_scale, true);
+				self.fit_image_to_panel(dpi_scale, true);
 			}
 			ScalingMode::FitMin => {
-				self.fit_image_to_panel(display, dpi_scale, false);
+				self.fit_image_to_panel(dpi_scale, false);
 			}
 		}
 		self.prev_draw_size = self.drawn_bounds.size;
+	}
+
+	fn apply_camera_movement(&mut self, dpi_scale: f32) {
+		fn animate_value(v: &mut f32, dir: f32, dt: f32, next_update: &mut NextUpdate) {
+			#[allow(clippy::float_cmp)]
+			if v.signum() != dir {
+				*v = 0.0;
+			}
+			*v += dir * dt * (2.0 / (v.abs() + 1.0));
+			*next_update = NextUpdate::Soonest;
+		}
+
+		let now = Instant::now();
+		let dt_sec = now.duration_since(self.last_cam_move_time).as_secs_f32();
+		self.last_cam_move_time = now;
+
+		match self.hor_pan_input {
+			MovementDir::None => self.hor_pan_vel = 0.0,
+			MovementDir::Positive => {
+				animate_value(&mut self.hor_pan_vel, 1.0, dt_sec, &mut self.next_update)
+			}
+			MovementDir::Negative => {
+				animate_value(&mut self.hor_pan_vel, -1.0, dt_sec, &mut self.next_update)
+			}
+		}
+		match self.ver_pan_input {
+			MovementDir::None => self.ver_pan_vel = 0.0,
+			MovementDir::Positive => {
+				animate_value(&mut self.ver_pan_vel, 1.0, dt_sec, &mut self.next_update)
+			}
+			MovementDir::Negative => {
+				animate_value(&mut self.ver_pan_vel, -1.0, dt_sec, &mut self.next_update)
+			}
+		}
+		match self.zoom_input {
+			MovementDir::None => self.zoom_vel = 0.0,
+			MovementDir::Positive => {
+				animate_value(&mut self.zoom_vel, 1.0, dt_sec, &mut self.next_update)
+			}
+			MovementDir::Negative => {
+				animate_value(&mut self.zoom_vel, -1.0, dt_sec, &mut self.next_update)
+			}
+		}
+
+		if self.zoom_input.moving() {
+			let bounds_size = self.drawn_bounds.size.vec;
+			let anchor = LogicalVector::new(bounds_size.x * 0.5, bounds_size.y * 0.5);
+			self.zoom_image(anchor, self.zoom_vel * dt_sec);
+		}
+		if self.hor_pan_input.moving() || self.ver_pan_input.moving() {
+			let panning_speed = 400.0 * dpi_scale;
+			let pos_delta = Vector2::new(self.hor_pan_vel, self.ver_pan_vel) * dt_sec;
+			self.scaling = ScalingMode::Fixed;
+			self.update_scaling_buttons();
+			self.img_pos.vec += panning_speed * pos_delta;
+		}
+	}
+
+	fn camera_movement_will_start(&mut self) {
+		// If there hasn't been any movement in a while, then reset the last update time
+		// to avoid large jumps at the beggining of a move when the delta would be large.
+		if !self.hor_pan_input.moving() && !self.ver_pan_input.moving() && !self.zoom_input.moving()
+		{
+			self.last_cam_move_time = Instant::now();
+		}
 	}
 
 	fn set_window_title_filename(
@@ -384,10 +478,17 @@ impl PictureWidget {
 			scaling,
 			img_pos: Default::default(),
 			antialiasing,
+			hor_pan_input: MovementDir::None,
+			ver_pan_input: MovementDir::None,
+			zoom_input: MovementDir::None,
+			hor_pan_vel: 0.0,
+			ver_pan_vel: 0.0,
+			zoom_vel: 0.0,
 			last_click_time: Instant::now() - Duration::from_secs(10),
 			last_mouse_pos: Default::default(),
 			panning: false,
 			hover_state: HoverState::None,
+			last_cam_move_time: Instant::now(),
 			first_draw: true,
 			next_update: NextUpdate::Latest,
 			bottom_bar,
@@ -554,6 +655,7 @@ impl Widget for PictureWidget {
 			data.next_update = NextUpdate::Soonest;
 			return data.next_update;
 		}
+		let now = Instant::now();
 		let prev_texture = data.playback_manager.image_texture();
 		data.next_update = data.playback_manager.update_image(window);
 		let new_texture = data.playback_manager.image_texture();
@@ -584,10 +686,13 @@ impl Widget for PictureWidget {
 				}
 				data.clipboard_request_was_pending = request_pending;
 			} else if request_pending {
-				let now = Instant::now();
 				let next_update = now + Duration::from_millis(100);
 				data.next_update = data.next_update.aggregate(NextUpdate::WaitUntil(next_update));
 			}
+		}
+		if data.zoom_input.moving() || data.hor_pan_input.moving() || data.ver_pan_input.moving() {
+			data.render_validity.invalidate();
+			data.next_update = NextUpdate::Soonest;
 		}
 		let next_copy_noti_update = data.copy_notifications.update();
 		data.next_update = data.next_update.aggregate(next_copy_noti_update);
@@ -601,7 +706,8 @@ impl Widget for PictureWidget {
 			if !data.visible {
 				return Ok(data.next_update);
 			}
-			data.update_image_transform(context.display, context.dpi_scale_factor);
+			data.update_image_transform(context.dpi_scale_factor);
+			data.apply_camera_movement(context.dpi_scale_factor);
 			texture = data.get_texture();
 		}
 		{
@@ -759,11 +865,7 @@ impl Widget for PictureWidget {
 			EventKind::MouseScroll { delta } => {
 				let mut borrowed = self.data.borrow_mut();
 				let delta = delta.vec.y * 0.375;
-				let delta = if delta > 0.0 { delta + 1.0 } else { 1.0 / (delta.abs() + 1.0) };
-
-				let new_image_texel_size = (borrowed.img_texel_size * delta).max(0.0);
-
-				borrowed.zoom_image(event.cursor_pos, new_image_texel_size);
+				borrowed.zoom_image(event.cursor_pos, delta);
 			}
 			EventKind::ReceivedCharacter(ch) => {
 				//println!("Got char {}", ch);
@@ -771,8 +873,8 @@ impl Widget for PictureWidget {
 				// of an ascii control character
 				// See https://en.wikipedia.org/wiki/Caret_notation
 				if !event.modifiers.ctrl() {
-					//println!("triggering for char {}", ch);
 					let input_key = char_to_input_key(ch);
+					//println!("triggering for char {}, input str: {}", ch, input_key);
 					self.handle_key_input(input_key.as_str(), event.modifiers);
 				}
 			}
@@ -795,6 +897,67 @@ impl Widget for PictureWidget {
 					) {
 						borrowed.panning = input.state == ElementState::Pressed;
 					}
+
+					let pressed = input.state == ElementState::Pressed;
+
+					macro_rules! movement_trigger {
+						($input:expr, $vel:expr, $name:expr, $dir:expr) => {
+							if action_triggered(
+								&borrowed.configuration,
+								$name,
+								input_key_str.as_str(),
+								event.modifiers,
+								) {
+								if $input == $dir && !pressed {
+									$input = MovementDir::None;
+									$vel = 0.0;
+									}
+								if $input != $dir && pressed {
+									borrowed.camera_movement_will_start();
+									$input = $dir;
+									}
+								}
+						};
+					}
+
+					movement_trigger!(
+						borrowed.zoom_input,
+						borrowed.zoom_vel,
+						ZOOM_IN_NAME,
+						MovementDir::Positive
+					);
+					movement_trigger!(
+						borrowed.zoom_input,
+						borrowed.zoom_vel,
+						ZOOM_OUT_NAME,
+						MovementDir::Negative
+					);
+
+					movement_trigger!(
+						borrowed.hor_pan_input,
+						borrowed.hor_pan_vel,
+						PAN_LEFT_NAME,
+						MovementDir::Positive
+					);
+					movement_trigger!(
+						borrowed.hor_pan_input,
+						borrowed.hor_pan_vel,
+						PAN_RIGHT_NAME,
+						MovementDir::Negative
+					);
+
+					movement_trigger!(
+						borrowed.ver_pan_input,
+						borrowed.ver_pan_vel,
+						PAN_UP_NAME,
+						MovementDir::Positive
+					);
+					movement_trigger!(
+						borrowed.ver_pan_input,
+						borrowed.ver_pan_vel,
+						PAN_DOWN_NAME,
+						MovementDir::Negative
+					);
 				}
 			}
 			EventKind::DroppedFile(ref path) => {

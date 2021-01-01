@@ -133,7 +133,8 @@ impl Window {
 			.with_window_icon(desc.icon)
 			.with_visible(desc.position.is_none());
 
-		let context = glutin::ContextBuilder::new().with_gl_profile(glutin::GlProfile::Core);
+		let context =
+			glutin::ContextBuilder::new().with_gl_profile(glutin::GlProfile::Core).with_vsync(true);
 		let display = glium::Display::new(window, context, &application.event_loop).unwrap();
 
 		if let Some(pos) = desc.position {

@@ -134,6 +134,13 @@ impl<Dim: PickDimension + 'static> LineLayoutContainer<Dim> {
 		}
 	}
 }
+
+impl<Dim: PickDimension + 'static> Default for LineLayoutContainer<Dim> {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
 impl<Dim: PickDimension + 'static> Widget for LineLayoutContainer<Dim> {
 	fn before_draw(&self, window: &Window) -> NextUpdate {
 		let mut next_update = NextUpdate::Latest;

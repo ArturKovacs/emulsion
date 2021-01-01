@@ -40,7 +40,6 @@ pub fn virtual_keycode_is_char(vk: VirtualKeyCode) -> bool {
 		VirtualKeyCode::Z => true,
 		VirtualKeyCode::Space => true,
 		VirtualKeyCode::Caret => true,
-		VirtualKeyCode::Numlock => true,
 		VirtualKeyCode::Numpad0 => true,
 		VirtualKeyCode::Numpad1 => true,
 		VirtualKeyCode::Numpad2 => true,
@@ -199,7 +198,12 @@ pub fn virtual_keycode_to_string(vk: VirtualKeyCode) -> String {
 		VirtualKeyCode::Mail => "Mail".into(),
 		VirtualKeyCode::MediaSelect => "MediaSelect".into(),
 		VirtualKeyCode::MediaStop => "MediaStop".into(),
-		VirtualKeyCode::Minus => "Minus".into(),
+
+		// Handling the alphanumeric and the numpad version of `-`
+		// as the same key.
+		// Alphanumeric is `Minus`, the numapd is `Subtract`
+		VirtualKeyCode::Minus => "Subtract".into(),
+
 		VirtualKeyCode::Multiply => "Multiply".into(),
 		VirtualKeyCode::Mute => "Mute".into(),
 		VirtualKeyCode::MyComputer => "MyComputer".into(),
