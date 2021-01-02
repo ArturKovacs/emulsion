@@ -2,7 +2,7 @@
 /target
 /.idea
 /.vscode
-.rs.bk
 .~lock.*
 .DS_Store
-.blend1
+*.rs.bk
+*.blend1
