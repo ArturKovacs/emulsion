@@ -8,6 +8,7 @@
 ### Added
 - The Windows installer now adds a Start menu entry.
 - Added multiple configuration fields: https://github.com/ArturKovacs/emulsion/pull/160
+- Zooming and camera panning can now be bound to keyboard input.
 
 ## 7.2 on 2020-11-30
 
