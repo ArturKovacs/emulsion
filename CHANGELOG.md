@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 8.0 on 2021-01-02
+
 ### Changed
 - The original scale button now shows "1:1" instead of "1"
 - Changed the configuration folder on macOS (run `emulsion -h` to find where it's located)
