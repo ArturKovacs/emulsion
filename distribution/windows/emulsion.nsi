@@ -172,6 +172,11 @@ SectionEnd
 ;--------------------------------
 Section Uninstall
     
+    ; Remove Start Menu launcher
+    Delete "$SMPROGRAMS\${PROGRAM_NAME}\${PROGRAM_NAME}.lnk"
+    ; Try to remove the Start Menu folder - this will only happen if it is empty
+    RMDir "$SMPROGRAMS\${PROGRAM_NAME}"
+    
     Delete "$INSTDIR\emulsion.exe"
     Delete "$INSTDIR\Uninstall.exe"
     RMDir "$INSTDIR" ; This is okay, rmdir fails if the directory is not empty.
