@@ -116,14 +116,9 @@ pub fn detect_format(path: &Path) -> Result<ImgFormat> {
 
 #[cfg(feature = "svg")]
 mod svg {
-	use resvg;
-	use tiny_skia;
-	use usvg;
-        use super::Result;
+	use super::Result;
 
-	pub fn load_svg(
-		path: &std::path::Path,
-	) -> Result<Vec<u8>> {
+	pub fn load_svg(path: &std::path::Path) -> Result<Vec<u8>> {
 		let opt = usvg::Options::default();
 		let rtree = usvg::Tree::from_file(path, &opt)?;
 		let pixmap_size = rtree.svg_node().size.to_screen_size();
@@ -236,7 +231,8 @@ where
 		#[cfg(feature = "svg")]
 		ImgFormat::Svg => {
 			let buf = svg::load_svg(path)?;
-			let image = image::load_from_memory_with_format(buf.as_slice(), ImageFormat::Png)?.into_rgba8();
+			let image =
+				image::load_from_memory_with_format(buf.as_slice(), ImageFormat::Png)?.into_rgba8();
 			process_image(LoadResult::Frame { req_id, image, delay_nano: 0, orientation })?;
 		}
 	}
