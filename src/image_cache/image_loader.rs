@@ -24,6 +24,8 @@ pub mod errors {
 			ImageLoadError(image::ImageError);
 			ExifError(exif::Error);
 			AvifError(libavif_image::Error) #[cfg(feature = "avif")];
+			SvgError(usvg::Error) #[cfg(feature = "svg")];
+			SvgEncodeError(png::EncodingError) #[cfg(feature = "svg")];
 		}
 	}
 }
@@ -39,6 +41,8 @@ pub const NON_EXISTENT_REQUEST_ID: u32 = std::u32::MAX;
 
 pub enum ImgFormat {
 	Image(ImageFormat),
+	#[cfg(feature = "svg")]
+	Svg,
 	#[cfg(feature = "avif")]
 	Avif,
 }
@@ -95,6 +99,12 @@ pub fn detect_format(path: &Path) -> Result<ImgFormat> {
 				return Ok(ImgFormat::Avif);
 			}
 		}
+		#[cfg(feature = "svg")]
+		{
+			if path.extension() == Some(std::ffi::OsStr::new("svg")) {
+				return Ok(ImgFormat::Svg);
+			}
+		}
 		if let Ok(format) = image::guess_format(&file_start_bytes) {
 			return Ok(ImgFormat::Image(format));
 		}
@@ -102,6 +112,25 @@ pub fn detect_format(path: &Path) -> Result<ImgFormat> {
 
 	// If that didn't work, try to detect the format from the file ending
 	Ok(ImgFormat::Image(ImageFormat::from_path(path)?))
+}
+
+#[cfg(feature = "svg")]
+mod svg {
+	use resvg;
+	use tiny_skia;
+	use usvg;
+        use super::Result;
+
+	pub fn load_svg(
+		path: &std::path::Path,
+	) -> Result<Vec<u8>> {
+		let opt = usvg::Options::default();
+		let rtree = usvg::Tree::from_file(path, &opt)?;
+		let pixmap_size = rtree.svg_node().size.to_screen_size();
+		let mut pixmap = tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height()).unwrap();
+		resvg::render(&rtree, usvg::FitTo::Original, pixmap.as_mut()).unwrap();
+		Ok(pixmap.encode_png()?)
+	}
 }
 
 pub fn detect_orientation(path: &Path) -> Result<Orientation> {
@@ -202,6 +231,12 @@ where
 		ImgFormat::Avif => {
 			let buf = fs::read(path)?;
 			let image = libavif_image::read(&buf)?.into_rgba8();
+			process_image(LoadResult::Frame { req_id, image, delay_nano: 0, orientation })?;
+		}
+		#[cfg(feature = "svg")]
+		ImgFormat::Svg => {
+			let buf = svg::load_svg(path)?;
+			let image = image::load_from_memory_with_format(buf.as_slice(), ImageFormat::Png)?.into_rgba8();
 			process_image(LoadResult::Frame { req_id, image, delay_nano: 0, orientation })?;
 		}
 	}

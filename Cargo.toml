@@ -25,6 +25,7 @@ lto = true
 default = []
 networking = ["ureq"]
 avif = ["libavif-image"]
+svg = ["usvg", "resvg", "tiny-skia", "png"]
 
 [package.metadata.bundle]
 name = "Emulsion"
@@ -45,6 +46,8 @@ linux_mime_types = [
 	"image/tiff",
 	"image/bmp",
 	"image/avif",
+	"image/svg+xml",
+	"image/svg",
 	"image/x-png",
 	"image/x-tga",
 	"image/x-targa",
@@ -77,6 +80,10 @@ trash = "1.2"
 clap = { version = "2.33", default-features = false }
 kamadak-exif = "0.5.1"
 arboard = "1.1"
+resvg = {version = "0.13.0", optional = true}
+usvg = {version = "0.13.0", optional = true}
+tiny-skia = {version = "0.3.0", optional = true}
+png = {version = "0.16.7", optional = true}
 
 [dependencies.libavif-image]
 version = "0.5"
