@@ -24,7 +24,6 @@ pub mod errors {
 			ImageLoadError(image::ImageError);
 			ExifError(exif::Error);
 			SvgError(usvg::Error);
-			SvgEncodeError(png::EncodingError);
 			AvifError(libavif_image::Error) #[cfg(feature = "avif")];
 		}
 	}
@@ -158,13 +157,15 @@ pub fn load_gif(path: &Path, req_id: u32) -> Result<impl Iterator<Item = Result<
 	load_animation(req_id, decoder)
 }
 
-pub fn load_svg(path: &std::path::Path) -> Result<Vec<u8>> {
+/// Parse, render and gather an SVG into a ImageBuffer<Rgba>
+pub fn load_svg(path: &std::path::Path) -> Result<image::RgbaImage> {
 	let opt = usvg::Options::default();
 	let rtree = usvg::Tree::from_file(path, &opt)?;
-	let pixmap_size = rtree.svg_node().size.to_screen_size();
-	let mut pixmap = tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height()).unwrap();
+	let (width, height) = rtree.svg_node().size.to_screen_size().dimensions();
+	// These unwrapped Options are fine as long as the dimesions are correct
+	let mut pixmap = tiny_skia::Pixmap::new(width, height).unwrap();
 	resvg::render(&rtree, usvg::FitTo::Original, pixmap.as_mut()).unwrap();
-	Ok(pixmap.encode_png()?)
+	Ok(image::RgbaImage::from_raw(width, height, pixmap.data().to_vec()).unwrap())
 }
 
 pub fn complex_load_image<F>(
@@ -222,9 +223,7 @@ where
 			process_image(LoadResult::Frame { req_id, image, delay_nano: 0, orientation })?;
 		}
 		ImgFormat::Svg => {
-			let buf = load_svg(path)?;
-			let image =
-				image::load_from_memory_with_format(buf.as_slice(), ImageFormat::Png)?.into_rgba8();
+			let image = load_svg(path)?;
 			process_image(LoadResult::Frame { req_id, image, delay_nano: 0, orientation })?;
 		}
 	}

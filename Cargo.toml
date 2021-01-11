@@ -82,7 +82,6 @@ arboard = "1.1"
 resvg = "0.13.0"
 usvg = "0.13.0"
 tiny-skia = "0.3.0"
-png = "0.16.7"
 
 [dependencies.libavif-image]
 version = "0.5"

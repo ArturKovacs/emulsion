@@ -629,7 +629,6 @@ dependencies = [
  "lexical-sort",
  "libavif-image",
  "open",
- "png",
  "rand 0.7.3",
  "resvg",
  "serde",
