@@ -97,10 +97,8 @@ pub fn detect_format(path: &Path) -> Result<ImgFormat> {
 				return Ok(ImgFormat::Avif);
 			}
 		}
-		{
-			if path.extension() == Some(std::ffi::OsStr::new("svg")) {
-				return Ok(ImgFormat::Svg);
-			}
+		if path.extension() == Some(std::ffi::OsStr::new("svg")) {
+			return Ok(ImgFormat::Svg);
 		}
 		if let Ok(format) = image::guess_format(&file_start_bytes) {
 			return Ok(ImgFormat::Image(format));
@@ -161,15 +159,14 @@ pub fn load_gif(path: &Path, req_id: u32) -> Result<impl Iterator<Item = Result<
 pub fn load_svg(path: &std::path::Path) -> Result<image::RgbaImage> {
 	let opt = usvg::Options::default();
 	let rtree = usvg::Tree::from_file(path, &opt)?;
-	let (width, height) = rtree.svg_node().size.to_screen_size().dimensions();
+	let (width, height) = (rtree.svg_node().size.width(), rtree.svg_node().size.height());
 	// Scale to fit 4096
-	let zoom = 4096 / width.max(height);
-	let (width, height) = (width * zoom, height * zoom);
-
+	let zoom = 4096. / width.max(height);
+	let (width, height) = ((width * zoom) as u32, (height * zoom) as u32);
 	// These unwrapped Options are fine as long as the dimensions are correct
 	let mut pixmap = tiny_skia::Pixmap::new(width, height).unwrap();
 	resvg::render(&rtree, usvg::FitTo::Zoom(zoom as f32), pixmap.as_mut()).unwrap();
-	Ok(image::RgbaImage::from_raw(width, height, pixmap.data().to_vec()).unwrap())
+	Ok(image::RgbaImage::from_raw(width, height, pixmap.take()).unwrap())
 }
 
 pub fn complex_load_image<F>(
