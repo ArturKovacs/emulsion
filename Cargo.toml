@@ -45,6 +45,8 @@ linux_mime_types = [
 	"image/tiff",
 	"image/bmp",
 	"image/avif",
+	"image/svg+xml",
+	"image/svg",
 	"image/x-png",
 	"image/x-tga",
 	"image/x-targa",
@@ -77,6 +79,9 @@ trash = "1.2"
 clap = { version = "2.33", default-features = false }
 kamadak-exif = "0.5.1"
 arboard = "1.1"
+resvg = "0.13.0"
+usvg = "0.13.0"
+tiny-skia = "0.3.0"
 
 [dependencies.libavif-image]
 version = "0.5"

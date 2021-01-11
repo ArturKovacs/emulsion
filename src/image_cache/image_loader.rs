@@ -23,6 +23,7 @@ pub mod errors {
 			TextureCreationError(texture::TextureCreationError);
 			ImageLoadError(image::ImageError);
 			ExifError(exif::Error);
+			SvgError(usvg::Error);
 			AvifError(libavif_image::Error) #[cfg(feature = "avif")];
 		}
 	}
@@ -39,6 +40,7 @@ pub const NON_EXISTENT_REQUEST_ID: u32 = std::u32::MAX;
 
 pub enum ImgFormat {
 	Image(ImageFormat),
+	Svg,
 	#[cfg(feature = "avif")]
 	Avif,
 }
@@ -95,6 +97,9 @@ pub fn detect_format(path: &Path) -> Result<ImgFormat> {
 				return Ok(ImgFormat::Avif);
 			}
 		}
+		if path.extension() == Some(std::ffi::OsStr::new("svg")) {
+			return Ok(ImgFormat::Svg);
+		}
 		if let Ok(format) = image::guess_format(&file_start_bytes) {
 			return Ok(ImgFormat::Image(format));
 		}
@@ -150,6 +155,21 @@ pub fn load_gif(path: &Path, req_id: u32) -> Result<impl Iterator<Item = Result<
 	load_animation(req_id, decoder)
 }
 
+/// Parse, render and gather an SVG into a ImageBuffer<Rgba>
+pub fn load_svg(path: &std::path::Path) -> Result<image::RgbaImage> {
+	let opt = usvg::Options::default();
+	let rtree = usvg::Tree::from_file(path, &opt)?;
+	let size = rtree.svg_node().size;
+	let (width, height) = (size.width(), size.height());
+	// Scale to fit 4096
+	let zoom = 4096. / width.max(height);
+	let (width, height) = ((width * zoom) as u32, (height * zoom) as u32);
+	// These unwrapped Options are fine as long as the dimensions are correct
+	let mut pixmap = tiny_skia::Pixmap::new(width, height).unwrap();
+	resvg::render(&rtree, usvg::FitTo::Zoom(zoom as f32), pixmap.as_mut()).unwrap();
+	Ok(image::RgbaImage::from_raw(width, height, pixmap.take()).unwrap())
+}
+
 pub fn complex_load_image<F>(
 	path: &Path,
 	allow_animation: bool,
@@ -202,6 +222,10 @@ where
 		ImgFormat::Avif => {
 			let buf = fs::read(path)?;
 			let image = libavif_image::read(&buf)?.into_rgba8();
+			process_image(LoadResult::Frame { req_id, image, delay_nano: 0, orientation })?;
+		}
+		ImgFormat::Svg => {
+			let image = load_svg(path)?;
 			process_image(LoadResult::Frame { req_id, image, delay_nano: 0, orientation })?;
 		}
 	}
