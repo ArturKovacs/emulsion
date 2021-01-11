@@ -159,7 +159,8 @@ pub fn load_gif(path: &Path, req_id: u32) -> Result<impl Iterator<Item = Result<
 pub fn load_svg(path: &std::path::Path) -> Result<image::RgbaImage> {
 	let opt = usvg::Options::default();
 	let rtree = usvg::Tree::from_file(path, &opt)?;
-	let (width, height) = (rtree.svg_node().size.width(), rtree.svg_node().size.height());
+	let size = rtree.svg_node().size;
+	let (width, height) = (size.width(), size.height());
 	// Scale to fit 4096
 	let zoom = 4096. / width.max(height);
 	let (width, height) = ((width * zoom) as u32, (height * zoom) as u32);
