@@ -162,9 +162,13 @@ pub fn load_svg(path: &std::path::Path) -> Result<image::RgbaImage> {
 	let opt = usvg::Options::default();
 	let rtree = usvg::Tree::from_file(path, &opt)?;
 	let (width, height) = rtree.svg_node().size.to_screen_size().dimensions();
-	// These unwrapped Options are fine as long as the dimesions are correct
+	// Scale to fit 4096
+	let zoom = 4096 / width.max(height);
+	let (width, height) = (width * zoom, height * zoom);
+
+	// These unwrapped Options are fine as long as the dimensions are correct
 	let mut pixmap = tiny_skia::Pixmap::new(width, height).unwrap();
-	resvg::render(&rtree, usvg::FitTo::Original, pixmap.as_mut()).unwrap();
+	resvg::render(&rtree, usvg::FitTo::Zoom(zoom as f32), pixmap.as_mut()).unwrap();
 	Ok(image::RgbaImage::from_raw(width, height, pixmap.data().to_vec()).unwrap())
 }
 
