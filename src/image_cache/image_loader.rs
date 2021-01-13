@@ -1,4 +1,3 @@
-use std;
 use std::fs;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
@@ -6,6 +5,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::{self, ffi::OsStr};
 
 use gelatin::glium;
 use gelatin::image::{self, gif::GifDecoder, png::PngDecoder, AnimationDecoder, ImageFormat};
@@ -25,6 +25,7 @@ pub mod errors {
 			ExifError(exif::Error);
 			SvgError(usvg::Error);
 			AvifError(libavif_image::Error) #[cfg(feature = "avif")];
+			ArchiveError(compress_tools::Error) #[cfg(feature = "archives")];
 		}
 	}
 }
@@ -43,6 +44,8 @@ pub enum ImgFormat {
 	Svg,
 	#[cfg(feature = "avif")]
 	Avif,
+	#[cfg(feature = "archives")]
+	ComicBook,
 }
 
 /// These values define the transformation for a pixel array which is to be displayed.
@@ -89,6 +92,15 @@ pub fn detect_format(path: &Path) -> Result<ImgFormat> {
 	let mut file = fs::File::open(path)?;
 	let mut file_start_bytes = [0; 512];
 
+	#[cfg(feature = "archives")]
+	{
+		if let Some(ext) = path.extension() {
+			if ext == OsStr::new("cbr") || ext == OsStr::new("cbz") || ext == OsStr::new("cbt") {
+				return Ok(ImgFormat::ComicBook);
+			}
+		}
+	}
+
 	// Try to detect the format from the first 512 bytes
 	if file.read_exact(&mut file_start_bytes).is_ok() {
 		#[cfg(feature = "avif")]
@@ -97,7 +109,7 @@ pub fn detect_format(path: &Path) -> Result<ImgFormat> {
 				return Ok(ImgFormat::Avif);
 			}
 		}
-		if path.extension() == Some(std::ffi::OsStr::new("svg")) {
+		if path.extension() == Some(OsStr::new("svg")) {
 			return Ok(ImgFormat::Svg);
 		}
 		if let Ok(format) = image::guess_format(&file_start_bytes) {
@@ -170,6 +182,28 @@ pub fn load_svg(path: &std::path::Path) -> Result<image::RgbaImage> {
 	Ok(image::RgbaImage::from_raw(width, height, pixmap.take()).unwrap())
 }
 
+#[cfg(feature = "archives")]
+fn load_comic_book(path: PathBuf, req_id: u32) -> Result<impl Iterator<Item = Result<LoadResult>>> {
+	let file = fs::File::open(&path)?;
+	let mut page_filenames = compress_tools::list_archive_files(file)?;
+
+	page_filenames.sort_unstable();
+
+	Ok(page_filenames.into_iter().map(move |page_filename| {
+		let mut file = fs::File::open(&path)?;
+		let mut page = Vec::new();
+		compress_tools::uncompress_archive_file(&mut file, &mut page, &page_filename)?;
+
+		let image = image::load_from_memory(&page)?.to_rgba8();
+		Ok(LoadResult::Frame {
+			req_id,
+			image,
+			delay_nano: 4_000_000_000,
+			orientation: Orientation::Deg0,
+		})
+	}))
+}
+
 pub fn complex_load_image<F>(
 	path: &Path,
 	allow_animation: bool,
@@ -223,6 +257,19 @@ where
 			let buf = fs::read(path)?;
 			let image = libavif_image::read(&buf)?.into_rgba8();
 			process_image(LoadResult::Frame { req_id, image, delay_nano: 0, orientation })?;
+		}
+		#[cfg(feature = "archives")]
+		ImgFormat::ComicBook => {
+			// this panics if the archive contains no images
+
+			for load_result in load_comic_book(path.to_owned(), req_id)? {
+				match load_result {
+					Ok(load_result) => process_image(load_result)?,
+					Err(e) => {
+						eprintln!("{}", e);
+					}
+				}
+			}
 		}
 		ImgFormat::Svg => {
 			let image = load_svg(path)?;
@@ -282,6 +329,8 @@ pub fn is_file_supported(filename: &Path) -> bool {
 				| "bmp" | "ico" | "hdr" | "pbm" | "pam" | "ppm" | "pgm" => {
 					return true;
 				}
+				#[cfg(feature = "archives")]
+				"cbr" | "cbz" | "cbt" => return true,
 				#[cfg(feature = "avif")]
 				"avif" => return true,
 				_ => (),

@@ -52,16 +52,17 @@ jobs:
           override: true
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Install avif build dependencies (linux)
+      - name: Install avif/compress-tools build dependencies (linux)
         if: matrix.os == 'ubuntu-20.04'
         run: |
           DEBIAN_FRONTEND=noninteractive sudo apt-get update
-          DEBIAN_FRONTEND=noninteractive sudo apt-get install -y ninja-build nasm meson
+          DEBIAN_FRONTEND=noninteractive sudo apt-get install -y ninja-build nasm meson libarchive-dev
 
-      - name: Install avif build dependencies (macOS)
+      - name: Install avif/compress-tools build dependencies (macOS)
         if: matrix.os == 'macOS-latest'
         run: |
-          brew install ninja nasm meson
+          brew install ninja nasm meson pkgconfig libarchive
+          echo ::set-env name=PKG_CONFIG_PATH::$(brew ls libarchive | grep .pc$ | sed 's|/libarchive.pc||')
 
       - name: Install avif build dependencies (Windows)
         if: matrix.os == 'windows-latest'
@@ -87,4 +88,4 @@ jobs:
         shell: cmd
         run: |
           call "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
-          env RUSTFLAGS="-C opt-level=0" cargo test --verbose --all-features
+          env RUSTFLAGS="-C opt-level=0" cargo test --verbose --features=avif,networking

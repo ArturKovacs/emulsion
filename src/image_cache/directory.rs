@@ -86,14 +86,12 @@ pub struct Directory {
 	filter_action: ParallelAction<Vec<DirItem>, Vec<usize>>,
 }
 
-fn get_action() -> impl FnMut(Vec<DirItem>) -> Vec<usize> {
-	|input: Vec<DirItem>| {
-		input
-			.into_iter()
-			.enumerate()
-			.filter_map(|(i, item)| if is_file_supported(&item.path) { Some(i) } else { None })
-			.collect()
-	}
+fn get_action(input: Vec<DirItem>) -> Vec<usize> {
+	input
+		.into_iter()
+		.enumerate()
+		.filter_map(|(i, item)| if is_file_supported(&item.path) { Some(i) } else { None })
+		.collect()
 }
 
 impl Directory {
@@ -106,7 +104,7 @@ impl Directory {
 			curr_file_idx: 0,
 			curr_image_idx: 0,
 			current_req_id: 0,
-			filter_action: ParallelAction::new(get_action()),
+			filter_action: ParallelAction::new(get_action),
 		}
 	}
 
