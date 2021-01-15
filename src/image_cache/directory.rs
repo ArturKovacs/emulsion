@@ -3,7 +3,7 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use super::image_loader::is_file_supported;
+use super::image_loader::{is_comic_book_archive, is_file_supported};
 use crate::parallel_action::ParallelAction;
 
 #[derive(Debug)]
@@ -46,9 +46,17 @@ macro_rules! step_to_next_img {
 pub struct DirItem {
 	pub path: PathBuf,
 
+	pub item_type: DirItemType,
+
 	/// Sometimes also abbreviated as `req_id` is used as a more efficient replacement
 	/// of a PathBuf to identify a file load request.
 	pub request_id: u32,
+}
+
+#[derive(Clone, PartialEq)]
+pub enum DirItemType {
+	ImageFile,
+	ComicBook,
 }
 
 // enum FilterState {
@@ -247,7 +255,14 @@ impl Directory {
 					Ok(file_type) => {
 						if file_type.is_file() || file_type.is_symlink() {
 							self.current_req_id += 1;
-							Some(DirItem { path: entry.path(), request_id: self.current_req_id })
+							let path = entry.path();
+							let item_type =
+								if cfg!(feature = "archives") && is_comic_book_archive(&path) {
+									DirItemType::ComicBook
+								} else {
+									DirItemType::ImageFile
+								};
+							Some(DirItem { path, item_type, request_id: self.current_req_id })
 						} else {
 							None
 						}

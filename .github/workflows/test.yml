@@ -62,7 +62,7 @@ jobs:
         if: matrix.os == 'macOS-latest'
         run: |
           brew install ninja nasm meson pkgconfig libarchive
-          echo ::set-env name=PKG_CONFIG_PATH::$(brew ls libarchive | grep .pc$ | sed 's|/libarchive.pc||')
+          echo PKG_CONFIG_PATH=$(brew ls libarchive | grep .pc$ | sed 's|/libarchive.pc||') >> $GITHUB_ENV
 
       - name: Install avif build dependencies (Windows)
         if: matrix.os == 'windows-latest'
@@ -74,6 +74,18 @@ jobs:
           curl -LO "$LINK/nasm-$NASM_VERSION-win64.zip"
           7z e -y "nasm-$NASM_VERSION-win64.zip" -o"C:\nasm"
           echo "C:\nasm" >> $env:GITHUB_PATH
+
+      - name: Install compress-tools build dependencies
+        if: matrix.os == 'windows-latest'
+        uses: lukka/run-vcpkg@v6
+        with:
+          vcpkgArguments: "libarchive"
+          vcpkgTriplet: x64-windows-static-md
+          vcpkgDirectory: ${{ runner.workspace }}/vcpkg/
+          appendedCacheKey: ${{ hashFiles(env.vcpkgResponseFile) }}
+          # run-vcpkg action needs to have a pinned down version of vcpkg
+          # this commit id refferes to the vcpkg version 2021.xx
+          vcpkgGitCommitId: acb6b10e7fdf5e8519c18398d0b069e1d58ca025
 
       # According to https://github.com/actions-rs/cargo
       # it's okay to simply just run `cargo` once the toolchain is set up
@@ -88,4 +100,4 @@ jobs:
         shell: cmd
         run: |
           call "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
-          env RUSTFLAGS="-C opt-level=0" cargo test --verbose --features=avif,networking
+          env RUSTFLAGS="-C opt-level=0" cargo test --verbose --all-features

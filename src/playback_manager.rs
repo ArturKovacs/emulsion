@@ -20,6 +20,8 @@ pub enum LoadRequest {
 	None,
 	LoadNext,
 	LoadPrevious,
+	LoadNextFrame,
+	LoadPreviousFrame,
 	FilePath(PathBuf),
 	LoadAtIndex(usize),
 	Jump(i32),
@@ -154,13 +156,12 @@ impl PlaybackManager {
 			_ => 4,
 		};
 
-		let result = PlaybackManager {
+		PlaybackManager {
 			//playback_state: PlaybackState::Paused,
 			image_cache: ImageCache::new(cache_capaxity, thread_count),
 			folder_player: ImgSequencePlayer::new(),
 			image_player: ImgSequencePlayer::new(),
-		};
-		result
+		}
 	}
 
 	pub fn playback_state(&self) -> PlaybackState {
@@ -209,16 +210,13 @@ impl PlaybackManager {
 	}
 
 	pub fn update_directory(&mut self) -> image_cache::Result<()> {
-		match self.folder_player.load_request {
-			LoadRequest::None => {
-				let curr_path = self.image_cache.current_file_path();
-				if !curr_path.to_string_lossy().is_empty() {
-					self.image_cache.update_directory()?;
-					let path = self.current_file_path();
-					self.request_load(LoadRequest::FilePath(path));
-				}
+		if let LoadRequest::None = self.folder_player.load_request {
+			let curr_path = self.image_cache.current_file_path();
+			if !curr_path.to_string_lossy().is_empty() {
+				self.image_cache.update_directory()?;
+				let path = self.current_file_path();
+				self.request_load(LoadRequest::FilePath(path));
 			}
-			_ => (),
 		}
 		Ok(())
 	}
@@ -342,14 +340,9 @@ impl<P: Playback> ImgSequencePlayer<P> {
 		// function early. And at the same time I want to use it's value as it is at this line.
 		let mut load_request = LoadRequest::None;
 		mem::swap(&mut self.load_request, &mut load_request);
-		let frame_delta_time_nanos;
-		match self.playback_state {
-			PlaybackState::Present | PlaybackState::RandomPresent => {
-				frame_delta_time_nanos = (NANOS_PER_SEC * 6) as i64;
-			}
-			_ => {
-				frame_delta_time_nanos = P::delay_nanos(&self) as i64;
-			}
+		let frame_delta_time_nanos = match self.playback_state {
+			PlaybackState::Present | PlaybackState::RandomPresent => (NANOS_PER_SEC * 6) as i64,
+			_ => P::delay_nanos(&self) as i64,
 		};
 		if self.playback_state == PlaybackState::Paused {
 			if let Err(e) = image_cache.process_prefetched(display) {
@@ -448,6 +441,8 @@ impl<P: Playback> ImgSequencePlayer<P> {
 				Some(P::load_path(image_cache, display, &file_path).map(|x| (x, file_path)))
 			}
 			LoadRequest::LoadAtIndex(index) => Some(P::load_at_index(image_cache, display, index)),
+			LoadRequest::LoadNextFrame => Some(image_cache.load_jump(display, 0, 1)),
+			LoadRequest::LoadPreviousFrame => Some(image_cache.load_jump(display, 0, -1)),
 			LoadRequest::Jump(jump_count) => Some(P::load_jump(image_cache, display, jump_count)),
 			LoadRequest::None => None,
 		};

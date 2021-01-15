@@ -62,11 +62,21 @@ jobs:
         curl -LO "$LINK/nasm-$NASM_VERSION-win64.zip"
         7z e -y "nasm-$NASM_VERSION-win64.zip" -o"C:\nasm"
         echo "C:\nasm" >> $env:GITHUB_PATH
+    - name: Install compress-tools build dependencies (Windows)
+      uses: lukka/run-vcpkg@v6
+      with:
+        vcpkgArguments: "libarchive"
+        vcpkgTriplet: x64-windows-static-md
+        vcpkgDirectory: ${{ runner.workspace }}/vcpkg/
+        appendedCacheKey: ${{ hashFiles(env.vcpkgResponseFile) }}
+        # run-vcpkg action needs to have a pinned down version of vcpkg
+        # this commit id refferes to the vcpkg version 2021.xx
+        vcpkgGitCommitId: acb6b10e7fdf5e8519c18398d0b069e1d58ca025
     - name: Build executable
       shell: cmd
       run: |
         call "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
-        cargo build --release --features=networking,avif
+        cargo build --release --features=networking,avif,archives
     - name: Copy executable to distributable folder
       working-directory: ./distribution/windows/
       shell: cmd
@@ -78,12 +88,12 @@ jobs:
       run: |
         makensis emulsion.nsi
     - name: Upload Release Asset
-      id: upload-release-asset 
+      id: upload-release-asset
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ needs.create_release.outputs.upload_url }} 
+        upload_url: ${{ needs.create_release.outputs.upload_url }}
         asset_path: ./distribution/windows/Emulsion-Installer.exe
         asset_name: ${{ env.INSTALLER_NAME }}
         asset_content_type: application/octet-stream
@@ -102,11 +112,12 @@ jobs:
       uses: actions/checkout@v2
     - name: Install cargo bundle
       run: cargo install cargo-bundle
-    - name: Install avif build dependencies (macOS)
+    - name: Install avif/compress-tools build dependencies (macOS)
       run: |
-        brew install ninja nasm meson
+        brew install ninja nasm meson pkgconfig libarchive
+        echo PKG_CONFIG_PATH=$(brew ls libarchive | grep .pc$ | sed 's|/libarchive.pc||') >> $GITHUB_ENV
     - name: Create osx app
-      run: cargo bundle --release --features=avif
+      run: cargo bundle --release --features=avif,archives
     - name: Install create-dmg
       run: npm install --global create-dmg
     - name: Create .dmg file
@@ -138,12 +149,12 @@ jobs:
       uses: actions/checkout@v2
     - name: Install cargo bundle
       run: cargo install cargo-bundle
-    - name: Install avif build dependencies (linux)
+    - name: Install avif/compress-tools build dependencies (linux)
       run: |
         DEBIAN_FRONTEND=noninteractive sudo apt-get update
-        DEBIAN_FRONTEND=noninteractive sudo apt-get install -y ninja-build nasm meson
+        DEBIAN_FRONTEND=noninteractive sudo apt-get install -y ninja-build nasm meson libarchive-dev
     - name: Create deb package
-      run: cargo bundle --release --features=avif
+      run: cargo bundle --release --features=avif,archives
     - name: Rename .deb
       run: mv target/release/bundle/deb/*.deb Emulsion.deb
     - name: Upload Release Asset

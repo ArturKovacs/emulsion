@@ -93,12 +93,8 @@ pub fn detect_format(path: &Path) -> Result<ImgFormat> {
 	let mut file_start_bytes = [0; 512];
 
 	#[cfg(feature = "archives")]
-	{
-		if let Some(ext) = path.extension() {
-			if ext == OsStr::new("cbr") || ext == OsStr::new("cbz") || ext == OsStr::new("cbt") {
-				return Ok(ImgFormat::ComicBook);
-			}
-		}
+	if is_comic_book_archive(path) {
+		return Ok(ImgFormat::ComicBook);
 	}
 
 	// Try to detect the format from the first 512 bytes
@@ -119,6 +115,17 @@ pub fn detect_format(path: &Path) -> Result<ImgFormat> {
 
 	// If that didn't work, try to detect the format from the file ending
 	Ok(ImgFormat::Image(ImageFormat::from_path(path)?))
+}
+
+pub fn is_comic_book_archive(path: &Path) -> bool {
+	if let Some(ext) = path.extension() {
+		if let Some(ext) = ext.to_str() {
+			return ext.eq_ignore_ascii_case("cbr")
+				|| ext.eq_ignore_ascii_case("cbz")
+				|| ext.eq_ignore_ascii_case("cbt");
+		}
+	}
+	false
 }
 
 pub fn detect_orientation(path: &Path) -> Result<Orientation> {
@@ -195,12 +202,7 @@ fn load_comic_book(path: PathBuf, req_id: u32) -> Result<impl Iterator<Item = Re
 		compress_tools::uncompress_archive_file(&mut file, &mut page, &page_filename)?;
 
 		let image = image::load_from_memory(&page)?.to_rgba8();
-		Ok(LoadResult::Frame {
-			req_id,
-			image,
-			delay_nano: 4_000_000_000,
-			orientation: Orientation::Deg0,
-		})
+		Ok(LoadResult::Frame { req_id, image, delay_nano: 0, orientation: Orientation::Deg0 })
 	}))
 }
 

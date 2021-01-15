@@ -18,7 +18,7 @@ mod pending_requests;
 use pending_requests::PendingRequests;
 
 mod directory;
-use directory::Directory;
+use directory::{DirItemType, Directory};
 
 pub mod errors {
 	use crate::image_cache::image_loader;
@@ -198,11 +198,13 @@ impl ImageCache {
 		self.dir.image_count()
 	}
 
-	/// Returns tru if and only if the current image has been fully loaded and it has a single frame.
+	/// Returns tru if and only if the current image has been fully loaded and it has a single frame or is a comic book archive.
 	pub fn loaded_still_image(&self) -> bool {
 		if let Some(desc) = self.dir.curr_descriptor() {
 			if let Some(img) = self.texture_cache.get(&desc.request_id) {
-				if img.fully_loaded && img.frames.len() == 1 {
+				if img.fully_loaded
+					&& (img.frames.len() == 1 || desc.item_type == DirItemType::ComicBook)
+				{
 					return true;
 				}
 			}

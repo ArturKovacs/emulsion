@@ -568,6 +568,14 @@ impl PictureWidget {
 			borrowed.playback_manager.request_load(LoadRequest::LoadNext);
 			borrowed.render_validity.invalidate();
 		}
+		if triggered!(PREV_FRAME_NAME) {
+			borrowed.playback_manager.request_load(LoadRequest::LoadPreviousFrame);
+			borrowed.render_validity.invalidate();
+		}
+		if triggered!(NEXT_FRAME_NAME) {
+			borrowed.playback_manager.request_load(LoadRequest::LoadNextFrame);
+			borrowed.render_validity.invalidate();
+		}
 		if triggered!(IMG_FIT_NAME) {
 			borrowed.set_img_size_to_fit(true);
 		}

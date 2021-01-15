@@ -20,6 +20,8 @@ pub static PAN_NAME: &str = "pan";
 pub static PLAY_ANIM_NAME: &str = "play_anim";
 pub static PLAY_PRESENT_NAME: &str = "play_present";
 pub static PLAY_PRESENT_RND_NAME: &str = "play_present_rnd";
+pub static NEXT_FRAME_NAME: &str = "next_frame";
+pub static PREV_FRAME_NAME: &str = "prev_frame";
 pub static TOGGLE_ANTIALIAS_NAME: &str = "toggle_antialias";
 pub static SET_AUTOMATIC_ANTIALIAS_NAME: &str = "automatic_antialias";
 pub static ZOOM_IN_NAME: &str = "zoom_in";
@@ -47,6 +49,8 @@ lazy_static! {
 		m.insert(PLAY_PRESENT_RND_NAME, vec!["Alt+P"]);
 		m.insert(TOGGLE_ANTIALIAS_NAME, vec!["S"]);
 		m.insert(SET_AUTOMATIC_ANTIALIAS_NAME, vec!["Alt+S"]);
+		m.insert(NEXT_FRAME_NAME, vec!["Down"]);
+		m.insert(PREV_FRAME_NAME, vec!["Up"]);
 		m
 	};
 }
