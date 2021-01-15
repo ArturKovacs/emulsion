@@ -12,7 +12,7 @@ use gelatin::glium;
 use glium::texture::SrgbTexture2d;
 
 pub mod image_loader;
-use self::image_loader::*;
+use self::{directory::DirItem, image_loader::*};
 
 mod pending_requests;
 use pending_requests::PendingRequests;
@@ -193,9 +193,31 @@ impl ImageCache {
 		self.dir.curr_img_index()
 	}
 
+	/// Returns the page index in the comic book, or `None` if the file
+	/// isn't a comic book archive
+	pub fn current_page_index(&self) -> Option<usize> {
+		match self.dir.curr_descriptor() {
+			Some(DirItem { item_type: DirItemType::ComicBook, .. }) => Some(self.current_frame_idx),
+			_ => None,
+		}
+	}
+
 	/// Returns `None` when the directory hasn't finished filtering image files.
 	pub fn current_dir_len(&mut self) -> Option<usize> {
 		self.dir.image_count()
+	}
+
+	/// Returns the number of loaded comic book pages, or `None` if the current file
+	/// isn't fully loaded or is not a comic book archive
+	pub fn current_page_len(&self) -> Option<usize> {
+		if let Some(desc) = self.dir.curr_descriptor() {
+			if let Some(img) = self.texture_cache.get(&desc.request_id) {
+				if img.fully_loaded && desc.item_type == DirItemType::ComicBook {
+					return Some(img.frames.len());
+				}
+			}
+		}
+		None
 	}
 
 	/// Returns tru if and only if the current image has been fully loaded and it has a single frame or is a comic book archive.

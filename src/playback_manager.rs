@@ -204,9 +204,17 @@ impl PlaybackManager {
 		self.image_cache.current_file_index()
 	}
 
+	pub fn current_page_index(&self) -> Option<usize> {
+		self.image_cache.current_page_index()
+	}
+
 	/// Returns None when the folder hasn't finished filtering
 	pub fn current_dir_len(&mut self) -> Option<usize> {
 		self.image_cache.current_dir_len()
+	}
+
+	pub fn current_page_len(&self) -> Option<usize> {
+		self.image_cache.current_page_len()
 	}
 
 	pub fn update_directory(&mut self) -> image_cache::Result<()> {

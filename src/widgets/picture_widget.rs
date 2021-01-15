@@ -306,13 +306,8 @@ impl PictureWidgetData {
 		}
 	}
 
-	fn set_window_title_filename(
-		&self,
-		window: &Window,
-		playback_state: PlaybackState,
-		file_path: &Option<PathBuf>,
-	) {
-		let playback = match playback_state {
+	fn set_window_title_filename(&self, window: &Window, playback_manager: &PlaybackManager) {
+		let playback = match playback_manager.playback_state() {
 			PlaybackState::Forward => " : Playing",
 			PlaybackState::Present => " : Presenting",
 			PlaybackState::RandomPresent => " : Presenting Shuffled",
@@ -322,11 +317,22 @@ impl PictureWidgetData {
 		let config = self.configuration.borrow();
 		let title_config = config.title.clone().unwrap_or_default();
 
-		let name = match file_path {
+		let name = match playback_manager.file_path() {
 			Some(file_path) => title_config.format_file_path(file_path),
 			None => "[ none ]".into(),
 		};
-		let title = format!("{}{}{}", name, playback, title_config.format_program_name());
+		let mut title = name.to_string();
+		if let Some(page) = playback_manager.current_page_index() {
+			use std::fmt::Write;
+			if let Some(len) = playback_manager.current_page_len() {
+				write!(title, " -- page {} of {}", page + 1, len).unwrap();
+			} else {
+				write!(title, " -- page {}", page + 1).unwrap();
+			}
+		}
+		title.push_str(playback);
+		title.push_str(title_config.format_program_name());
+
 		let display = window.display_mut();
 		display.gl_window().window().set_title(title.as_str());
 	}
@@ -673,15 +679,13 @@ impl Widget for PictureWidget {
 			data.bottom_bar.slider.set_steps(curr_dir_len as u32, curr_file_index as u32);
 		}
 		//data.slider.set_step_bg(data.playback_manager.cached_from_dir());
-		let playback_state = data.playback_manager.playback_state();
-		data.set_window_title_filename(window, playback_state, data.playback_manager.file_path());
+
+		data.set_window_title_filename(window, &data.playback_manager);
 		if prev_texture.is_none() != new_texture.is_none() {
 			data.render_validity.invalidate();
-		} else {
-			if let (Some(prev_tex), Some(new_tex)) = (prev_texture, new_texture) {
-				if !Rc::ptr_eq(&prev_tex.texture, &new_tex.texture) {
-					data.render_validity.invalidate();
-				}
+		} else if let (Some(prev_tex), Some(new_tex)) = (prev_texture, new_texture) {
+			if !Rc::ptr_eq(&prev_tex.texture, &new_tex.texture) {
+				data.render_validity.invalidate();
 			}
 		}
 		if let Some(clipboard_handler) = &data.clipboard_handler {

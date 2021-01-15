@@ -194,6 +194,10 @@ fn load_comic_book(path: PathBuf, req_id: u32) -> Result<impl Iterator<Item = Re
 	let file = fs::File::open(&path)?;
 	let mut page_filenames = compress_tools::list_archive_files(file)?;
 
+	if page_filenames.is_empty() {
+		return Err("Comic book archive is empty".into());
+	}
+
 	page_filenames.sort_unstable();
 
 	Ok(page_filenames.into_iter().map(move |page_filename| {
@@ -225,10 +229,8 @@ where
 				for frame in frames {
 					process_image(frame?)?;
 				}
-			} else {
-				if let Some(frame) = frames.next() {
-					process_image(frame?)?;
-				}
+			} else if let Some(frame) = frames.next() {
+				process_image(frame?)?;
 			}
 		}
 		ImgFormat::Image(ImageFormat::Png) => {
@@ -240,10 +242,8 @@ where
 					for frame in animation {
 						process_image(frame?)?;
 					}
-				} else {
-					if let Some(frame) = animation.next() {
-						process_image(frame?)?;
-					}
+				} else if let Some(frame) = animation.next() {
+					process_image(frame?)?;
 				}
 			} else {
 				let image = simple_load_image(path, ImageFormat::Png)?;
@@ -262,8 +262,6 @@ where
 		}
 		#[cfg(feature = "archives")]
 		ImgFormat::ComicBook => {
-			// this panics if the archive contains no images
-
 			for load_result in load_comic_book(path.to_owned(), req_id)? {
 				match load_result {
 					Ok(load_result) => process_image(load_result)?,
@@ -308,8 +306,8 @@ pub fn texture_from_image(
 	let data = image.into_raw();
 	let raw_image = RawImage2d::from_raw_rgba(data, dimensions);
 
-	let x_pow = (31 as u32) - dimensions.0.leading_zeros();
-	let y_pow = (31 as u32) - dimensions.1.leading_zeros();
+	let x_pow = 31_u32 - dimensions.0.leading_zeros();
+	let y_pow = 31_u32 - dimensions.1.leading_zeros();
 
 	let max_mipmap_levels = x_pow.min(y_pow).min(4);
 
