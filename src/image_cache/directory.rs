@@ -37,8 +37,8 @@ macro_rules! step_to_next_img {
 				$this.curr_file_idx = i;
 				$this.set_image_index_from_file_index();
 				return;
-				}
 			}
+		}
 	};
 }
 
