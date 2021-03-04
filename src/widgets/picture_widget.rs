@@ -907,16 +907,16 @@ impl Widget for PictureWidget {
 								$name,
 								input_key_str.as_str(),
 								event.modifiers,
-								) {
+							) {
 								if $input == $dir && !pressed {
 									$input = MovementDir::None;
 									$vel = 0.0;
-									}
+								}
 								if $input != $dir && pressed {
 									borrowed.camera_movement_will_start();
 									$input = $dir;
-									}
 								}
+							}
 						};
 					}
 
