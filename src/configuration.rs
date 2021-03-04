@@ -72,6 +72,7 @@ impl Default for CacheWindowSection {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ConfigWindowSection {
 	pub start_fullscreen: Option<bool>,
+	pub start_maximized: Option<bool>,
 	pub show_bottom_bar: Option<bool>,
 	pub use_last_window_area: Option<bool>,
 	pub win_w: Option<u32>,

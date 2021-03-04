@@ -128,6 +128,10 @@ fn main() {
 		// the specified position when the position is specified during initialization
 		window.display_mut().gl_window().window().set_outer_position(pos);
 
+		if let Some(ConfigWindowSection { start_maximized: Some(true), .. }) = window_cfg {
+			window.set_maximized(true);
+		}
+
 		if let Some(ConfigWindowSection { start_fullscreen: Some(true), .. }) = window_cfg {
 			window.set_fullscreen(true);
 		}
