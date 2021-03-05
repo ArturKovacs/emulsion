@@ -463,7 +463,7 @@ mod update {
 			Ok(res) => {
 				let release_info = res.into_json()?;
 				Ok(release_info)
-			},
+			}
 			Err(err) => Err(err.into()),
 		}
 	}
