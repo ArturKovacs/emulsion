@@ -111,7 +111,7 @@ impl PendingRequests {
 		self.by_id.get(id).filter(|i| !i.finished)
 	}
 
-	pub fn iter_mut<'a>(&'a mut self) -> impl Iterator<Item = (&u32, &mut PendingRequestInfo)> {
+	pub fn iter_mut(&mut self) -> impl Iterator<Item = (&u32, &mut PendingRequestInfo)> {
 		self.by_id.iter_mut().filter(|(_, i)| !i.finished)
 	}
 

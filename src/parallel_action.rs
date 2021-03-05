@@ -35,11 +35,7 @@ fn run_processor<InpT, OutT, F: FnMut(InpT) -> OutT>(
 		std::thread::sleep(Duration::from_millis(5));
 		let input = {
 			let mut state = shared.state.lock().unwrap();
-			let has_input = match &*state {
-				ActionState::InputGiven(_) => true,
-				_ => false,
-			};
-			if has_input {
+			if let ActionState::InputGiven(_) = &*state {
 				let mut input = ActionState::Pending;
 				std::mem::swap(&mut input, &mut *state);
 				match input {
@@ -53,11 +49,7 @@ fn run_processor<InpT, OutT, F: FnMut(InpT) -> OutT>(
 		if let Some(input) = input {
 			let output = action(input);
 			let mut state = shared.state.lock().unwrap();
-			let got_new_request = match &*state {
-				ActionState::Pending => false,
-				_ => true,
-			};
-			if !got_new_request {
+			if let ActionState::Pending = &*state {
 				*state = ActionState::OutputReady(output);
 			}
 		}
@@ -94,11 +86,7 @@ impl<InpT: Send + 'static, OutT: Send + 'static> ParallelAction<InpT, OutT> {
 
 	pub fn try_get_output(&self) -> Option<OutT> {
 		let mut state = self.shared.state.lock().unwrap();
-		let has_output = match &*state {
-			ActionState::OutputReady(_) => true,
-			_ => false,
-		};
-		if has_output {
+		if let ActionState::OutputReady(_) = &*state {
 			let mut output = ActionState::Ready;
 			std::mem::swap(&mut output, &mut *state);
 			match output {
@@ -112,10 +100,7 @@ impl<InpT: Send + 'static, OutT: Send + 'static> ParallelAction<InpT, OutT> {
 
 	pub fn is_ready(&self) -> bool {
 		let state = self.shared.state.lock().unwrap();
-		match &*state {
-			ActionState::Ready => true,
-			_ => false,
-		}
+		matches!(&*state, ActionState::Ready)
 	}
 }
 impl<InpT, OutT> Drop for ParallelAction<InpT, OutT> {

@@ -257,3 +257,9 @@ impl Widget for Slider {
 		self.data.borrow_mut().render_validity = render_validity;
 	}
 }
+
+impl Default for Slider {
+	fn default() -> Self {
+		Self::new()
+	}
+}

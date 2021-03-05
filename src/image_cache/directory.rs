@@ -37,8 +37,8 @@ macro_rules! step_to_next_img {
 				$this.curr_file_idx = i;
 				$this.set_image_index_from_file_index();
 				return;
-				}
 			}
+		}
 	};
 }
 
@@ -161,7 +161,7 @@ impl Directory {
 				return Ok(());
 			}
 		}
-		Err(Error::Other(format!("Could not find image index")))
+		Err(Error::Other("Could not find image index".to_string()))
 	}
 
 	pub fn jump_to_prev(&mut self) {
