@@ -1,6 +1,7 @@
 use gelatin::glium::glutin::event::VirtualKeyCode;
 
 pub fn virtual_keycode_is_char(vk: VirtualKeyCode) -> bool {
+	#[allow(clippy::match_like_matches_macro)]
 	match vk {
 		VirtualKeyCode::Key1 => true,
 		VirtualKeyCode::Key2 => true,

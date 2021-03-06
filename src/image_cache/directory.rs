@@ -161,7 +161,7 @@ impl Directory {
 				return Ok(());
 			}
 		}
-		Err(Error::Other(format!("Could not find image index")))
+		Err(Error::Other("Could not find image index".to_string()))
 	}
 
 	pub fn jump_to_prev(&mut self) {

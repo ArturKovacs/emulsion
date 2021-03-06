@@ -236,7 +236,6 @@ fn main() {
 		});
 	}
 	{
-		let picture_widget = picture_widget.clone();
 		bottom_bar.fit_stretch_button.set_on_click(move || {
 			picture_widget.set_img_size_to_fit(true);
 		});
@@ -261,10 +260,8 @@ fn main() {
 
 	window.set_root(root_container);
 
-	let check_updates_enabled = match &config.borrow().updates {
-		Some(u) if !u.check_updates => false,
-		_ => true,
-	};
+	let check_updates_enabled =
+		config.borrow().updates.as_ref().map(|u| u.check_updates).unwrap_or(true);
 
 	let update_checker_join_handle = {
 		let updates = &mut cache.lock().unwrap().updates;

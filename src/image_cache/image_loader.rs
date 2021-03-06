@@ -1,4 +1,3 @@
-use std;
 use std::fs;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
@@ -152,7 +151,7 @@ pub fn simple_load_image(path: &Path, image_format: ImageFormat) -> Result<image
 pub fn load_gif(path: &Path, req_id: u32) -> Result<impl Iterator<Item = Result<LoadResult>>> {
 	let file = fs::File::open(path)?;
 	let decoder = GifDecoder::new(file)?;
-	load_animation(req_id, decoder)
+	Ok(load_animation(req_id, decoder))
 }
 
 /// Parse, render and gather an SVG into a ImageBuffer<Rgba>
@@ -189,25 +188,21 @@ where
 				for frame in frames {
 					process_image(frame?)?;
 				}
-			} else {
-				if let Some(frame) = frames.next() {
-					process_image(frame?)?;
-				}
+			} else if let Some(frame) = frames.next() {
+				process_image(frame?)?;
 			}
 		}
 		ImgFormat::Image(ImageFormat::Png) => {
 			let file = fs::File::open(path)?;
 			let decoder = PngDecoder::new(file)?;
 			if decoder.is_apng() {
-				let mut animation = load_animation(req_id, decoder.apng())?;
+				let mut animation = load_animation(req_id, decoder.apng());
 				if allow_animation {
 					for frame in animation {
 						process_image(frame?)?;
 					}
-				} else {
-					if let Some(frame) = animation.next() {
-						process_image(frame?)?;
-					}
+				} else if let Some(frame) = animation.next() {
+					process_image(frame?)?;
 				}
 			} else {
 				let image = simple_load_image(path, ImageFormat::Png)?;
@@ -236,10 +231,10 @@ where
 fn load_animation(
 	req_id: u32,
 	decoder: impl AnimationDecoder<'static>,
-) -> Result<impl Iterator<Item = Result<LoadResult>>> {
+) -> impl Iterator<Item = Result<LoadResult>> {
 	let frames = decoder.into_frames();
 
-	Ok(frames.map(move |frame| {
+	frames.map(move |frame| {
 		Ok(frame.map(|frame| {
 			let (numerator_ms, denom_ms) = frame.delay().numer_denom_ms();
 			let numerator_nano = numerator_ms as u64 * 1_000_000;
@@ -248,7 +243,7 @@ fn load_animation(
 			let image = frame.into_buffer();
 			LoadResult::Frame { req_id, image, delay_nano, orientation: Orientation::Deg0 }
 		})?)
-	}))
+	})
 }
 
 pub fn texture_from_image(
@@ -259,8 +254,8 @@ pub fn texture_from_image(
 	let data = image.into_raw();
 	let raw_image = RawImage2d::from_raw_rgba(data, dimensions);
 
-	let x_pow = (31 as u32) - dimensions.0.leading_zeros();
-	let y_pow = (31 as u32) - dimensions.1.leading_zeros();
+	let x_pow = 31 - dimensions.0.leading_zeros();
+	let y_pow = 31 - dimensions.1.leading_zeros();
 
 	let max_mipmap_levels = x_pow.min(y_pow).min(4);
 

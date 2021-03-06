@@ -154,13 +154,12 @@ impl PlaybackManager {
 			_ => 4,
 		};
 
-		let result = PlaybackManager {
+		PlaybackManager {
 			//playback_state: PlaybackState::Paused,
 			image_cache: ImageCache::new(cache_capaxity, thread_count),
 			folder_player: ImgSequencePlayer::new(),
 			image_player: ImgSequencePlayer::new(),
-		};
-		result
+		}
 	}
 
 	pub fn playback_state(&self) -> PlaybackState {
@@ -209,16 +208,13 @@ impl PlaybackManager {
 	}
 
 	pub fn update_directory(&mut self) -> image_cache::Result<()> {
-		match self.folder_player.load_request {
-			LoadRequest::None => {
-				let curr_path = self.image_cache.current_file_path();
-				if !curr_path.to_string_lossy().is_empty() {
-					self.image_cache.update_directory()?;
-					let path = self.current_file_path();
-					self.request_load(LoadRequest::FilePath(path));
-				}
+		if let LoadRequest::None = self.folder_player.load_request {
+			let curr_path = self.image_cache.current_file_path();
+			if !curr_path.to_string_lossy().is_empty() {
+				self.image_cache.update_directory()?;
+				let path = self.current_file_path();
+				self.request_load(LoadRequest::FilePath(path));
 			}
-			_ => (),
 		}
 		Ok(())
 	}

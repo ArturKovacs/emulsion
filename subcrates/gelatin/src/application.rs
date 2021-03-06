@@ -129,10 +129,7 @@ impl Application {
 				}
 				Event::MainEventsCleared => {
 					if !EXIT_REQUESTED.load(Ordering::Relaxed) {
-						let mut should_sleep = match control_flow {
-							ControlFlow::Poll => false,
-							_ => true,
-						};
+						let mut should_sleep = !matches!(control_flow, ControlFlow::Poll);
 						for (window_id, window) in windows.iter() {
 							let new_control_flow = window.main_events_cleared().into();
 							update_control_flow(

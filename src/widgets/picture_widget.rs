@@ -50,10 +50,7 @@ pub enum MovementDir {
 
 impl MovementDir {
 	fn moving(self) -> bool {
-		match self {
-			MovementDir::None => false,
-			_ => true,
-		}
+		!matches!(self, MovementDir::None)
 	}
 }
 
@@ -669,11 +666,9 @@ impl Widget for PictureWidget {
 		data.set_window_title_filename(window, playback_state, data.playback_manager.file_path());
 		if prev_texture.is_none() != new_texture.is_none() {
 			data.render_validity.invalidate();
-		} else {
-			if let (Some(prev_tex), Some(new_tex)) = (prev_texture, new_texture) {
-				if !Rc::ptr_eq(&prev_tex.texture, &new_tex.texture) {
-					data.render_validity.invalidate();
-				}
+		} else if let (Some(prev_tex), Some(new_tex)) = (prev_texture, new_texture) {
+			if !Rc::ptr_eq(&prev_tex.texture, &new_tex.texture) {
+				data.render_validity.invalidate();
 			}
 		}
 		if let Some(clipboard_handler) = &data.clipboard_handler {
