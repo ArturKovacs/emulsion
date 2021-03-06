@@ -449,6 +449,7 @@ mod update {
 		error_chain! {
 			foreign_links {
 				Io(std::io::Error);
+				Ureq(ureq::Error);
 				ParseIntError(std::num::ParseIntError);
 			}
 		}
@@ -458,11 +459,12 @@ mod update {
 	fn latest_release() -> errors::Result<ReleaseInfoJson> {
 		let url = "https://api.github.com/repos/ArturKovacs/emulsion/releases/latest";
 		let res = ureq::get(&url).set("User-Agent", "emulsion").call();
-		if res.ok() {
-			let release_info = res.into_json_deserialize()?;
-			Ok(release_info)
-		} else {
-			Err(res.status_line().into())
+		match res {
+			Ok(res) => {
+				let release_info = res.into_json()?;
+				Ok(release_info)
+			}
+			Err(err) => Err(err.into()),
 		}
 	}
 

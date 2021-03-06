@@ -590,9 +590,10 @@ impl ImageCache {
 				if let Some(tex) = self.texture_cache.get_mut(&req_id) {
 					tex.fully_loaded = true;
 				}
-				PRIORITY_REQUEST_ID.compare_and_swap(
+				let _ = PRIORITY_REQUEST_ID.compare_exchange(
 					req_id,
 					NON_EXISTENT_REQUEST_ID,
+					Ordering::SeqCst,
 					Ordering::SeqCst,
 				);
 				self.pending_requests.set_finished(&req_id);
@@ -603,9 +604,10 @@ impl ImageCache {
 					tex.fully_loaded = true;
 					tex.failed = true;
 				}
-				PRIORITY_REQUEST_ID.compare_and_swap(
+				let _ = PRIORITY_REQUEST_ID.compare_exchange(
 					req_id,
 					NON_EXISTENT_REQUEST_ID,
+					Ordering::SeqCst,
 					Ordering::SeqCst,
 				);
 				self.pending_requests.set_finished(&req_id);

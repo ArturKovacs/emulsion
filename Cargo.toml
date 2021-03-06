@@ -9,23 +9,6 @@ readme = "README.md"
 edition = "2018"
 build = "build.rs"
 
-[workspace]
-members = [
-    "subcrates/gelatin",
-]
-
-[profile.dev.package."*"]
-opt-level = 1
-[profile.dev.build-override]
-opt-level = 1
-[profile.release]
-lto = true
-
-[features]
-default = []
-networking = ["ureq"]
-avif = ["libavif-image"]
-
 [package.metadata.bundle]
 name = "Emulsion"
 identifier = "io.github.arturkovacs.emulsion"
@@ -59,32 +42,49 @@ linux_mime_types = [
 	"image/x‑portable‑anymap"
 ]
 
+[workspace]
+members = [
+    "subcrates/gelatin",
+]
+
+[profile.dev.package."*"]
+opt-level = 1
+[profile.dev.build-override]
+opt-level = 1
+[profile.release]
+lto = true
+
+[features]
+default = []
+networking = ["ureq"]
+avif = ["libavif-image"]
+
 [target.'cfg(windows)'.build-dependencies]
-winres = "0.1"
+winres = "0.1.11"
 
 [dependencies]
 gelatin = { path = "./subcrates/gelatin", version = "0.6" }
-ureq = { version = "1", features = ["json"], optional = true }
+ureq = { version = "2.0.2", features = ["json"], optional = true }
 lazy_static = "1.4.0"
-directories-next = "2.0"
-open = "1.4.0"
-sys-info = "0.7"
-error-chain = "0.12"
-backtrace = "0.3"
-serde = { version = "1.0", features = ["derive"] }
-toml = "0.5"
-rand = "0.7"
-lexical-sort = "0.3"
-trash = "1.2"
-clap = { version = "2.33", default-features = false }
-kamadak-exif = "0.5.1"
-arboard = "1.1"
-resvg = "0.13.0"
-usvg = "0.13.0"
-tiny-skia = "0.3.0"
+directories-next = "2.0.0"
+open = "1.5.0"
+sys-info = "0.8.0"
+error-chain = "0.12.4"
+backtrace = "0.3.56"
+serde = { version = "1.0.123", features = ["derive"] }
+toml = "0.5.8"
+rand = "0.8.3"
+lexical-sort = "0.3.1"
+trash = "1.3.0"
+clap = { version = "2.33.3", default-features = false }
+kamadak-exif = "0.5.3"
+arboard = "1.1.0"
+resvg = "0.13.1"
+usvg = "0.13.1"
+tiny-skia = "0.4.2"
 
 [dependencies.libavif-image]
-version = "0.5"
+version = "0.5.0"
 default-features = false
 features = ["codec-dav1d"]
 optional = true
