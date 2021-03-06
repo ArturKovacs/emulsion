@@ -41,8 +41,8 @@ pub struct HelpScreen {
 impl HelpScreen {
 	pub fn new(usage_img: Picture) -> HelpScreen {
 		let placement = WidgetPlacement {
-			width: Length::Fixed(0.0_f32),
-			height: Length::Fixed(0.0_f32),
+			width: Length::Fixed(0.0),
+			height: Length::Fixed(0.0),
 			horizontal_align: Alignment::Center,
 			vertical_align: Alignment::Center,
 			ignore_layout: true,
