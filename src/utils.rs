@@ -1,6 +1,7 @@
 use gelatin::glium::glutin::event::VirtualKeyCode;
 
 pub fn virtual_keycode_is_char(vk: VirtualKeyCode) -> bool {
+	#[allow(clippy::match_like_matches_macro)]
 	match vk {
 		VirtualKeyCode::Key1 => true,
 		VirtualKeyCode::Key2 => true,
@@ -52,26 +53,28 @@ pub fn virtual_keycode_is_char(vk: VirtualKeyCode) -> bool {
 		VirtualKeyCode::Numpad9 => true,
 		VirtualKeyCode::AbntC1 => true,
 		VirtualKeyCode::AbntC2 => true,
-		VirtualKeyCode::Add => true,
 		VirtualKeyCode::Apostrophe => true,
+		VirtualKeyCode::Asterisk => true,
 		VirtualKeyCode::At => true,
 		VirtualKeyCode::Backslash => true,
 		VirtualKeyCode::Colon => true,
 		VirtualKeyCode::Comma => true,
-		VirtualKeyCode::Divide => true,
 		VirtualKeyCode::Equals => true,
 		VirtualKeyCode::Grave => true,
 		VirtualKeyCode::LBracket => true,
 		VirtualKeyCode::Minus => true,
-		VirtualKeyCode::Multiply => true,
+		VirtualKeyCode::NumpadAdd => true,
 		VirtualKeyCode::NumpadComma => true,
+		VirtualKeyCode::NumpadDivide => true,
 		VirtualKeyCode::NumpadEnter => true,
 		VirtualKeyCode::NumpadEquals => true,
+		VirtualKeyCode::NumpadMultiply => true,
+		VirtualKeyCode::NumpadSubtract => true,
 		VirtualKeyCode::Period => true,
+		VirtualKeyCode::Plus => true,
 		VirtualKeyCode::RBracket => true,
 		VirtualKeyCode::Semicolon => true,
 		VirtualKeyCode::Slash => true,
-		VirtualKeyCode::Subtract => true,
 		VirtualKeyCode::Tab => true,
 		VirtualKeyCode::Underline => true,
 		VirtualKeyCode::Yen => true,
@@ -173,9 +176,9 @@ pub fn virtual_keycode_to_string(vk: VirtualKeyCode) -> String {
 		VirtualKeyCode::Numpad9 => "Numpad9".into(),
 		VirtualKeyCode::AbntC1 => "AbntC1".into(),
 		VirtualKeyCode::AbntC2 => "AbntC2".into(),
-		VirtualKeyCode::Add => "Add".into(),
 		VirtualKeyCode::Apostrophe => "Apostrophe".into(),
 		VirtualKeyCode::Apps => "Apps".into(),
+		VirtualKeyCode::Asterisk => "Asterisk".into(),
 		VirtualKeyCode::At => "At".into(),
 		VirtualKeyCode::Ax => "Ax".into(),
 		VirtualKeyCode::Backslash => "Backslash".into(),
@@ -184,8 +187,6 @@ pub fn virtual_keycode_to_string(vk: VirtualKeyCode) -> String {
 		VirtualKeyCode::Colon => "Colon".into(),
 		VirtualKeyCode::Comma => "Comma".into(),
 		VirtualKeyCode::Convert => "Convert".into(),
-		VirtualKeyCode::Decimal => "Decimal".into(),
-		VirtualKeyCode::Divide => "Divide".into(),
 		VirtualKeyCode::Equals => "Equals".into(),
 		VirtualKeyCode::Grave => "Grave".into(),
 		VirtualKeyCode::Kana => "Kana".into(),
@@ -201,22 +202,32 @@ pub fn virtual_keycode_to_string(vk: VirtualKeyCode) -> String {
 
 		// Handling the alphanumeric and the numpad version of `-`
 		// as the same key.
-		// Alphanumeric is `Minus`, the numapd is `Subtract`
+		// Alphanumeric is `Minus`, the numapd is `NumpadSubtract`
 		VirtualKeyCode::Minus => "Subtract".into(),
 
-		VirtualKeyCode::Multiply => "Multiply".into(),
 		VirtualKeyCode::Mute => "Mute".into(),
 		VirtualKeyCode::MyComputer => "MyComputer".into(),
-		VirtualKeyCode::NavigateForward => "NavigateForward".into(),
 		VirtualKeyCode::NavigateBackward => "NavigateBackward".into(),
+		VirtualKeyCode::NavigateForward => "NavigateForward".into(),
 		VirtualKeyCode::NextTrack => "NextTrack".into(),
 		VirtualKeyCode::NoConvert => "NoConvert".into(),
+		VirtualKeyCode::NumpadAdd => "Add".into(),
 		VirtualKeyCode::NumpadComma => "NumpadComma".into(),
+		VirtualKeyCode::NumpadDecimal => "Decimal".into(),
+		VirtualKeyCode::NumpadDivide => "Divide".into(),
 		VirtualKeyCode::NumpadEnter => "NumpadEnter".into(),
 		VirtualKeyCode::NumpadEquals => "NumpadEquals".into(),
+		VirtualKeyCode::NumpadMultiply => "Multiply".into(),
+		VirtualKeyCode::NumpadSubtract => "Subtract".into(),
 		VirtualKeyCode::OEM102 => "OEM102".into(),
 		VirtualKeyCode::Period => "Period".into(),
 		VirtualKeyCode::PlayPause => "PlayPause".into(),
+
+		// Handling the alphanumeric and the numpad version of `+`
+		// as the same key.
+		// Alphanumeric is `Plus`, the numapd is `NumpadAdd`
+		VirtualKeyCode::Plus => "Add".into(),
+
 		VirtualKeyCode::Power => "Power".into(),
 		VirtualKeyCode::PrevTrack => "PrevTrack".into(),
 		VirtualKeyCode::RAlt => "RAlt".into(),
@@ -228,7 +239,6 @@ pub fn virtual_keycode_to_string(vk: VirtualKeyCode) -> String {
 		VirtualKeyCode::Slash => "Slash".into(),
 		VirtualKeyCode::Sleep => "Sleep".into(),
 		VirtualKeyCode::Stop => "Stop".into(),
-		VirtualKeyCode::Subtract => "Subtract".into(),
 		VirtualKeyCode::Sysrq => "Sysrq".into(),
 		VirtualKeyCode::Tab => "Tab".into(),
 		VirtualKeyCode::Underline => "Underline".into(),

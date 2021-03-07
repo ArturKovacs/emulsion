@@ -161,7 +161,7 @@ impl Window {
 
 		// building the index buffer
 		let index_buffer =
-			IndexBuffer::new(&display, PrimitiveType::TriangleStrip, &[1 as u16, 2, 0, 3]).unwrap();
+			IndexBuffer::new(&display, PrimitiveType::TriangleStrip, &[1_u16, 2, 0, 3]).unwrap();
 
 		// compiling shaders and linking them together
 		let textured_program = program!(&display,
@@ -369,11 +369,8 @@ impl Window {
 			let mut borrowed = self.data.borrow_mut();
 			borrowed.should_sleep = false;
 			if borrowed.render_validity.get() {
-				match event.kind {
-					EventKind::MouseMove => {
-						borrowed.should_sleep = true;
-					}
-					_ => (),
+				if let EventKind::MouseMove = event.kind {
+					borrowed.should_sleep = true;
 				}
 			} else {
 				borrowed.last_event_invalidated = true;
@@ -440,9 +437,9 @@ impl Window {
 		let projection_transform = ortho(left, right, bottom, top, -1f32, 1f32);
 
 		let viewport = Rect {
-			left: 0 as u32,
+			left: 0_u32,
 			width: phys_width as u32,
-			bottom: 0 as u32,
+			bottom: 0_u32,
 			height: phys_height as u32,
 		};
 
@@ -499,6 +496,10 @@ impl Window {
 		};
 		let gl_win = borrowed.display.gl_window();
 		gl_win.window().set_fullscreen(monitor);
+	}
+
+	pub fn set_maximized(&self, maximized: bool) {
+		self.display_mut().gl_window().window().set_maximized(maximized);
 	}
 
 	/// Sets the alpha values by drawing a quad covering the entire framebuffer

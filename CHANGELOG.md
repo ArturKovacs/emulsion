@@ -1,5 +1,8 @@
 ## Unreleased
 
+### Added
+- Added `start_maximized` configuration field
+
 ## 8.0 on 2021-01-02
 
 ### Changed

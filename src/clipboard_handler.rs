@@ -4,7 +4,6 @@ use std::sync::{
 	Arc, Condvar, Mutex,
 };
 
-use arboard;
 use gelatin::image::imageops::{
 	flip_horizontal_in_place, flip_vertical_in_place, rotate180_in_place, rotate270, rotate90,
 };
@@ -36,7 +35,7 @@ impl ClipboardHandler {
 		let request_handle = Arc::new(ClipboardRequestHandle {
 			run_thread: AtomicBool::new(true),
 			condvar: Condvar::new(),
-			state: Mutex::new(prev_state.clone()),
+			state: Mutex::new(prev_state),
 		});
 		let handle = {
 			let request_handle = request_handle.clone();

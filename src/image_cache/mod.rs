@@ -242,7 +242,7 @@ impl ImageCache {
 		let path = self
 			.dir
 			.image_by_index(index)
-			.ok_or(Error::from_kind(ErrorKind::WaitingOnDirFilter))?
+			.ok_or_else(|| Error::from_kind(ErrorKind::WaitingOnDirFilter))?
 			.path
 			.clone();
 
@@ -377,21 +377,19 @@ impl ImageCache {
 				self.dir.jump_to_prev();
 			}
 			target_path = self.dir.curr_descriptor().unwrap().path.clone();
-		} else {
-			if let (Some(curr_index), Some(img_count)) =
-				(self.dir.curr_img_index(), self.dir.image_count())
-			{
-				// rem_euclid calculates the least nonnegative remainder
-				let target_index = (curr_index as isize + file_jump_count as isize)
-					.rem_euclid(img_count as isize) as usize;
+		} else if let (Some(curr_index), Some(img_count)) =
+			(self.dir.curr_img_index(), self.dir.image_count())
+		{
+			// rem_euclid calculates the least nonnegative remainder
+			let target_index = (curr_index as isize + file_jump_count as isize)
+				.rem_euclid(img_count as isize) as usize;
 
-				target_path = self.dir.image_by_index(target_index).unwrap().path.clone();
-			} else {
-				bail!("Folder is empty, no folder was open, or folder hasn't finished filtering when trying to jump to an image by index.");
-			}
+			target_path = self.dir.image_by_index(target_index).unwrap().path.clone();
+		} else {
+			bail!("Folder is empty, no folder was open, or folder hasn't finished filtering when trying to jump to an image by index.");
 		}
 		let result = self.load_specific(display, &target_path, None)?;
-		return Ok((result, target_path));
+		Ok((result, target_path))
 	}
 
 	fn receive_prefetched(&mut self) {
@@ -590,9 +588,10 @@ impl ImageCache {
 				if let Some(tex) = self.texture_cache.get_mut(&req_id) {
 					tex.fully_loaded = true;
 				}
-				PRIORITY_REQUEST_ID.compare_and_swap(
+				let _ = PRIORITY_REQUEST_ID.compare_exchange(
 					req_id,
 					NON_EXISTENT_REQUEST_ID,
+					Ordering::SeqCst,
 					Ordering::SeqCst,
 				);
 				self.pending_requests.set_finished(&req_id);
@@ -603,9 +602,10 @@ impl ImageCache {
 					tex.fully_loaded = true;
 					tex.failed = true;
 				}
-				PRIORITY_REQUEST_ID.compare_and_swap(
+				let _ = PRIORITY_REQUEST_ID.compare_exchange(
 					req_id,
 					NON_EXISTENT_REQUEST_ID,
+					Ordering::SeqCst,
 					Ordering::SeqCst,
 				);
 				self.pending_requests.set_finished(&req_id);

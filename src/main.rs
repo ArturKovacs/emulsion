@@ -128,6 +128,10 @@ fn main() {
 		// the specified position when the position is specified during initialization
 		window.display_mut().gl_window().window().set_outer_position(pos);
 
+		if let Some(ConfigWindowSection { start_maximized: Some(true), .. }) = window_cfg {
+			window.set_maximized(true);
+		}
+
 		if let Some(ConfigWindowSection { start_fullscreen: Some(true), .. }) = window_cfg {
 			window.set_fullscreen(true);
 		}
@@ -236,7 +240,6 @@ fn main() {
 		});
 	}
 	{
-		let picture_widget = picture_widget.clone();
 		bottom_bar.fit_stretch_button.set_on_click(move || {
 			picture_widget.set_img_size_to_fit(true);
 		});
@@ -261,10 +264,8 @@ fn main() {
 
 	window.set_root(root_container);
 
-	let check_updates_enabled = match &config.borrow().updates {
-		Some(u) if !u.check_updates => false,
-		_ => true,
-	};
+	let check_updates_enabled =
+		config.borrow().updates.as_ref().map(|u| u.check_updates).unwrap_or(true);
 
 	let update_checker_join_handle = {
 		let updates = &mut cache.lock().unwrap().updates;
@@ -449,6 +450,7 @@ mod update {
 		error_chain! {
 			foreign_links {
 				Io(std::io::Error);
+				Ureq(ureq::Error);
 				ParseIntError(std::num::ParseIntError);
 			}
 		}
@@ -458,11 +460,12 @@ mod update {
 	fn latest_release() -> errors::Result<ReleaseInfoJson> {
 		let url = "https://api.github.com/repos/ArturKovacs/emulsion/releases/latest";
 		let res = ureq::get(&url).set("User-Agent", "emulsion").call();
-		if res.ok() {
-			let release_info = res.into_json_deserialize()?;
-			Ok(release_info)
-		} else {
-			Err(res.status_line().into())
+		match res {
+			Ok(res) => {
+				let release_info = res.into_json()?;
+				Ok(release_info)
+			}
+			Err(err) => Err(err.into()),
 		}
 	}
 
