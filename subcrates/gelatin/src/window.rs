@@ -498,6 +498,10 @@ impl Window {
 		gl_win.window().set_fullscreen(monitor);
 	}
 
+	pub fn set_maximized(&self, maximized: bool) {
+		self.display_mut().gl_window().window().set_maximized(maximized);
+	}
+
 	/// Sets the alpha values by drawing a quad covering the entire framebuffer
 	/// with a blending mode set to max and a shader that draws (0,0,0,1) values
 	fn set_alpha_to_1(&self, target: &mut Frame, context: &DrawContext) {
