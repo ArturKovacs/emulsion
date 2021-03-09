@@ -450,7 +450,7 @@ mod update {
 		error_chain! {
 			foreign_links {
 				Io(std::io::Error);
-				Ureq(ureq::Error);
+				Ureq(Box<ureq::Error>);
 				ParseIntError(std::num::ParseIntError);
 			}
 		}
@@ -465,7 +465,7 @@ mod update {
 				let release_info = res.into_json()?;
 				Ok(release_info)
 			}
-			Err(err) => Err(err.into()),
+			Err(err) => Err(Box::new(err).into()),
 		}
 	}
 
