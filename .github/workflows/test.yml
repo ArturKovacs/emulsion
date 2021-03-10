@@ -37,7 +37,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --verbose
+          args: --all-targets --features=networking -- -D warnings
 
   build:
     needs: clippy
