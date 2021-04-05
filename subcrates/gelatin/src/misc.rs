@@ -68,9 +68,9 @@ impl From<dpi::LogicalSize<f32>> for LogicalVector {
 		LogicalVector { vec: Vector2::new(other.width, other.height) }
 	}
 }
-impl Into<dpi::LogicalSize<f32>> for LogicalVector {
-	fn into(self) -> dpi::LogicalSize<f32> {
-		dpi::LogicalSize::<f32> { width: self.vec.x, height: self.vec.y }
+impl From<LogicalVector> for dpi::LogicalSize<f32> {
+	fn from(vec: LogicalVector) -> Self {
+		dpi::LogicalSize::<f32> { width: vec.vec.x, height: vec.vec.y }
 	}
 }
 

@@ -98,7 +98,7 @@ impl ClipboardHandler {
 								state_guard = guard;
 							}
 							Err(e) => {
-								panic!(format!("{}", e));
+								panic!("{}", e);
 							}
 						}
 					}
