@@ -1,6 +1,6 @@
 use crate::Version;
 use clap::{App, Arg};
-use std::path::PathBuf;
+use std::path::Path;
 
 pub struct Args {
 	pub file_path: Option<String>,
@@ -8,7 +8,7 @@ pub struct Args {
 }
 
 /// Parses the command-line arguments and returns the file path
-pub fn parse_args(config_path: &PathBuf, cache_path: &PathBuf) -> Args {
+pub fn parse_args(config_path: &Path, cache_path: &Path) -> Args {
 	let config = format!(
 		"CONFIGURATION:\n    config file: {}\n    cache file:  {}",
 		config_path.to_string_lossy(),

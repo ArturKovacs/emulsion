@@ -10,7 +10,7 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -190,7 +190,7 @@ pub struct TitleSection {
 	pub show_program_name: Option<bool>,
 }
 impl TitleSection {
-	pub fn format_file_path<'a>(&self, file_path: &'a PathBuf) -> Cow<'a, str> {
+	pub fn format_file_path<'a>(&self, file_path: &'a Path) -> Cow<'a, str> {
 		match self.displayed_folders {
 			Some(0) | None => file_path.file_name().unwrap().to_string_lossy(),
 			Some(n) => {
