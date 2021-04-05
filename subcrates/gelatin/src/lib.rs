@@ -185,9 +185,9 @@ impl NextUpdate {
 	}
 }
 
-impl Into<ControlFlow> for NextUpdate {
-	fn into(self) -> ControlFlow {
-		match self {
+impl From<NextUpdate> for ControlFlow {
+	fn from(next_update: NextUpdate) -> Self {
+		match next_update {
 			NextUpdate::Soonest => ControlFlow::Poll,
 			NextUpdate::WaitUntil(time) => ControlFlow::WaitUntil(time),
 			NextUpdate::Latest => ControlFlow::Wait,

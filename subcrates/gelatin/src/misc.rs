@@ -79,9 +79,9 @@ impl From<dpi::LogicalPosition<f32>> for LogicalVector {
 		LogicalVector { vec: Vector2::new(other.x, other.y) }
 	}
 }
-impl Into<dpi::LogicalPosition<f32>> for LogicalVector {
-	fn into(self) -> dpi::LogicalPosition<f32> {
-		dpi::LogicalPosition::<f32> { x: self.vec.x, y: self.vec.y }
+impl From<LogicalVector> for dpi::LogicalPosition<f32> {
+	fn from(vec: LogicalVector) -> Self {
+		dpi::LogicalPosition::<f32> { x: vec.vec.x, y: vec.vec.y }
 	}
 }
 
