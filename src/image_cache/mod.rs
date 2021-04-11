@@ -132,7 +132,12 @@ impl AnimationFrameTexture {
 		let img_bytes = image.into_raw();
 		let mut tex_grid = Vec::new();
 
-		let max_size = display.get_capabilities().max_texture_size as u32;
+		// The reasoning behind dividing by 2 and taking the min with 4*1024, is
+		// that if the textures are going to be swaped out from GPU memory it
+		// might be easier to shuffle smaller chunks of memory around. (Because
+		// I believe that if the memory is fragmented, it is easier to find
+		// space for a smaller texture)
+		let max_size = (display.get_capabilities().max_texture_size as u32 / 2).min(4*1024);
 
 		// DEBUG
 		// let max_size = 1024;
