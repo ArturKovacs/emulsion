@@ -236,10 +236,15 @@ fn load_animation(
 
 	frames.map(move |frame| {
 		Ok(frame.map(|frame| {
-			let (numerator_ms, denom_ms) = frame.delay().numer_denom_ms();
+			let (mut numerator_ms, mut denom) = frame.delay().numer_denom_ms();
+			if numerator_ms == 0 {
+				// Some animated gifs specify a 0 inter-frame delay, but
+				// most gif viewers interpret this as a 0.1 second delay.
+				numerator_ms = 100;
+				denom = 1;
+			}
 			let numerator_nano = numerator_ms as u64 * 1_000_000;
-			let denom_nano = denom_ms as u64;
-			let delay_nano = numerator_nano / denom_nano;
+			let delay_nano = numerator_nano / (denom as u64);
 			let image = frame.into_buffer();
 			LoadResult::Frame { req_id, image, delay_nano, orientation: Orientation::Deg0 }
 		})?)
