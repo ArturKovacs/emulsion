@@ -239,7 +239,7 @@ impl PlaybackManager {
 		let new_file = self.folder_player.image_texture();
 		let mut file_changed = prev_file.is_none() != new_file.is_none();
 		if let (Some(prev), Some(new)) = (prev_file, new_file) {
-			file_changed = !Rc::ptr_eq(&prev.texture, &new.texture);
+			file_changed = !Rc::ptr_eq(&prev.tex_grid, &new.tex_grid);
 		}
 		if file_changed {
 			self.image_player.start_playback_forward();

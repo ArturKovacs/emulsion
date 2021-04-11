@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell};
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
 use std::sync::{Arc, Mutex};
@@ -667,7 +667,7 @@ impl Widget for PictureWidget {
 		if prev_texture.is_none() != new_texture.is_none() {
 			data.render_validity.invalidate();
 		} else if let (Some(prev_tex), Some(new_tex)) = (prev_texture, new_texture) {
-			if !Rc::ptr_eq(&prev_tex.texture, &new_tex.texture) {
+			if !Rc::ptr_eq(&prev_tex.tex_grid, &new_tex.tex_grid) {
 				data.render_validity.invalidate();
 			}
 		}
@@ -705,93 +705,9 @@ impl Widget for PictureWidget {
 			data.apply_camera_movement(context.dpi_scale_factor);
 			texture = data.get_texture();
 		}
-		{
+		if let Some(texture) = texture {
 			let data = self.data.borrow();
-
-			let size = data.drawn_bounds.size.vec;
-			let projection_transform = gelatin::cgmath::ortho(0.0, size.x, size.y, 0.0, -1.0, 1.0);
-
-			let viewport_rect = context.logical_rect_to_viewport(&data.drawn_bounds);
-			let image_draw_params = gelatin::glium::DrawParameters {
-				viewport: Some(viewport_rect),
-				..Default::default()
-			};
-
-			if let Some(texture) = texture {
-				let img_w = texture.texture.width() as f32;
-				let img_h = texture.texture.height() as f32;
-				let img_height_over_width = img_h / img_w;
-				let image_display_width = data.img_texel_size * img_w / context.dpi_scale_factor;
-				let image_display_height = image_display_width * img_height_over_width;
-				// Model tranform
-				let img_pyhs_pos = data.img_pos.vec * context.dpi_scale_factor;
-				let img_phys_siz = {
-					let img_phys_w = image_display_width * context.dpi_scale_factor;
-					let img_phys_h = image_display_height * context.dpi_scale_factor;
-					LogicalVector::new(img_phys_w.ceil(), img_phys_h.ceil())
-				};
-				let corner_x =
-					(img_pyhs_pos.x - img_phys_siz.vec.x * 0.5).ceil() / context.dpi_scale_factor;
-				let corner_y =
-					(img_pyhs_pos.y - img_phys_siz.vec.y * 0.5).ceil() / context.dpi_scale_factor;
-				let adjusted_w = img_phys_siz.vec.x / context.dpi_scale_factor;
-				let adjusted_h = img_phys_siz.vec.y / context.dpi_scale_factor;
-				let scaling = Matrix4::from_nonuniform_scale(adjusted_w, adjusted_h, 1.0);
-				let orientation;
-				{
-					let to_center = Matrix4::from_translation(Vector3::new(
-						-0.5 * adjusted_w,
-						-0.5 * adjusted_h,
-						0.0,
-					));
-					let orient = orientation_to_matrix(texture.orientation);
-					let to_corner = Matrix4::from_translation(Vector3::new(
-						0.5 * adjusted_w,
-						0.5 * adjusted_h,
-						0.0,
-					));
-					orientation = to_corner * orient * to_center;
-				}
-				let translation = Matrix4::from_translation(Vector3::new(corner_x, corner_y, 0.0));
-				let transform = translation * orientation * scaling;
-				// Projection tranform
-				let transform = projection_transform * transform;
-
-				let sampler = texture
-					.texture
-					.sampled()
-					.minify_filter(
-						gelatin::glium::uniforms::MinifySamplerFilter::LinearMipmapLinear,
-					)
-					.wrap_function(gelatin::glium::uniforms::SamplerWrapFunction::Clamp);
-
-				let filter = match data.antialiasing {
-					Antialias::Auto if data.img_texel_size < AA_TEXEL_SIZE_THRESHOLD => {
-						MagnifySamplerFilter::Linear
-					}
-					Antialias::Auto | Antialias::Never => MagnifySamplerFilter::Nearest,
-					Antialias::Always => MagnifySamplerFilter::Linear,
-				};
-				let sampler = sampler.magnify_filter(filter);
-
-				// building the uniforms
-				let lod_level = ((1.0 / data.img_texel_size).log2().max(0.0) + 0.125).floor();
-				let uniforms = uniform! {
-					matrix: Into::<[[f32; 4]; 4]>::into(transform),
-					bright_shade: data.bright_shade,
-					tex: sampler,
-					lod_level: lod_level,
-				};
-				target
-					.draw(
-						context.unit_quad_vertices,
-						context.unit_quad_indices,
-						&data.program,
-						&uniforms,
-						&image_draw_params,
-					)
-					.unwrap();
-			}
+			draw_tex_grid(data, target, context, texture);
 		}
 		let borrowed = self.data.borrow();
 		Ok(borrowed.next_update)
@@ -1025,5 +941,122 @@ impl Drop for PictureWidget {
 		// This doesn't work. Would be nice to fix at some point. I think I managed to create a
 		// circular reference with my `Rc`s
 		//println!("Called drop for the picture widget.");
+	}
+}
+
+fn draw_tex_grid(
+	data: Ref<PictureWidgetData>,
+	target: &mut Frame,
+	context: &DrawContext,
+	texture: AnimationFrameTexture,
+) {
+	let size = data.drawn_bounds.size.vec;
+	let projection_transform = gelatin::cgmath::ortho(0.0, size.x, size.y, 0.0, -1.0, 1.0);
+
+	let viewport_rect = context.logical_rect_to_viewport(&data.drawn_bounds);
+	let image_draw_params =
+		gelatin::glium::DrawParameters { viewport: Some(viewport_rect), ..Default::default() };
+
+	let img_phys_w = texture.w as f32;
+	let img_phys_h = texture.h as f32;
+	let img_height_over_width = img_phys_h / img_phys_w;
+	let image_display_width = data.img_texel_size * img_phys_w / context.dpi_scale_factor;
+	let image_display_height = image_display_width * img_height_over_width;
+	// Model tranform
+	let img_pyhs_pos = data.img_pos.vec * context.dpi_scale_factor;
+	let img_phys_siz = {
+		let img_phys_w = image_display_width * context.dpi_scale_factor;
+		let img_phys_h = image_display_height * context.dpi_scale_factor;
+		LogicalVector::new(img_phys_w.ceil(), img_phys_h.ceil())
+	};
+	let img_logical_corner_x =
+		(img_pyhs_pos.x - img_phys_siz.vec.x * 0.5).ceil() / context.dpi_scale_factor;
+	let img_logical_corner_y =
+		(img_pyhs_pos.y - img_phys_siz.vec.y * 0.5).ceil() / context.dpi_scale_factor;
+
+	// This is the display width of the image in logical pixel units
+	let img_adjusted_w = img_phys_siz.vec.x / context.dpi_scale_factor;
+	// This is the display height of the image in logical pixel units
+	let img_adjusted_h = img_phys_siz.vec.y / context.dpi_scale_factor;
+	let img_scaling = Matrix4::from_nonuniform_scale(img_adjusted_w, img_adjusted_h, 1.0);
+	let orientation;
+	{
+		let to_center = Matrix4::from_translation(Vector3::new(
+			-0.5 * img_adjusted_w,
+			-0.5 * img_adjusted_h,
+			0.0,
+		));
+		let orient = orientation_to_matrix(texture.orientation);
+		let to_corner = Matrix4::from_translation(Vector3::new(
+			0.5 * img_adjusted_w,
+			0.5 * img_adjusted_h,
+			0.0,
+		));
+		orientation = to_corner * orient * to_center;
+	}
+	let img_translation =
+		Matrix4::from_translation(Vector3::new(img_logical_corner_x, img_logical_corner_y, 0.0));
+
+	// let img_logical_w = img_w / context.dpi_scale_factor;
+	// let img_logical_h = img_h / context.dpi_scale_factor;
+	let cell_phy_step = texture.cell_step_size;
+	for cell_tex in texture.tex_grid.iter() {
+		let (cell_phys_w, cell_phys_h) = cell_tex.tex.dimensions();
+
+		let cell_phy_offset_x = cell_phy_step * cell_tex.col;
+		let cell_phy_offset_y = cell_phy_step * cell_tex.row;
+		// let cell_logical_offset_x = cell_phy_offset_x as f32 / context.dpi_scale_factor;
+		// let cell_logical_offset_y = cell_phy_offset_y as f32 / context.dpi_scale_factor;
+
+		// The grid is constructed so that it is exactly of size (1, 1) and is located at (0, 0)
+		// This allows to leave most of the image transformation logic unchanged.
+		let cell_scaling = Matrix4::from_nonuniform_scale(
+			cell_phys_w as f32 / img_phys_w,
+			cell_phys_h as f32 / img_phys_h,
+			1.0,
+		);
+		let cell_translation = Matrix4::from_translation(Vector3::new(
+			cell_phy_offset_x as f32 / img_phys_w,
+			cell_phy_offset_y as f32 / img_phys_h,
+			0.0,
+		));
+
+		let transform =
+			img_translation * orientation * img_scaling * cell_translation * cell_scaling;
+		// Projection tranform
+		let transform = projection_transform * transform;
+
+		let sampler = cell_tex
+			.tex
+			.sampled()
+			.minify_filter(gelatin::glium::uniforms::MinifySamplerFilter::LinearMipmapLinear)
+			.wrap_function(gelatin::glium::uniforms::SamplerWrapFunction::Clamp);
+
+		let filter = match data.antialiasing {
+			Antialias::Auto if data.img_texel_size < AA_TEXEL_SIZE_THRESHOLD => {
+				MagnifySamplerFilter::Linear
+			}
+			Antialias::Auto | Antialias::Never => MagnifySamplerFilter::Nearest,
+			Antialias::Always => MagnifySamplerFilter::Linear,
+		};
+		let sampler = sampler.magnify_filter(filter);
+
+		// building the uniforms
+		let lod_level = ((1.0 / data.img_texel_size).log2().max(0.0) + 0.125).floor();
+		let uniforms = uniform! {
+			matrix: Into::<[[f32; 4]; 4]>::into(transform),
+			bright_shade: data.bright_shade,
+			tex: sampler,
+			lod_level: lod_level,
+		};
+		target
+			.draw(
+				context.unit_quad_vertices,
+				context.unit_quad_indices,
+				&data.program,
+				&uniforms,
+				&image_draw_params,
+			)
+			.unwrap();
 	}
 }
