@@ -8,6 +8,8 @@ use std::time::{Duration, Instant};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
+use log::{debug, trace};
+
 use gelatin::glium::Display;
 use gelatin::window::Window;
 
@@ -193,10 +195,6 @@ impl PlaybackManager {
 		// self.playback_state = PlaybackState::Present;
 	}
 
-	pub fn current_file_path(&self) -> PathBuf {
-		self.image_cache.current_file_path()
-	}
-
 	/// Returns None when the folder hasn't finished filtering
 	pub fn current_file_index(&mut self) -> Option<usize> {
 		self.image_cache.current_file_index()
@@ -210,9 +208,12 @@ impl PlaybackManager {
 	pub fn update_directory(&mut self) -> image_cache::Result<()> {
 		if let LoadRequest::None = self.folder_player.load_request {
 			let curr_path = self.image_cache.current_file_path();
-			if !curr_path.to_string_lossy().is_empty() {
+			if curr_path.is_some() {
 				self.image_cache.update_directory()?;
-				let path = self.current_file_path();
+
+				// The there's no file to open, just request to open the empty path.
+				// This will hide the previously loaded image.
+				let path = self.file_path().clone().unwrap_or_else(PathBuf::new);
 				self.request_load(LoadRequest::FilePath(path));
 			}
 		}
@@ -236,6 +237,7 @@ impl PlaybackManager {
 		let display = window.display_mut();
 		let prev_file = self.folder_player.image_texture();
 		let next_update = self.folder_player.update_image(&display, &mut self.image_cache);
+		debug!("Folder player next update: {:?}", next_update);
 		let new_file = self.folder_player.image_texture();
 		let mut file_changed = prev_file.is_none() != new_file.is_none();
 		if let (Some(prev), Some(new)) = (prev_file, new_file) {
@@ -248,7 +250,10 @@ impl PlaybackManager {
 		if self.image_cache.loaded_still_image() {
 			self.image_player.pause_playback();
 		}
-		next_update.aggregate(self.image_player.update_image(&display, &mut self.image_cache))
+		let img_player_next_update =
+			self.image_player.update_image(&display, &mut self.image_cache);
+		debug!("Image player next update: {:?}", img_player_next_update);
+		next_update.aggregate(img_player_next_update)
 	}
 }
 
@@ -330,8 +335,18 @@ impl<P: Playback> ImgSequencePlayer<P> {
 		display: &Display,
 		image_cache: &mut ImageCache,
 	) -> gelatin::NextUpdate {
+		trace!(
+			"Begin `update_image`. Curr image is: {:?}. Load request is {:?}",
+			self.file_path,
+			self.load_request
+		);
+		let is_paused = matches!(self.playback_state, PlaybackState::Paused);
+		let no_request = matches!(self.load_request, LoadRequest::None);
+		if self.file_path.is_none() && no_request && is_paused {
+			return gelatin::NextUpdate::Latest;
+		}
 		let now = Instant::now();
-		let a_millisec_from_now = now.checked_add(Duration::from_millis(1)).unwrap();
+		let few_millisecs_from_now = now.checked_add(Duration::from_millis(50)).unwrap();
 		let mut next_update;
 		// The reason why I reset the `self.load_request` in such a convoluted way is that
 		// it has to be guaranteed that it will be reset even if I return from this
@@ -354,7 +369,7 @@ impl<P: Playback> ImgSequencePlayer<P> {
 			match load_request {
 				LoadRequest::Jump(0) => {
 					// Waiting on current image to be loaded.
-					next_update = gelatin::NextUpdate::WaitUntil(a_millisec_from_now);
+					next_update = gelatin::NextUpdate::WaitUntil(few_millisecs_from_now);
 				}
 				_ => {
 					image_cache.prefetch_neighbors();
@@ -427,7 +442,7 @@ impl<P: Playback> ImgSequencePlayer<P> {
 				}
 			}
 		} else {
-			next_update = gelatin::NextUpdate::WaitUntil(a_millisec_from_now);
+			next_update = gelatin::NextUpdate::WaitUntil(few_millisecs_from_now);
 		}
 		match load_request {
 			LoadRequest::None | LoadRequest::FilePath(..) => (),
@@ -437,6 +452,7 @@ impl<P: Playback> ImgSequencePlayer<P> {
 				}
 			}
 		}
+		trace!("Attempting actual load in `update_image`");
 		let load_result = match load_request {
 			LoadRequest::LoadNext => Some(P::load_next(image_cache, display)),
 			LoadRequest::LoadPrevious => Some(P::load_prev(image_cache, display)),
@@ -460,7 +476,7 @@ impl<P: Playback> ImgSequencePlayer<P> {
 					// Set the load request to jump in place so that
 					// next time we attempt to load this again.
 					self.load_request = LoadRequest::Jump(0);
-					next_update = gelatin::NextUpdate::WaitUntil(a_millisec_from_now);
+					next_update = gelatin::NextUpdate::WaitUntil(few_millisecs_from_now);
 				}
 				Err(err) => {
 					self.image_texture = None;

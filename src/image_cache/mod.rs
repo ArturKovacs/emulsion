@@ -7,12 +7,14 @@ use std::rc::Rc;
 use std::sync::atomic::Ordering;
 use std::time::SystemTime;
 
+use log::trace;
+
 use gelatin::glium;
 
 use glium::texture::SrgbTexture2d;
 
 pub mod image_loader;
-use self::image_loader::*;
+use self::{directory::DirItem, image_loader::*};
 
 mod pending_requests;
 use pending_requests::PendingRequests;
@@ -180,12 +182,16 @@ impl ImageCache {
 		}
 	}
 
-	pub fn current_filename(&self) -> OsString {
+	pub fn current_filename(&self) -> Option<OsString> {
 		self.dir.curr_filename()
 	}
 
-	pub fn current_file_path(&self) -> PathBuf {
-		self.dir.path().join(self.current_filename())
+	pub fn current_file_path(&self) -> Option<PathBuf> {
+		if let Some(filename) = self.current_filename() {
+			Some(self.dir.path().join(filename))
+		} else {
+			None
+		}
 	}
 
 	/// Returns `None` when the directory hasn't finished filtering image files.
@@ -196,6 +202,14 @@ impl ImageCache {
 	/// Returns `None` when the directory hasn't finished filtering image files.
 	pub fn current_dir_len(&mut self) -> Option<usize> {
 		self.dir.image_count()
+	}
+
+	fn curr_dir_item(&self) -> Result<DirItem> {
+		if let Some(desc) = self.dir.curr_descriptor() {
+			Ok(desc.clone())
+		} else {
+			bail!("Could not get the current file descriptor");
+		}
 	}
 
 	/// Returns tru if and only if the current image has been fully loaded and it has a single frame.
@@ -258,7 +272,9 @@ impl ImageCache {
 		path: &Path,
 		frame_id: Option<isize>,
 	) -> Result<AnimationFrameTexture> {
+		trace!("Begin `load_specific`");
 		self.receive_prefetched();
+		trace!("Receive prefetched done");
 		let target_file_name;
 		let parent;
 		if path.is_dir() {
@@ -278,15 +294,8 @@ impl ImageCache {
 			self.current_frame_idx = 0;
 		}
 		if self.dir.path() != parent {
-			let file_path;
-			let req_id;
-			if let Some(desc) = self.dir.curr_descriptor() {
-				file_path = desc.path.clone();
-				req_id = desc.request_id;
-			} else {
-				bail!("Could not got current file descriptor");
-			}
-			self.send_request_for_file(file_path, req_id, RequestKind::Priority { display });
+			let DirItem { path, request_id } = self.curr_dir_item()?;
+			self.send_request_for_file(path, request_id, RequestKind::Priority { display });
 			return Err(errors::Error::from_kind(errors::ErrorKind::WaitingOnLoader));
 		}
 		if let Some(img_index) = self.dir.curr_img_index() {
@@ -311,6 +320,7 @@ impl ImageCache {
 	}
 
 	fn refresh_cache(&mut self) {
+		trace!("Begin `refresh_cache`");
 		if let Some(curr_index) = self.dir.curr_img_index() {
 			let cache = mem::take(&mut self.texture_cache);
 
@@ -359,12 +369,15 @@ impl ImageCache {
 		frame_jump_count: isize,
 	) -> Result<(AnimationFrameTexture, PathBuf)> {
 		if file_jump_count == 0 {
-			let _path = self.current_file_path();
 			// Here, it is possible that the current image was already
 			// requested but not yet loaded.
 			let target_frame = self.current_frame_idx as isize + frame_jump_count;
 			let requested = self.try_getting_requested_image(display, target_frame);
-			return requested.map(|t| (t, self.current_file_path()));
+			if let Some(path) = self.current_file_path() {
+				return requested.map(|t| (t, path));
+			} else {
+				bail!("No file is open");
+			}
 		} else {
 			self.current_frame_idx = 0;
 		}
@@ -449,14 +462,8 @@ impl ImageCache {
 		display: &glium::Display,
 		frame_id: isize,
 	) -> Result<AnimationFrameTexture> {
-		let path;
-		let req_id;
-		if let Some(desc) = self.dir.curr_descriptor() {
-			path = desc.path.clone();
-			req_id = desc.request_id;
-		} else {
-			bail!("Could not got current file descriptor");
-		}
+		trace!("Begin `try_getting_requested_image` in `image_cache`");
+		let DirItem { path, request_id: req_id } = self.curr_dir_item()?;
 
 		// Check if it's among the prefetched, and upload it, if it is
 		if let Some(results) = self.pending_requests.take_results(req_id) {
@@ -503,16 +510,7 @@ impl ImageCache {
 			PRIORITY_REQUEST_ID.store(req_id, Ordering::SeqCst);
 			return Err(Error::from_kind(ErrorKind::WaitingOnLoader));
 		}
-
-		let file_path;
-		let req_id;
-		if let Some(desc) = self.dir.curr_descriptor() {
-			file_path = desc.path.clone();
-			req_id = desc.request_id;
-		} else {
-			bail!("Could not got current file descriptor");
-		}
-		self.send_request_for_file(file_path, req_id, RequestKind::Priority { display });
+		self.send_request_for_file(path, req_id, RequestKind::Priority { display });
 		// If the texture is not in the cache just throw our hands in the air
 		// and tell the caller that we gotta wait for the loader to load this texture.
 		Err(Error::from_kind(ErrorKind::WaitingOnLoader))
