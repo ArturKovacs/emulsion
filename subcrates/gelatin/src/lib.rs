@@ -152,7 +152,7 @@ pub trait WidgetData {
 	}
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum NextUpdate {
 	/// Analogous to glutin::ControlFlow::Poll
 	Soonest,

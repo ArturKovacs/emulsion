@@ -143,22 +143,9 @@ impl Application {
 								window.request_redraw();
 							}
 						}
-						if should_sleep {
-							let mut sleep_duration = MAX_SLEEP_DURATION;
-							if let ControlFlow::WaitUntil(next_update) = control_flow {
-								let now = std::time::Instant::now();
-								if *next_update > now {
-									let control_flow_sleep = *next_update - now;
-									if control_flow_sleep < sleep_duration {
-										sleep_duration = control_flow_sleep;
-									}
-								} else {
-									should_sleep = false;
-								}
-							}
-							if should_sleep {
-								std::thread::sleep(sleep_duration);
-							}
+						if should_sleep && !matches!(control_flow, ControlFlow::WaitUntil(_)) {
+							let now = std::time::Instant::now();
+							*control_flow = ControlFlow::WaitUntil(now + MAX_SLEEP_DURATION);
 						}
 					} else {
 						*control_flow = ControlFlow::Exit;
@@ -188,6 +175,14 @@ impl Application {
 				}
 				// Drop 'em all!
 				//windows.clear();
+			}
+
+			if matches!(control_flow, ControlFlow::Poll) {
+				// This is an ugly workaround for the X server completely freezing
+				// sometimes.
+				// See: https://github.com/ArturKovacs/emulsion/issues/172
+				let now = std::time::Instant::now();
+				*control_flow = ControlFlow::WaitUntil(now + MAX_SLEEP_DURATION);
 			}
 		});
 	}
