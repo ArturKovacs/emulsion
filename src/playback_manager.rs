@@ -206,14 +206,17 @@ impl PlaybackManager {
 	}
 
 	pub fn update_directory(&mut self) -> image_cache::Result<()> {
+		debug!("In `update_directory`");
 		if let LoadRequest::None = self.folder_player.load_request {
 			let curr_path = self.image_cache.current_file_path();
+			debug!("In `update_directory`, current_file_path is: {:?}", curr_path);
 			if curr_path.is_some() {
 				self.image_cache.update_directory()?;
 
 				// The there's no file to open, just request to open the empty path.
 				// This will hide the previously loaded image.
-				let path = self.file_path().clone().unwrap_or_else(PathBuf::new);
+				// Note that `image_cache.current_file_path()` is used instead of `self.shown_file_path()`
+				let path = self.image_cache.current_file_path().unwrap_or_else(PathBuf::new);
 				self.request_load(LoadRequest::FilePath(path));
 			}
 		}
@@ -229,7 +232,8 @@ impl PlaybackManager {
 		self.image_player.image_texture()
 	}
 
-	pub fn file_path(&self) -> &Option<PathBuf> {
+	/// The path to the image file which is currently rendered onto the screen.
+	pub fn shown_file_path(&self) -> &Option<PathBuf> {
 		&self.folder_player.file_path
 	}
 
@@ -237,7 +241,7 @@ impl PlaybackManager {
 		let display = window.display_mut();
 		let prev_file = self.folder_player.image_texture();
 		let next_update = self.folder_player.update_image(&display, &mut self.image_cache);
-		debug!("Folder player next update: {:?}", next_update);
+		trace!("Folder player next update: {:?}", next_update);
 		let new_file = self.folder_player.image_texture();
 		let mut file_changed = prev_file.is_none() != new_file.is_none();
 		if let (Some(prev), Some(new)) = (prev_file, new_file) {
@@ -252,7 +256,7 @@ impl PlaybackManager {
 		}
 		let img_player_next_update =
 			self.image_player.update_image(&display, &mut self.image_cache);
-		debug!("Image player next update: {:?}", img_player_next_update);
+		trace!("Image player next update: {:?}", img_player_next_update);
 		next_update.aggregate(img_player_next_update)
 	}
 }

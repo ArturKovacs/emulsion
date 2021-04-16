@@ -595,7 +595,7 @@ impl PictureWidget {
 			borrowed.render_validity.invalidate();
 		}
 		if triggered!(IMG_DEL_NAME) {
-			if let Some(path) = borrowed.playback_manager.file_path() {
+			if let Some(path) = borrowed.playback_manager.shown_file_path() {
 				if let Err(e) = trash::delete(&path) {
 					eprintln!("Error while moving file '{:?}' to trash: {:?}", path, e);
 				}
@@ -606,7 +606,7 @@ impl PictureWidget {
 			}
 		}
 		if triggered!(IMG_COPY_NAME) {
-			if let Some(path) = borrowed.playback_manager.file_path().clone() {
+			if let Some(path) = borrowed.playback_manager.shown_file_path().clone() {
 				let request_started;
 				if let Some(clipboard_handler) = &mut borrowed.clipboard_handler {
 					request_started = true;
@@ -620,7 +620,7 @@ impl PictureWidget {
 				}
 			}
 		}
-		if let Some(img_path) = borrowed.playback_manager.file_path() {
+		if let Some(img_path) = borrowed.playback_manager.shown_file_path() {
 			if let Some(folder_path) = img_path.parent() {
 				let img_and_folder = (img_path.to_str(), folder_path.to_str());
 				if let (Some(img_path), Some(folder_path)) = img_and_folder {
@@ -666,7 +666,11 @@ impl Widget for PictureWidget {
 		}
 		//data.slider.set_step_bg(data.playback_manager.cached_from_dir());
 		let playback_state = data.playback_manager.playback_state();
-		data.set_window_title_filename(window, playback_state, data.playback_manager.file_path());
+		data.set_window_title_filename(
+			window,
+			playback_state,
+			data.playback_manager.shown_file_path(),
+		);
 		if prev_texture.is_none() != new_texture.is_none() {
 			data.render_validity.invalidate();
 		} else if let (Some(prev_tex), Some(new_tex)) = (prev_texture, new_texture) {
@@ -970,7 +974,7 @@ impl Widget for PictureWidget {
 					HoverState::None => {
 						let curr_path = borrowed
 							.playback_manager
-							.file_path()
+							.shown_file_path()
 							.clone()
 							.unwrap_or_else(PathBuf::new);
 						borrowed.hover_state = HoverState::ItemHovered { prev_path: curr_path };
