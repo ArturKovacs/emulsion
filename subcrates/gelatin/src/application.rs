@@ -143,11 +143,9 @@ impl Application {
 								window.request_redraw();
 							}
 						}
-						if should_sleep {
-							if !matches!(control_flow, ControlFlow::WaitUntil(_)) {
-								let now = std::time::Instant::now();
-								*control_flow = ControlFlow::WaitUntil(now + MAX_SLEEP_DURATION);
-							}
+						if should_sleep && !matches!(control_flow, ControlFlow::WaitUntil(_)) {
+							let now = std::time::Instant::now();
+							*control_flow = ControlFlow::WaitUntil(now + MAX_SLEEP_DURATION);
 						}
 					} else {
 						*control_flow = ControlFlow::Exit;
