@@ -90,6 +90,8 @@ struct WindowData {
 	last_event_invalidated: bool,
 	should_sleep: bool,
 
+	new_title: Option<String>,
+
 	render_validity: RenderValidity,
 	cursor_pos: LogicalVector,
 	modifiers: glutin::event::ModifiersState,
@@ -207,6 +209,7 @@ impl Window {
 				unprocessed_move_event: None,
 				last_event_invalidated: true,
 				should_sleep: false,
+				new_title: None,
 				cursor_pos: Default::default(),
 				modifiers: glutin::event::ModifiersState::empty(),
 				render_validity: RenderValidity { validity: Rc::new(Cell::new(false)) },
@@ -382,6 +385,15 @@ impl Window {
 		self.data.borrow().should_sleep
 	}
 
+	pub fn set_title(&self, title: String) {
+		// Deferring to set the title later, because
+		// the program sometimes crashes on wayland if this is
+		// done in the `MainEventsCleared` event.
+		let mut borrowed = self.data.borrow_mut();
+		borrowed.new_title = Some(title);
+		borrowed.render_validity.invalidate();
+	}
+
 	pub fn display_mut(&self) -> WindowDisplayRefMut<'_> {
 		WindowDisplayRefMut { window_ref: self.data.borrow_mut() }
 	}
@@ -411,7 +423,14 @@ impl Window {
 	/// This means that trying to borrow the window *mutably* in a widget's
 	/// draw function will fail.
 	pub fn redraw(&self) -> crate::NextUpdate {
-		self.data.borrow_mut().last_event_invalidated = false;
+		// Using a scope to only borrow the data mutable for the very beggining.
+		{
+			let mut borrowed = self.data.borrow_mut();
+			if let Some(new_title) = borrowed.new_title.take() {
+				borrowed.display.gl_window().window().set_title(&new_title);
+			}
+			borrowed.last_event_invalidated = false;
+		}
 		// this way self.data is not borrowed while before draw is running.
 		let dpi_scaling = self.data.borrow().display.gl_window().window().scale_factor();
 		let mut target = self.data.borrow().display.draw();

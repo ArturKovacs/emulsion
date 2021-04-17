@@ -324,8 +324,7 @@ impl PictureWidgetData {
 			None => "[ none ]".into(),
 		};
 		let title = format!("{}{}{}", name, playback, title_config.format_program_name());
-		let display = window.display_mut();
-		display.gl_window().window().set_title(title.as_str());
+		window.set_title(title);
 	}
 
 	fn get_texture(&self) -> Option<AnimationFrameTexture> {
