@@ -324,8 +324,7 @@ impl PictureWidgetData {
 			None => "[ none ]".into(),
 		};
 		let title = format!("{}{}{}", name, playback, title_config.format_program_name());
-		let display = window.display_mut();
-		display.gl_window().window().set_title(title.as_str());
+		window.set_title(title);
 	}
 
 	fn get_texture(&self) -> Option<AnimationFrameTexture> {
@@ -595,45 +594,48 @@ impl PictureWidget {
 			borrowed.render_validity.invalidate();
 		}
 		if triggered!(IMG_DEL_NAME) {
-			let path = borrowed.playback_manager.current_file_path();
-			if let Err(e) = trash::delete(&path) {
-				eprintln!("Error while moving file '{:?}' to trash: {:?}", path, e);
+			if let Some(path) = borrowed.playback_manager.shown_file_path() {
+				if let Err(e) = trash::delete(&path) {
+					eprintln!("Error while moving file '{:?}' to trash: {:?}", path, e);
+				}
+				if let Err(e) = borrowed.playback_manager.update_directory() {
+					eprintln!("Error while updating directory {:?}", e);
+				}
+				borrowed.render_validity.invalidate();
 			}
-			if let Err(e) = borrowed.playback_manager.update_directory() {
-				eprintln!("Error while updating directory {:?}", e);
-			}
-			borrowed.render_validity.invalidate();
 		}
 		if triggered!(IMG_COPY_NAME) {
-			let path = borrowed.playback_manager.current_file_path();
-			let request_started;
-			if let Some(clipboard_handler) = &mut borrowed.clipboard_handler {
-				request_started = true;
-				clipboard_handler.request_copy(path);
-				borrowed.copy_notifications.set_started();
-			} else {
-				request_started = false;
-			}
-			if request_started {
-				borrowed.clipboard_request_was_pending = true;
+			if let Some(path) = borrowed.playback_manager.shown_file_path().clone() {
+				let request_started;
+				if let Some(clipboard_handler) = &mut borrowed.clipboard_handler {
+					request_started = true;
+					clipboard_handler.request_copy(path);
+					borrowed.copy_notifications.set_started();
+				} else {
+					request_started = false;
+				}
+				if request_started {
+					borrowed.clipboard_request_was_pending = true;
+				}
 			}
 		}
-		let img_path = borrowed.playback_manager.current_file_path();
-		if let Some(folder_path) = img_path.parent() {
-			let img_and_folder = (img_path.to_str(), folder_path.to_str());
-			if let (Some(img_path), Some(folder_path)) = img_and_folder {
-				execute_triggered_commands(
-					borrowed.configuration.clone(),
-					input_key,
-					modifiers,
-					img_path,
-					folder_path,
-				);
+		if let Some(img_path) = borrowed.playback_manager.shown_file_path() {
+			if let Some(folder_path) = img_path.parent() {
+				let img_and_folder = (img_path.to_str(), folder_path.to_str());
+				if let (Some(img_path), Some(folder_path)) = img_and_folder {
+					execute_triggered_commands(
+						borrowed.configuration.clone(),
+						input_key,
+						modifiers,
+						img_path,
+						folder_path,
+					);
+				} else {
+					eprintln!("Could not convert the image path to utf8. Path: '{:?}'", img_path);
+				}
 			} else {
-				eprintln!("Could not convert the image path to utf8. Path: '{:?}'", img_path);
+				eprintln!("Could not get parent folder for the image path {:?}", img_path);
 			}
-		} else {
-			eprintln!("Could not get parent folder for the image path {:?}", img_path);
 		}
 	}
 }
@@ -663,7 +665,11 @@ impl Widget for PictureWidget {
 		}
 		//data.slider.set_step_bg(data.playback_manager.cached_from_dir());
 		let playback_state = data.playback_manager.playback_state();
-		data.set_window_title_filename(window, playback_state, data.playback_manager.file_path());
+		data.set_window_title_filename(
+			window,
+			playback_state,
+			data.playback_manager.shown_file_path(),
+		);
 		if prev_texture.is_none() != new_texture.is_none() {
 			data.render_validity.invalidate();
 		} else if let (Some(prev_tex), Some(new_tex)) = (prev_texture, new_texture) {
@@ -881,9 +887,12 @@ impl Widget for PictureWidget {
 				let mut borrowed = self.data.borrow_mut();
 				match borrowed.hover_state {
 					HoverState::None => {
-						borrowed.hover_state = HoverState::ItemHovered {
-							prev_path: borrowed.playback_manager.current_file_path(),
-						};
+						let curr_path = borrowed
+							.playback_manager
+							.shown_file_path()
+							.clone()
+							.unwrap_or_else(PathBuf::new);
+						borrowed.hover_state = HoverState::ItemHovered { prev_path: curr_path };
 					}
 					HoverState::ItemHovered { .. } => {}
 				}

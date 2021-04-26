@@ -14,6 +14,8 @@ use std::time::{Duration, Instant};
 use directories_next::ProjectDirs;
 use lazy_static::lazy_static;
 
+use log::trace;
+
 use gelatin::glium::glutin::{
 	dpi::{PhysicalPosition, PhysicalSize},
 	event::WindowEvent,
@@ -68,6 +70,8 @@ static LEFT_TO_PAN: &[u8] = include_bytes!("../resource/use-left-to-pan.png");
 // ========================================================
 fn main() {
 	std::panic::set_hook(Box::new(handle_panic::handle_panic));
+	env_logger::init();
+	trace!("Starting up. Panic hook set, logger initialized.");
 
 	// Load configuration and cache files
 	let (config_path, cache_path) = get_config_and_cache_paths();

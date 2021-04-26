@@ -3,6 +3,8 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use log::debug;
+
 use super::image_loader::is_file_supported;
 use crate::parallel_action::ParallelAction;
 
@@ -135,11 +137,8 @@ impl Directory {
 		Err(Error::Other(format!("Could not find file {:?} in directory {:?}", filename, path)))
 	}
 
-	pub fn curr_filename(&self) -> OsString {
-		match self.files.get(self.curr_file_idx) {
-			Some(n) => n.path.file_name().unwrap().to_owned(),
-			None => OsString::new(),
-		}
+	pub fn curr_filename(&self) -> Option<OsString> {
+		self.files.get(self.curr_file_idx).and_then(|x| x.path.file_name().map(|x| x.to_owned()))
 	}
 
 	pub fn curr_descriptor(&self) -> Option<&DirItem> {
@@ -216,19 +215,29 @@ impl Directory {
 
 	pub fn update_directory(&mut self) -> Result<()> {
 		let curr_filename = self.curr_filename();
+		let curr_filename = curr_filename.as_deref();
 		let curr_index = self.curr_file_idx;
+		debug!(
+			"Directory: `update_directory`. Current filename: {:?}, curr_index: {:?}",
+			curr_filename, curr_index
+		);
 		self.collect_directory()?;
-		for (index, desc) in self.files.iter().enumerate() {
-			if desc.path.file_name().unwrap() == curr_filename {
-				self.curr_file_idx = index;
-				self.set_image_index_from_file_index();
-				self.check_filter_ready();
-				return Ok(());
+		if curr_filename.is_some() {
+			for (index, desc) in self.files.iter().enumerate() {
+				if desc.path.file_name() == curr_filename {
+					debug!("Found file the previously 'current' file in the directory.");
+					self.curr_file_idx = index;
+					self.set_image_index_from_file_index();
+					self.check_filter_ready();
+					return Ok(());
+				}
 			}
 		}
+		debug!("Previously 'current' file not found, skipping to next supported.");
 		// if is_file_supported, preserve index of previous file or its following files
 		for (index, desc) in self.files.iter().enumerate().skip(curr_index) {
 			if is_file_supported(&desc.path) {
+				debug!("Next supported file found. Index {:?}, name {:?}.", index, desc.path);
 				self.curr_file_idx = index;
 				self.set_image_index_from_file_index();
 				self.check_filter_ready();
