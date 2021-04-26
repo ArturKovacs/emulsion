@@ -137,7 +137,7 @@ impl AnimationFrameTexture {
 		// might be easier to shuffle smaller chunks of memory around. (Because
 		// I believe that if the memory is fragmented, it is easier to find
 		// space for a smaller texture)
-		let max_size = (display.get_capabilities().max_texture_size as u32 / 2).min(4*1024);
+		let max_size = (display.get_capabilities().max_texture_size as u32 / 2).min(4 * 1024);
 
 		// DEBUG
 		// let max_size = 1024;
@@ -181,6 +181,7 @@ impl AnimationFrameTexture {
 }
 
 /// img_bytes has to be an rgba8 buffer.
+#[allow(clippy::too_many_arguments)]
 fn texture_from_img_rect(
 	display: &glium::Display,
 	img_w: u32,
