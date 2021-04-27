@@ -9,6 +9,9 @@ use glium::glutin::{
 use glium::{program, uniform, Display, Frame, IndexBuffer, Program, Rect, Surface, VertexBuffer};
 use glium::{Blend, BlendingFunction};
 
+#[cfg(not(any(target_os = "macos", windows)))]
+use winit::platform::unix::WindowBuilderExtUnix;
+
 use std::cell::Cell;
 use std::cell::{RefCell, RefMut};
 use std::cmp::Eq;
@@ -79,6 +82,11 @@ pub struct WindowDescriptor {
 
 	#[builder(default)]
 	position: Option<PhysicalPosition<i32>>,
+
+	/// Only relevant on Wayland.
+	/// See: https://docs.rs/winit/0.24.0/winit/platform/unix/trait.WindowBuilderExtUnix.html#tymethod.with_app_id
+	#[builder(default)]
+	app_id: Option<String>,
 }
 
 struct WindowData {
@@ -134,6 +142,9 @@ impl Window {
 			.with_inner_size(desc.size)
 			.with_window_icon(desc.icon)
 			.with_visible(desc.position.is_none());
+
+		#[cfg(not(any(target_os = "macos", windows)))]
+		let window = if let Some(app_id) = desc.app_id { window.with_app_id(app_id) } else { window };
 
 		let context =
 			glutin::ContextBuilder::new().with_gl_profile(glutin::GlProfile::Core).with_vsync(true);
