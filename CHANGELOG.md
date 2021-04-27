@@ -2,6 +2,14 @@
 
 ### Added
 - Added `start_maximized` configuration field
+- Some very high resolution images that showed entirely black previously are now shown correctly.
+
+### Changed
+- Fixed spurious crashes on Wayland
+- Fixed incorrect file association method in the Windows installer
+- Fixed a bug that caused the entire system to freeze on X11 desktops.
+- Fixed some animated gifs showing as a still image
+- The parent folder could previously be deleted after deleting the last open image. This is now prevented.
 
 ## 8.0 on 2021-01-02
 
