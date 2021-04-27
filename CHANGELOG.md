@@ -3,6 +3,7 @@
 ### Added
 - Added `start_maximized` configuration field
 - Some very high resolution images that showed entirely black previously are now shown correctly.
+- Allow copying to the clipboard on Wayland
 
 ### Changed
 - Fixed spurious crashes on Wayland
