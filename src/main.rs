@@ -125,6 +125,7 @@ fn main() {
 			.icon(Some(make_icon()))
 			.size(size)
 			.position(Some(pos))
+			.app_id(Some("Emulsion".into()))
 			.build()
 			.unwrap();
 		let window = Window::new(&mut application, window_desc);
