@@ -32,6 +32,7 @@ jobs:
     needs: create_release
     runs-on: windows-latest
     env:
+      EMULSION_VERSION: ${{ needs.create_release.outputs.version }}
       INSTALLER_NAME: ${{ format('Emulsion-Windows-{0}.exe', needs.create_release.outputs.version) }}
     steps:
     - uses: actions-rs/toolchain@v1
@@ -76,7 +77,7 @@ jobs:
     - name: Create installer
       working-directory: ./distribution/windows/
       run: |
-        makensis emulsion.nsi
+        makensis /DVERSION=$Env:EMULSION_VERSION emulsion.nsi
     - name: Upload Release Asset
       id: upload-release-asset 
       uses: actions/upload-release-asset@v1

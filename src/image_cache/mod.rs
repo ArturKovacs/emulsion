@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};
 use std::fs;
@@ -9,9 +10,14 @@ use std::time::SystemTime;
 
 use log::trace;
 
-use gelatin::glium;
-
-use glium::texture::SrgbTexture2d;
+use gelatin::{
+	glium::{
+		self,
+		texture::{MipmapsOption, RawImage2d, SrgbTexture2d},
+		CapabilitiesSource,
+	},
+	image,
+};
 
 pub mod image_loader;
 use self::{directory::DirItem, image_loader::*};
@@ -63,10 +69,7 @@ pub fn get_image_size_estimate(width: u32, height: u32) -> isize {
 }
 
 pub fn get_anim_size_estimate(frames: &[AnimationFrameTexture]) -> isize {
-	frames
-		.iter()
-		.map(|frame| get_image_size_estimate(frame.texture.width(), frame.texture.height()))
-		.sum()
+	frames.iter().map(|frame| get_image_size_estimate(frame.w, frame.h)).sum()
 }
 
 /// The request sender function must process all prefetched requests to avoid
@@ -87,23 +90,144 @@ impl<'a> RequestKind<'a> {
 	}
 }
 
+pub struct TextureGridItem {
+	pub tex: SrgbTexture2d,
+	pub col: u32,
+	pub row: u32,
+}
+
 #[derive(Clone)]
 pub struct AnimationFrameTexture {
-	pub texture: Rc<SrgbTexture2d>,
+	/// The maximum texture size supported by GPUs is limited. However it may be
+	/// the I want to view a 16k*16k image while my GPU only supports 4k*4k
+	/// textures. To work around this, we split up large images into a grid of
+	/// smaller ones, which are displayed to appear as one continous surface.
+	pub tex_grid: Rc<Vec<TextureGridItem>>,
+	/// Number of physical pixels between two adjacent cells in one dimension.
+	/// For example the pixel offset from the corner of the image to the corner
+	/// of the cell at the 3rd column and 2nd row is
+	/// (3*cell_step_size, 2*cell_step_size)
+	pub cell_step_size: u32,
+	pub grid_rows: u32,
+	pub grid_cols: u32,
+
 	pub delay_nano: u64,
 	pub orientation: Orientation,
+
+	/// The total width of the image. This equals to the sum of the widths of the
+	/// textures from a single row of the grid
+	pub w: u32,
+	/// The total height of the image. This equals to the sum of the heights of the
+	/// textures from a single column of the grid
+	pub h: u32,
 }
 impl AnimationFrameTexture {
+	pub fn from_image(
+		display: &glium::Display,
+		image: image::RgbaImage,
+		delay_nano: u64,
+		orientation: Orientation,
+	) -> Result<Self> {
+		let (w, h) = image.dimensions();
+		let img_bytes = image.into_raw();
+		let mut tex_grid = Vec::new();
+
+		// The reasoning behind dividing by 2 and taking the min with 4*1024, is
+		// that if the textures are going to be swaped out from GPU memory it
+		// might be easier to shuffle smaller chunks of memory around. (Because
+		// I believe that if the memory is fragmented, it is easier to find
+		// space for a smaller texture)
+		let max_size = (display.get_capabilities().max_texture_size as u32 / 2).min(4 * 1024);
+
+		// DEBUG
+		// let max_size = 1024;
+
+		let grid_cols = ((w - 1) / max_size) + 1;
+		let grid_rows = ((h - 1) / max_size) + 1;
+
+		for row in 0..grid_rows {
+			for col in 0..grid_cols {
+				let offset_x = col * max_size;
+				let offset_y = row * max_size;
+				let cell_w = (w - offset_x).min(max_size);
+				let cell_h = (h - offset_y).min(max_size);
+				let tex = texture_from_img_rect(
+					display, w, h, &img_bytes, offset_x, offset_y, cell_w, cell_h,
+				)?;
+				let item = TextureGridItem { tex, col, row };
+				tex_grid.push(item);
+			}
+		}
+
+		Ok(AnimationFrameTexture {
+			tex_grid: Rc::new(tex_grid),
+			delay_nano,
+			orientation,
+			w,
+			h,
+			cell_step_size: max_size,
+			grid_rows,
+			grid_cols,
+		})
+	}
+
 	pub fn oriented_dimensions(&self) -> (u32, u32) {
 		use Orientation::*;
 		match self.orientation {
-			Deg0 | Deg0HorFlip | Deg180 | Deg180HorFlip => self.texture.dimensions(),
-			Deg90 | Deg90VerFlip | Deg270 | Deg270VerFlip => {
-				let (w, h) = self.texture.dimensions();
-				(h, w)
-			}
+			Deg0 | Deg0HorFlip | Deg180 | Deg180HorFlip => (self.w, self.h),
+			Deg90 | Deg90VerFlip | Deg270 | Deg270VerFlip => (self.h, self.w),
 		}
 	}
+}
+
+/// img_bytes has to be an rgba8 buffer.
+#[allow(clippy::too_many_arguments)]
+fn texture_from_img_rect(
+	display: &glium::Display,
+	img_w: u32,
+	img_h: u32,
+	img_bytes: &[u8],
+	offset_x: u32,
+	offset_y: u32,
+	cell_w: u32,
+	cell_h: u32,
+) -> Result<SrgbTexture2d> {
+	let raw_image;
+	if img_w == cell_w {
+		assert!(offset_x == 0);
+		let start = (offset_y as usize * img_w as usize) * 4;
+		let end = start + (cell_h as usize * cell_w as usize * 4);
+		raw_image = RawImage2d {
+			data: Cow::Borrowed(&img_bytes[start..end]),
+			format: glium::texture::ClientFormat::U8U8U8U8,
+			width: cell_w,
+			height: cell_h,
+		};
+	} else {
+		let cell_size = cell_w as usize * cell_h as usize * 4;
+		let mut cell_pixels = Vec::with_capacity(cell_size);
+		for y in offset_y..(offset_y + cell_h) {
+			// We multiply by four becase we need to convert from a pixel offset to
+			// a byte offset and each pixel is 4 bytes wide.
+			let start = (y as usize * img_w as usize + offset_x as usize) * 4;
+			let end = start + (cell_w as usize * 4);
+			cell_pixels.extend_from_slice(&img_bytes[start..end]);
+		}
+		raw_image = RawImage2d::from_raw_rgba(cell_pixels, (cell_w, cell_h));
+	}
+
+	let x_pow = 31 - img_w.leading_zeros();
+	let y_pow = 31 - img_h.leading_zeros();
+
+	let max_mipmap_levels = x_pow.min(y_pow).min(4);
+
+	let mipmaps = if max_mipmap_levels == 1 {
+		MipmapsOption::NoMipmap
+	} else {
+		MipmapsOption::AutoGeneratedMipmapsMax(max_mipmap_levels)
+		//MipmapsOption::AutoGeneratedMipmaps
+	};
+	Ok(SrgbTexture2d::with_mipmaps(display, raw_image, mipmaps)?)
 }
 
 struct CachedTexture {
@@ -574,8 +698,8 @@ impl ImageCache {
 				}
 				let size_estimate = get_image_size_estimate(image.width(), image.height());
 				if let Some(entry) = self.texture_cache.get_mut(&req_id) {
-					let texture = Rc::new(texture_from_image(display, image)?);
-					let anim_frame = AnimationFrameTexture { texture, delay_nano, orientation };
+					let anim_frame =
+						AnimationFrameTexture::from_image(display, image, delay_nano, orientation)?;
 					entry.frames.push(anim_frame.clone());
 					self.remaining_capacity -= size_estimate;
 					return Ok(Some(anim_frame));
