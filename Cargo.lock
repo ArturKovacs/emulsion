@@ -850,7 +850,7 @@ checksum = "3dcaa9ae7725d12cdb85b3ad99a434db70b468c09ded17e012d86b5c1010f7a7"
 
 [[package]]
 name = "gelatin"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "cgmath",
  "derive_builder",
