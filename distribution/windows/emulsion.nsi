@@ -4,10 +4,13 @@ Unicode True
 
 ;--------------------------------
 ;Includes and related defines
+
+    ; VERSION is defined through a command line argument to the maker
+    ; for example:
+    ; makensis.exe /DVERSION=9.0 emulsion.nsi
+
     !define PROGRAM_NAME "Emulsion"
     !define REG_PROG_PATH "SOFTWARE\Emulsion"
-    ;!define REG_EXT_PROG_KEY "Software\Classes\Emulsion"
-    ;!define REG_EXT_OPEN_COMMAND_KEY "Software\Classes\Emulsion\shell\open\command"
     !define REG_UNINST_PATH "Software\Microsoft\Windows\CurrentVersion\Uninstall\Emulsion"
     !define MULTIUSER_INSTALLMODE_INSTDIR "${PROGRAM_NAME}"
     !define MULTIUSER_INSTALLMODE_INSTDIR_REGISTRY_KEY "${REG_PROG_PATH}"
@@ -15,11 +18,14 @@ Unicode True
     !define MULTIUSER_USE_PROGRAMFILES64
     !define MULTIUSER_MUI
     !define MULTIUSER_INSTALLMODE_COMMANDLINE
+
+    ; The Programmatic ID for file associations
+    ; see: https://docs.microsoft.com/en-us/windows/win32/shell/fa-progids
+    !define GENERIC_PROG_ID "${PROGRAM_NAME}.Generic"
     
     !include "MultiUser.nsh"
     !include "MUI2.nsh"
     !include "FileAssociation.nsh"
-
     
 ;--------------------------------
 ;General
@@ -48,14 +54,14 @@ Unicode True
     !define MUI_HEADERIMAGE_BITMAP "empty.bmp"
     !define MUI_HEADERIMAGE_RIGHT
     
-    !define MUI_DIRECTORYPAGE_TEXT_TOP "The setup will install ${PROGRAM_NAME} in the following folder. To install in a different folder, click Browse and select another destination. Click Install to start the installation.$\n$\n--------------------------------------------------------------------------$\nRun this setup as administrator to install under Program Files!$\n--------------------------------------------------------------------------"
+    !define MUI_DIRECTORYPAGE_TEXT_TOP "The setup will install ${PROGRAM_NAME} in the following folder. To install in a different folder, click Browse and select another destination. Click Install to start the installation.$\n$\n--------------------------------------------------------------------------$\nRun this setup as administrator to install under Program Files.$\n--------------------------------------------------------------------------"
 
 ;--------------------------------
 ;Pages
 
     !insertmacro MULTIUSER_PAGE_INSTALLMODE
     !insertmacro MUI_PAGE_LICENSE "LICENSE.txt"
-    !insertmacro MUI_PAGE_COMPONENTS
+    ;!insertmacro MUI_PAGE_COMPONENTS
     !insertmacro MUI_PAGE_DIRECTORY
     !insertmacro MUI_PAGE_INSTFILES
     !insertmacro MUI_PAGE_FINISH
@@ -81,14 +87,21 @@ FunctionEnd
 
 
 !macro EmulsionRegisterExtension ExtensionName Description
-    ;WriteRegStr SHCTX "Software\Classes\.${ExtensionName}" "" "${PROGRAM_NAME}"
-    ;!insertmacro APP_ASSOCIATE "${ExtensionName}" "${PROGRAM_NAME}.${ExtensionName}" "${Description}" "$\"$INSTDIR\emulsion.exe$\",0" "Open with ${PROGRAM_NAME}" "$\"$INSTDIR\emulsion.exe$\" $\"%1$\""
-    ${RegisterExtension} "$INSTDIR\emulsion.exe" ".${ExtensionName}" "${Description}"
+    ; First, let's create the ProgID for the extension
+    ; For more information about what is being done here, see
+    ; "Default Programs"
+    ; https://docs.microsoft.com/en-us/windows/win32/shell/default-programs
+    WriteRegStr SHCTX "SOFTWARE\Classes\${GENERIC_PROG_ID}" "" "${Description}"
+    WriteRegStr SHCTX "SOFTWARE\Classes\${GENERIC_PROG_ID}" "DefaultIcon" "$\"$INSTDIR\${PROGRAM_NAME}.exe$\""
+    WriteRegStr SHCTX "SOFTWARE\Classes\${GENERIC_PROG_ID}\Shell\Open\Command" "" "$\"$INSTDIR\${PROGRAM_NAME}.exe$\" $\"%1$\""
+
+    ; Then, let's specify this extension as a supported one under the capabilties
+    WriteRegStr SHCTX "${REG_PROG_PATH}\Capabilities\FileAssociations" ".${ExtensionName}" "${GENERIC_PROG_ID}"
 !macroend
 
-!macro EmulsionUnregisterExtension ExtensionName Description
-    ${UnRegisterExtension} ".${ExtensionName}" "${Description}"
-!macroend
+; !macro EmulsionUnregisterExtension ExtensionName Description
+;     ${UnRegisterExtension} ".${ExtensionName}" "${Description}"
+; !macroend
 
 ;--------------------------------
 ;Installer Sections
@@ -108,22 +121,20 @@ Section "Emulsion" SecEmulsion
     
     ;Store installation folder
     WriteRegStr SHCTX "${REG_PROG_PATH}" "Install Directory" "$INSTDIR"
-    
+
     WriteRegStr SHCTX "${REG_UNINST_PATH}" "DisplayName" "${PROGRAM_NAME}"
     WriteRegStr SHCTX "${REG_UNINST_PATH}" "DisplayIcon" "$\"$INSTDIR\emulsion.exe$\""
     WriteRegStr SHCTX "${REG_UNINST_PATH}" "UninstallString" "$\"$INSTDIR\Uninstall.exe$\" /$MultiUser.InstallMode"
     WriteRegStr SHCTX "${REG_UNINST_PATH}" "QuietUninstallString" "$\"$INSTDIR\Uninstall.exe$\" /$MultiUser.InstallMode /S"
-                 
+
     ;Create uninstaller
     WriteUninstaller "$INSTDIR\Uninstall.exe"
-SectionEnd
 
-Section /o "Associate supported files" SecAssociate
-    ;WriteRegStr SHCTX "Software\Classes\${PROGRAM_NAME}" "" ""
-    ;WriteRegStr SHCTX "Software\Classes\${PROGRAM_NAME}\shell" "" ""
-    ;WriteRegStr SHCTX "Software\Classes\${PROGRAM_NAME}\shell\open" "" ""
-    ;WriteRegStr SHCTX "Software\Classes\${PROGRAM_NAME}\shell\open\command" "" "$\"$INSTDIR\emulsion.exe$\" $\"%1$\""
-    
+    ; Program description and list of supported extensions
+    ; (This in itself does not associate the extensions to Emulsion)
+    WriteRegStr SHCTX "${REG_PROG_PATH}\Capabilities" "ApplicationDescription" "A fast and minimalistic image viewer"
+    WriteRegStr SHCTX "${REG_PROG_PATH}\Capabilities" "ApplicationName" "${PROGRAM_NAME}"
+
     !insertmacro EmulsionRegisterExtension "jpg" "JPG Image"
     !insertmacro EmulsionRegisterExtension "jpeg" "JPEG Image"
     !insertmacro EmulsionRegisterExtension "png" "PNG Image"
@@ -134,13 +145,17 @@ Section /o "Associate supported files" SecAssociate
     !insertmacro EmulsionRegisterExtension "webp" "WEBP Image"
     !insertmacro EmulsionRegisterExtension "tif" "TIF Image"
     !insertmacro EmulsionRegisterExtension "tiff" "TIFF Image"
-    ;!insertmacro EmulsionRegisterExtension "ico" "ICO Image" ; Associating ico files with Emulsion seems to cause Adobe Reader's icon to be replaced by the Emulsion icon.
+    !insertmacro EmulsionRegisterExtension "ico" "ICO Image"
     !insertmacro EmulsionRegisterExtension "hdr" "HDR Image"
     !insertmacro EmulsionRegisterExtension "pbm" "PBM Image"
     !insertmacro EmulsionRegisterExtension "pam" "PAM Image"
     !insertmacro EmulsionRegisterExtension "ppm" "PPM Image"
     !insertmacro EmulsionRegisterExtension "pgm" "PGM Image"
 
+    WriteRegStr SHCTX "SOFTWARE\RegisteredApplications" "ArturK.${PROGRAM_NAME}.${VERSION}" "${REG_PROG_PATH}\Capabilities"
+
+    ; This won't apply the file associations, it merely tells the system that there are new
+    ; programs available for the specified formats
     !insertmacro UPDATEFILEASSOC
 SectionEnd
 
@@ -159,13 +174,19 @@ SectionEnd
 ;Descriptions
     ;Language strings
     LangString DESC_SecEmulsion ${LANG_ENGLISH} "The program itself."
-    LangString DESC_SecAssociate ${LANG_ENGLISH} "Associate jpg, jpeg, png, bmp, gif, tga, avif, webp, tif, tiff, hdr, pbm, pam, ppm, and pgm files with Emulsion"
+    ;LangString DESC_SecAssociate ${LANG_ENGLISH} "Associate jpg, jpeg, png, bmp, gif, tga, avif, webp, tif, tiff, hdr, pbm, pam, ppm, and pgm files with Emulsion"
 
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ; These are only relevant when using the MUI_PAGE_COMPONENTS
+    ; But we are not using that since the option to assign file associations has been
+    ; removed. (It was removed because it's not supported by Windows)
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;Assign language strings to sections
-    !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
-        !insertmacro MUI_DESCRIPTION_TEXT ${SecEmulsion} $(DESC_SecEmulsion)
-        !insertmacro MUI_DESCRIPTION_TEXT ${SecAssociate} $(DESC_SecAssociate)
-    !insertmacro MUI_FUNCTION_DESCRIPTION_END
+    ;!insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
+    ;    !insertmacro MUI_DESCRIPTION_TEXT ${SecEmulsion} $(DESC_SecEmulsion)
+    ;    !insertmacro MUI_DESCRIPTION_TEXT ${SecAssociate} $(DESC_SecAssociate)
+    ;!insertmacro MUI_FUNCTION_DESCRIPTION_END
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;--------------------------------
 ; Uninstaller
