@@ -1,4 +1,4 @@
-## Unreleased
+## 9.0 on 2021-04-27
 
 ### Added
 - Added `start_maximized` configuration field
