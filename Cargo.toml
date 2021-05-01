@@ -91,3 +91,7 @@ version = "0.6.0"
 default-features = false
 features = ["codec-dav1d"]
 optional = true
+
+[patch.crates-io]
+trash = { git = 'https://github.com/ArturKovacs/trash-rs.git', branch = 'fix-25' }
+
