@@ -76,7 +76,7 @@ serde = { version = "1.0.123", features = ["derive"] }
 toml = "0.5.8"
 rand = "0.8.3"
 lexical-sort = "0.3.1"
-trash = "2.0.0"
+trash = "2.0.1"
 clap = { version = "2.33.3", default-features = false }
 kamadak-exif = "0.5.3"
 arboard = { version = "1.2.0", features = ["wayland-data-control"] }
@@ -91,7 +91,3 @@ version = "0.6.0"
 default-features = false
 features = ["codec-dav1d"]
 optional = true
-
-[patch.crates-io]
-trash = { git = 'https://github.com/ArturKovacs/trash-rs.git', branch = 'fix-25' }
-

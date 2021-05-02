@@ -2471,8 +2471,9 @@ dependencies = [
 
 [[package]]
 name = "trash"
-version = "2.0.0"
-source = "git+https://github.com/ArturKovacs/trash-rs.git?branch=fix-25#a876d0f92e48cae89ac4815187b0bdff7634148d"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea78c1e8e861fed535e67f56601a59879f3b2d639aed32e98589d5a2d8378fbd"
 dependencies = [
  "chrono",
  "libc",
