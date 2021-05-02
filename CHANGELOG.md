@@ -1,3 +1,8 @@
+## Unreleased
+
+### Changed
+- Fix for not being able to delete images on some systems.
+
 ## 9.0 on 2021-04-27
 
 ### Added
