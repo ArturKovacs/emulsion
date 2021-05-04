@@ -79,7 +79,7 @@ lexical-sort = "0.3.1"
 trash = "2.0.1"
 clap = { version = "2.33.3", default-features = false }
 kamadak-exif = "0.5.3"
-arboard = { version = "1.2.0", features = ["wayland-data-control"] }
+arboard = { version = "1.2.1", features = ["wayland-data-control"] }
 resvg = "0.14.1"
 usvg = "0.14.1"
 tiny-skia = "0.5.1"
