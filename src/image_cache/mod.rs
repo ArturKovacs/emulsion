@@ -311,11 +311,12 @@ impl ImageCache {
 	}
 
 	pub fn current_file_path(&self) -> Option<PathBuf> {
-		if let Some(filename) = self.current_filename() {
-			Some(self.dir.path().join(filename))
-		} else {
-			None
-		}
+		self.current_filename().map(|name| self.dir.path().join(name))
+		// if let Some(filename) = self.current_filename() {
+		// 	Some(self.dir.path().join(filename))
+		// } else {
+		// 	None
+		// }
 	}
 
 	/// Returns `None` when the directory hasn't finished filtering image files.
@@ -755,11 +756,8 @@ impl ImageCache {
 
 	pub fn prefetch_at_index(&mut self, index: usize) -> bool {
 		if self.remaining_capacity > self.curr_est_size {
-			let params = if let Some(desc) = self.dir.image_by_index(index) {
-				Some((desc.path.clone(), desc.request_id))
-			} else {
-				None
-			};
+			let params =
+				self.dir.image_by_index(index).map(|desc| (desc.path.clone(), desc.request_id));
 			if let Some((path, req_id)) = params {
 				return self.send_request_for_file(path, req_id, RequestKind::NonPriority);
 			} else {
