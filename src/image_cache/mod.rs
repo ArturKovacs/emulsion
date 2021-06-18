@@ -312,11 +312,6 @@ impl ImageCache {
 
 	pub fn current_file_path(&self) -> Option<PathBuf> {
 		self.current_filename().map(|name| self.dir.path().join(name))
-		// if let Some(filename) = self.current_filename() {
-		// 	Some(self.dir.path().join(filename))
-		// } else {
-		// 	None
-		// }
 	}
 
 	/// Returns `None` when the directory hasn't finished filtering image files.
