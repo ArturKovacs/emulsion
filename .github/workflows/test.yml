@@ -8,31 +8,20 @@ on:
 
 jobs:
 
-  rustfmt:
+  rustfmt-clippy:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
-          components: rustfmt
+          components: rustfmt, clippy
       - uses: actions/checkout@v2
       - name: Run `cargo fmt`
         uses: actions-rs/cargo@v1
         with:
           command: fmt
           args: --all -- --check
-
-  clippy:
-    needs: rustfmt
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          components: clippy
-      - uses: actions/checkout@v2
       - name: Run `cargo clippy`
         uses: actions-rs/cargo@v1
         with:
@@ -40,7 +29,7 @@ jobs:
           args: --all-targets --features=networking -- -D warnings
 
   build:
-    needs: clippy
+    needs: rustfmt-clippy
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
