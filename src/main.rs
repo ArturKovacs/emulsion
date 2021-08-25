@@ -185,7 +185,13 @@ fn main() {
 
 	let update_available = Arc::new(AtomicBool::new(false));
 	let update_check_done = Arc::new(AtomicBool::new(false));
-	let theme = Rc::new(Cell::new(cache.lock().unwrap().theme()));
+
+	let theme = {
+		Rc::new(Cell::new(match &config.borrow().theme {
+			Some(theme_cfg) => *theme_cfg,
+			None => cache.lock().unwrap().theme(),
+		}))
+	};
 
 	let set_theme = {
 		let update_label = update_label;

@@ -15,7 +15,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq)]
 pub enum Theme {
 	Light,
 	Dark,
@@ -230,6 +230,7 @@ pub struct Configuration {
 	pub title: Option<TitleSection>,
 	pub image: Option<ConfigImageSection>,
 	pub window: Option<ConfigWindowSection>,
+	pub theme: Option<Theme>,
 }
 impl Configuration {
 	pub fn load<P: AsRef<Path>>(file_path: P) -> Result<Configuration, String> {
