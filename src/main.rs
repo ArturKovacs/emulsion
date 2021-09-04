@@ -464,7 +464,7 @@ mod update {
 	/// Tries to fetch latest release tag
 	fn latest_release() -> errors::Result<ReleaseInfoJson> {
 		let url = "https://api.github.com/repos/ArturKovacs/emulsion/releases/latest";
-		let res = ureq::get(&url).set("User-Agent", "emulsion").call();
+		let res = ureq::get(url).set("User-Agent", "emulsion").call();
 		match res {
 			Ok(res) => {
 				let release_info = res.into_json()?;
