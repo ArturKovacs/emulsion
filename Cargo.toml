@@ -53,7 +53,7 @@ opt-level = 1
 [profile.dev.build-override]
 opt-level = 1
 [profile.release]
-lto = true
+lto = "thin"
 
 [features]
 default = []
