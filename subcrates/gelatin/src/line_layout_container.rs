@@ -93,7 +93,7 @@ impl<Dim: PickDimension + 'static> LineLayoutContainer<Dim> {
 		let mut borrowed = self.data.borrow_mut();
 		let new_child_ptr = widget_data_ptr(&new_child);
 		for child in borrowed.children.iter() {
-			let child_ptr = widget_data_ptr(&child);
+			let child_ptr = widget_data_ptr(child);
 			if new_child_ptr == child_ptr {
 				return;
 			}

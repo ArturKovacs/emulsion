@@ -363,7 +363,7 @@ impl<P: Playback> ImgSequencePlayer<P> {
 				frame_delta_time_nanos = (NANOS_PER_SEC * 6) as i64;
 			}
 			_ => {
-				frame_delta_time_nanos = P::delay_nanos(&self) as i64;
+				frame_delta_time_nanos = P::delay_nanos(self) as i64;
 			}
 		};
 		if self.playback_state == PlaybackState::Paused {
