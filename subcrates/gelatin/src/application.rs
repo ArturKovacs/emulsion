@@ -177,6 +177,7 @@ impl Application {
 				//windows.clear();
 			}
 
+			#[cfg(all(unix, not(target_os = "macos")))]
 			if matches!(control_flow, ControlFlow::Poll) {
 				// This is an ugly workaround for the X server completely freezing
 				// sometimes.
