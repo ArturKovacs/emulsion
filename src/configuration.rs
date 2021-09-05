@@ -16,6 +16,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum Theme {
 	Light,
 	Dark,
@@ -30,6 +31,7 @@ impl Theme {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Antialias {
 	#[serde(rename = "auto")]
 	Auto,
