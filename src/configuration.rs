@@ -76,6 +76,7 @@ pub struct ConfigWindowSection {
 	pub start_fullscreen: Option<bool>,
 	pub start_maximized: Option<bool>,
 	pub show_bottom_bar: Option<bool>,
+	pub theme: Option<Theme>,
 	pub use_last_window_area: Option<bool>,
 	pub win_w: Option<u32>,
 	pub win_h: Option<u32>,
@@ -232,7 +233,6 @@ pub struct Configuration {
 	pub title: Option<TitleSection>,
 	pub image: Option<ConfigImageSection>,
 	pub window: Option<ConfigWindowSection>,
-	pub theme: Option<Theme>,
 }
 impl Configuration {
 	pub fn load<P: AsRef<Path>>(file_path: P) -> Result<Configuration, String> {

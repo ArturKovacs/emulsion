@@ -187,9 +187,9 @@ fn main() {
 	let update_check_done = Arc::new(AtomicBool::new(false));
 
 	let theme = {
-		Rc::new(Cell::new(match &config.borrow().theme {
-			Some(theme_cfg) => *theme_cfg,
-			None => cache.lock().unwrap().theme(),
+		Rc::new(Cell::new(match &config.borrow().window {
+			Some(ConfigWindowSection { theme: Some(theme_cfg), .. }) => *theme_cfg,
+			_ => cache.lock().unwrap().theme(),
 		}))
 	};
 
