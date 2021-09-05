@@ -1,7 +1,11 @@
 ## Unreleased
 
+### Added
+- Added configuration keyword to switch between dark and light mode.
+
 ### Changed
 - Fix for not being able to delete images on some systems.
+- Change antialias configuration keywords to snake_case.
 
 ## 9.0 on 2021-04-27
 
