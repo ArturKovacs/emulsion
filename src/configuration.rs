@@ -33,11 +33,8 @@ impl Theme {
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Antialias {
-	#[serde(rename = "auto")]
 	Auto,
-	#[serde(rename = "always")]
 	Always,
-	#[serde(rename = "never")]
 	Never,
 }
 impl Default for Antialias {
