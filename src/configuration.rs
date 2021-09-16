@@ -15,7 +15,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum Theme {
 	Light,
 	Dark,
@@ -30,12 +31,10 @@ impl Theme {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Antialias {
-	#[serde(rename = "auto")]
 	Auto,
-	#[serde(rename = "always")]
 	Always,
-	#[serde(rename = "never")]
 	Never,
 }
 impl Default for Antialias {
@@ -74,6 +73,7 @@ pub struct ConfigWindowSection {
 	pub start_fullscreen: Option<bool>,
 	pub start_maximized: Option<bool>,
 	pub show_bottom_bar: Option<bool>,
+	pub theme: Option<Theme>,
 	pub use_last_window_area: Option<bool>,
 	pub win_w: Option<u32>,
 	pub win_h: Option<u32>,

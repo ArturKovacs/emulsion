@@ -1,5 +1,8 @@
 ## Unreleased
 
+### Added
+- Added configuration keyword to switch between dark and light mode.
+
 ### Changed
 - Fix for not being able to delete images on some systems.
 
