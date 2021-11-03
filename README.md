@@ -1,5 +1,7 @@
 ## About
 
+DISCONTINUED I do not plan to work on this project anymore.
+
 Refer to the [website](https://arturkovacs.github.io/emulsion-website/) for an overview.
 
 Emulsion is targeting Windows, Mac, and Linux although it is currently only being tested on Linux and Windows. A note for Linux users: Wayland support is limited, so for example expect high CPU usage and the title text not being shown. However X is fully supported.
