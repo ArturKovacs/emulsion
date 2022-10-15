@@ -112,7 +112,7 @@ pub fn detect_orientation(path: &Path) -> Result<Orientation> {
 	let exif = exifreader.read_from_container(&mut bufreader)?;
 	if let Some(orientation) = exif.get_field(exif::Tag::Orientation, exif::In::PRIMARY) {
 		if let exif::Value::Short(ref shorts) = orientation.value {
-			if let Some(&exif_orientation) = shorts.get(0) {
+			if let Some(&exif_orientation) = shorts.first() {
 				// According to page 30 of http://www.cipa.jp/std/documents/e/DC-008-2012_E.pdf
 				match exif_orientation {
 					1 => Ok(Orientation::Deg0),

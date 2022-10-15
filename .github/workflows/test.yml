@@ -26,7 +26,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --all-targets --features=networking -- -D warnings
+          args: --all-targets --features=networking -- -D warnings -A clippy::type_complexity -A clippy::needless_late_init -A clippy::question_mark
 
   build:
     needs: rustfmt-clippy

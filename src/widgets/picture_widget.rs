@@ -34,7 +34,7 @@ const MIN_ZOOM_FACTOR: f32 = 0.0001;
 const MAX_ZOOM_FACTOR: f32 = 10000.0;
 const AA_TEXEL_SIZE_THRESHOLD: f32 = 4f32;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ScalingMode {
 	Fixed,
 	FitStretch,
@@ -440,8 +440,7 @@ impl PictureWidget {
 			.borrow()
 			.image
 			.as_ref()
-			.map(|s| s.antialiasing.clone())
-			.flatten()
+			.and_then(|s| s.antialiasing.clone())
 			.unwrap_or_else(|| "auto".into());
 
 		let antialiasing = match antialiasing.as_str() {

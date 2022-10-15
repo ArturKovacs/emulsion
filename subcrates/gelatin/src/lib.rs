@@ -346,7 +346,6 @@ pub struct Vertex {
 	pub tex_coords: [f32; 2],
 }
 
-#[allow(clippy::unneeded_field_pattern)]
 implement_vertex!(Vertex, position, tex_coords);
 
 pub struct DrawContext<'a> {

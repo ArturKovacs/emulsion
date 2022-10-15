@@ -17,7 +17,7 @@ use crate::image_cache::{self, AnimationFrameTexture, ImageCache};
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum LoadRequest {
 	None,
 	LoadNext,
@@ -27,7 +27,7 @@ pub enum LoadRequest {
 	Jump(i32),
 }
 
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Eq, PartialEq, Copy, Clone)]
 pub enum PlaybackState {
 	Paused,
 	Forward,

@@ -48,12 +48,12 @@ pub fn parse_args(config_path: &Path, cache_path: &Path) -> Args {
 		.arg(Arg::new("PATH").help("The file path of the image").index(1))
 		.get_matches();
 
-	let file_path = matches.get_one::<String>("PATH").map(|v| v.clone());
+	let file_path = matches.get_one::<String>("PATH").cloned();
 
 	let displayed_folders = if matches.contains_id("absolute") {
 		Some(std::u32::MAX)
 	} else {
-		matches.get_one::<u32>("FOLDER_COUNT").map(|v| *v)
+		matches.get_one::<u32>("FOLDER_COUNT").copied()
 	};
 
 	Args { file_path, displayed_folders }

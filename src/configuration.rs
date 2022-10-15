@@ -15,7 +15,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Theme {
 	Light,
@@ -30,7 +30,7 @@ impl Theme {
 	}
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Antialias {
 	Auto,
@@ -43,18 +43,18 @@ impl Default for Antialias {
 	}
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct CacheImageSection {
 	pub fit_stretches: bool,
 	pub antialiasing: Antialias,
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Deserialize)]
+#[derive(Debug, Default, Eq, PartialEq, Clone, Deserialize)]
 pub struct ConfigImageSection {
 	pub antialiasing: Option<String>,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct CacheWindowSection {
 	pub dark: bool,
 	pub win_w: u32,
@@ -81,7 +81,7 @@ pub struct ConfigWindowSection {
 	pub win_y: Option<i32>,
 }
 
-#[derive(Debug, PartialEq, Clone, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Deserialize)]
 pub struct ConfigUpdateSection {
 	pub check_updates: bool,
 }
@@ -91,15 +91,11 @@ impl Default for ConfigUpdateSection {
 	}
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct CacheUpdateSection {
 	pub last_checked: u64,
 }
-impl Default for CacheUpdateSection {
-	fn default() -> Self {
-		Self { last_checked: 0 }
-	}
-}
+
 impl CacheUpdateSection {
 	pub fn update_check_needed(&self) -> bool {
 		let duration = SystemTime::now()
@@ -124,7 +120,7 @@ struct IncompleteCache {
 	pub image: Option<CacheImageSection>,
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, Eq, PartialEq, Clone, Serialize)]
 pub struct Cache {
 	pub window: CacheWindowSection,
 	pub updates: CacheUpdateSection,
@@ -170,13 +166,13 @@ impl Cache {
 	}
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Deserialize)]
+#[derive(Debug, Default, Eq, PartialEq, Clone, Deserialize)]
 pub struct EnvVar {
 	pub name: String,
 	pub value: String,
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Deserialize)]
+#[derive(Debug, Default, Eq, PartialEq, Clone, Deserialize)]
 pub struct Command {
 	pub input: Vec<String>,
 	pub program: String,
@@ -184,7 +180,7 @@ pub struct Command {
 	pub envs: Option<Vec<EnvVar>>,
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Deserialize)]
+#[derive(Debug, Default, Eq, PartialEq, Clone, Deserialize)]
 pub struct TitleSection {
 	pub displayed_folders: Option<u32>,
 	pub show_program_name: Option<bool>,

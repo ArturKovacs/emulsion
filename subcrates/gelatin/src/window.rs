@@ -86,6 +86,7 @@ pub struct WindowDescriptor {
 	/// Only relevant on Wayland.
 	/// See: https://docs.rs/winit/0.24.0/winit/platform/unix/trait.WindowBuilderExtUnix.html#tymethod.with_app_id
 	#[builder(default)]
+	#[allow(dead_code)]
 	app_id: Option<String>,
 }
 
@@ -316,18 +317,13 @@ impl Window {
 					}
 				}
 				WindowEvent::MouseWheel { delta: native_delta, .. } => {
-					let delta;
-					match native_delta {
-						MouseScrollDelta::LineDelta(x, y) => {
-							delta = LogicalVector::new(x, y);
-						}
-						MouseScrollDelta::PixelDelta(native_pos) => {
-							delta = LogicalVector::new(
-								native_pos.x as f32 / 13.0,
-								native_pos.y as f32 / 8.0,
-							);
-						}
-					}
+					let delta = match native_delta {
+						MouseScrollDelta::LineDelta(x, y) => LogicalVector::new(x, y),
+						MouseScrollDelta::PixelDelta(native_pos) => LogicalVector::new(
+							native_pos.x as f32 / 13.0,
+							native_pos.y as f32 / 8.0,
+						),
+					};
 					event = Some(Event {
 						cursor_pos: borrowed.cursor_pos,
 						modifiers: borrowed.modifiers,
