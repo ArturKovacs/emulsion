@@ -147,7 +147,9 @@ struct PictureWidgetData {
 
 	last_click_time: Instant,
 	last_mouse_pos: LogicalVector,
-	panning: bool,
+	panning_2d: bool,
+	panning_vert: bool,
+	panning_hor: bool,
 	hover_state: HoverState,
 
 	first_draw: bool,
@@ -482,7 +484,9 @@ impl PictureWidget {
 			zoom_vel: 0.0,
 			last_click_time: Instant::now() - Duration::from_secs(10),
 			last_mouse_pos: Default::default(),
-			panning: false,
+			panning_2d: false,
+			panning_vert: false,
+			panning_hor: false,
 			hover_state: HoverState::None,
 			last_cam_move_time: Instant::now(),
 			first_draw: true,
@@ -733,8 +737,18 @@ impl Widget for PictureWidget {
 			EventKind::MouseMove => {
 				let mut borrowed = self.data.borrow_mut();
 				borrowed.hover = borrowed.drawn_bounds.contains(event.cursor_pos);
-				if borrowed.panning {
-					let delta = event.cursor_pos - borrowed.last_mouse_pos;
+				if borrowed.panning_2d || borrowed.panning_hor || borrowed.panning_vert {
+					let mut delta = event.cursor_pos - borrowed.last_mouse_pos;
+					if !borrowed.panning_2d {
+						if !borrowed.panning_hor {
+							// only vertical panning
+							delta.vec.x = 0.0;
+						}
+						if !borrowed.panning_vert {
+							// only horzontal panning
+							delta.vec.y = 0.0;
+						}
+					}
 					borrowed.scaling = ScalingMode::Fixed;
 					borrowed.update_scaling_buttons();
 					borrowed.img_pos += delta;
@@ -748,10 +762,10 @@ impl Widget for PictureWidget {
 					if state == ElementState::Pressed {
 						if borrowed.hover {
 							borrowed.click = true;
-							borrowed.panning = true
+							borrowed.panning_2d = true
 						}
 					} else {
-						borrowed.panning = false;
+						borrowed.panning_2d = false;
 						borrowed.click = false;
 						if borrowed.hover {
 							let now = Instant::now();
@@ -812,7 +826,23 @@ impl Widget for PictureWidget {
 						input_key_str.as_str(),
 						event.modifiers,
 					) {
-						borrowed.panning = input.state == ElementState::Pressed;
+						borrowed.panning_2d = input.state == ElementState::Pressed;
+					}
+					if action_triggered(
+						&borrowed.configuration,
+						PAN_VERT_NAME,
+						input_key_str.as_str(),
+						event.modifiers,
+					) {
+						borrowed.panning_vert = input.state == ElementState::Pressed;
+					}
+					if action_triggered(
+						&borrowed.configuration,
+						PAN_HOR_NAME,
+						input_key_str.as_str(),
+						event.modifiers,
+					) {
+						borrowed.panning_hor = input.state == ElementState::Pressed;
 					}
 
 					let pressed = input.state == ElementState::Pressed;
