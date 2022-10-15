@@ -1,7 +1,10 @@
 ## Unreleased
 
+## 10.0 on 2022-10-15
+
 ### Added
 - Added configuration keyword to switch between dark and light mode.
+- Added `pan_vert` and `pan_hor` as input bindings to pan with the mouse only vertically or horizontally
 
 ### Changed
 - Fix for not being able to delete images on some systems.
