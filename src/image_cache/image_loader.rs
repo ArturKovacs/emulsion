@@ -6,7 +6,11 @@ use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use gelatin::image::{self, gif::GifDecoder, png::PngDecoder, AnimationDecoder, ImageFormat};
+use gelatin::image::{
+	self,
+	codecs::{gif::GifDecoder, png::PngDecoder},
+	AnimationDecoder, ImageFormat,
+};
 
 pub mod errors {
 	use gelatin::glium::texture;
