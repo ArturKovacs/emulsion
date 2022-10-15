@@ -116,6 +116,7 @@ impl Widget for Label {
 					matrix: Into::<[[f32; 4]; 4]>::into(transform),
 					tex: sampler,
 					color: [1.0f32, 0.1, 0.5, 0.5],
+					bg_color: [0.0f32, 0.0, 0.0, 0.0],
 					texture_size: texture_size,
 					//brighten: if self.hover { 0.15f32 } else { 0.0f32 },
 					brighten: 0.0f32,
