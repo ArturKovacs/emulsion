@@ -1,5 +1,5 @@
 use crate::Version;
-use clap::{App, Arg};
+use clap::{value_parser, Arg, Command};
 use std::path::Path;
 
 pub struct Args {
@@ -9,48 +9,51 @@ pub struct Args {
 
 /// Parses the command-line arguments and returns the file path
 pub fn parse_args(config_path: &Path, cache_path: &Path) -> Args {
-	let config = format!(
-		"CONFIGURATION:\n    config file: {}\n    cache file:  {}",
-		config_path.to_string_lossy(),
-		cache_path.to_string_lossy(),
+	// It's okay to leak this, because this code should only be executed once.
+	let config: &'static str = Box::leak(
+		format!(
+			"CONFIGURATION:\n    config file: {}\n    cache file:  {}",
+			config_path.to_string_lossy(),
+			cache_path.to_string_lossy(),
+		)
+		.into_boxed_str(),
 	);
+	let version: &'static str =
+		Box::leak(Version::cargo_pkg_version().to_string().into_boxed_str());
 
-	let matches = App::new("emulsion")
-		.version(Version::cargo_pkg_version().to_string().as_str())
+	let matches = Command::new("emulsion")
+		.version(version)
 		.author("Artur Barnabas <kovacs.artur.barnabas@gmail.com>")
 		.about(
 			"A fast and minimalistic image viewer\n\
 			https://arturkovacs.github.io/emulsion-website/",
 		)
-		.after_help(config.as_str())
+		.after_help(config)
 		.arg(
-			Arg::with_name("FOLDERS")
+			Arg::new("FOLDER_COUNT")
 				.long("folders")
-				.short("f")
-				.help("Number of folders to display")
-				.takes_value(true)
-				.validator(|v| match v.parse::<u32>() {
-					Ok(_) => Ok(()),
-					Err(e) => Err(format!("{}: '{}'", e, v)),
-				}),
+				.short('f')
+				.help("Number of folders to display in the filepath")
+				.num_args(1)
+				.value_parser(value_parser!(u32)),
 		)
 		.arg(
-			Arg::with_name("absolute")
+			Arg::new("absolute")
 				.long("absolute")
-				.short("a")
-				.help("Show absolute file path")
-				.takes_value(false)
-				.conflicts_with("FOLDERS"),
+				.short('a')
+				.help("Display all folders in the filepath, all the way to the root")
+				.num_args(0)
+				.conflicts_with("FOLDER_COUNT"),
 		)
-		.arg(Arg::with_name("PATH").help("The file path of the image").index(1))
+		.arg(Arg::new("PATH").help("The file path of the image").index(1))
 		.get_matches();
 
-	let file_path = matches.value_of("PATH").map(ToString::to_string);
+	let file_path = matches.get_one::<&str>("PATH").map(ToString::to_string);
 
-	let displayed_folders = if matches.is_present("absolute") {
+	let displayed_folders = if matches.contains_id("absolute") {
 		Some(std::u32::MAX)
 	} else {
-		matches.value_of("FOLDERS").map(|s| s.parse::<u32>().unwrap())
+		matches.get_one::<u32>("FOLDER_COUNT").map(|v| *v)
 	};
 
 	Args { file_path, displayed_folders }

@@ -154,7 +154,9 @@ pub fn load_gif(path: &Path, req_id: u32) -> Result<impl Iterator<Item = Result<
 /// Parse, render and gather an SVG into a ImageBuffer<Rgba>
 pub fn load_svg(path: &std::path::Path) -> Result<image::RgbaImage> {
 	let opt = usvg::Options::default();
-	let rtree = usvg::Tree::from_file(path, &opt)?;
+
+	let svg_data = fs::read(path)?;
+	let rtree = usvg::Tree::from_data(&svg_data, &opt.to_ref())?;
 	let size = rtree.svg_node().size;
 	let (width, height) = (size.width(), size.height());
 	// Scale to fit 4096
@@ -162,7 +164,8 @@ pub fn load_svg(path: &std::path::Path) -> Result<image::RgbaImage> {
 	let (width, height) = ((width * zoom) as u32, (height * zoom) as u32);
 	// These unwrapped Options are fine as long as the dimensions are correct
 	let mut pixmap = tiny_skia::Pixmap::new(width, height).unwrap();
-	resvg::render(&rtree, usvg::FitTo::Zoom(zoom as f32), pixmap.as_mut()).unwrap();
+	let transform = tiny_skia::Transform::identity();
+	resvg::render(&rtree, usvg::FitTo::Zoom(zoom as f32), transform, pixmap.as_mut()).unwrap();
 	Ok(image::RgbaImage::from_raw(width, height, pixmap.take()).unwrap())
 }
 
