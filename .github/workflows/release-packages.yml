@@ -44,7 +44,7 @@ jobs:
         Write-Host $Env:INSTALLER_NAME
     - name: Install NSIS
       run: |
-        Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
+        iex "& {$(irm get.scoop.sh)} -RunAsAdmin"
         scoop bucket add extras
         scoop install nsis
     - name: Print NSIS version
