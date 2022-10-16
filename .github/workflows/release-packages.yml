@@ -62,7 +62,7 @@ jobs:
         ((Get-Command vcpkg.exe | select Source -First 1).source | Get-Item).Directory.FullName
         echo ((Get-Command vcpkg.exe | select Source -First 1).source | Get-Item).Directory.FullName
         $VCPKG_INSTALLATION_ROOT = ((Get-Command vcpkg.exe | select Source -First 1).source | Get-Item).Directory.FullName
-        $PKG_CONFIG_PATH = $VCPKG_INSTALLATION_ROOT/installed/x64-windows/lib/pkgconfig
+        $PKG_CONFIG_PATH = "$VCPKG_INSTALLATION_ROOT/installed/x64-windows/lib/pkgconfig"
 
         curl -LO "https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.2/LLVM-15.0.2-win64.exe"
         ./LLVM-15.0.2-win64.exe /S
