@@ -67,6 +67,9 @@ jobs:
         curl -LO "https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.2/LLVM-15.0.2-win64.exe"
         ./LLVM-15.0.2-win64.exe /S
         $LIBCLANG_PATH = "$env:ProgramFiles/LLVM/bin"
+        echo "------- CLANG BIN CONTENTS ----------"
+        dir $LIBCLANG_PATH
+        echo "vcpkg install folder: $LIBCLANG_PATH"
         echo "LIBCLANG_PATH=$LIBCLANG_PATH" >> $env:GITHUB_ENV
         
     - name: Build executable
@@ -115,14 +118,13 @@ jobs:
     - name: Build dav1d (macOS)
       env:
         DAV1D_DIR: dav1d_dir
-        LIB_PATH: lib/x86_64-apple-darwin
+        LIB_PATH: lib
       run: |
         git clone --branch 1.0.0 --depth 1 https://code.videolan.org/videolan/dav1d.git
         cd dav1d
         meson build -Dprefix=$HOME/$DAV1D_DIR --buildtype release
         ninja -C build
         ninja -C build install
-        ls $HOME/$DAV1D_DIR
         echo "PKG_CONFIG_PATH=$HOME/$DAV1D_DIR/$LIB_PATH/pkgconfig" >> $GITHUB_ENV
         echo "LD_LIBRARY_PATH=$HOME/$DAV1D_DIR/$LIB_PATH" >> $GITHUB_ENV
     - name: Create osx app
