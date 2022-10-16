@@ -1,5 +1,10 @@
 ## Unreleased
 
+## 10.2 on 2022-10-16
+
+No change is made to emulsion, this release is only made to fix errors
+in the build system and to re-trigger building the distributables
+
 ## 10.1 on 2022-10-15
 
 No change is made to emulsion, this release is only made to fix errors
