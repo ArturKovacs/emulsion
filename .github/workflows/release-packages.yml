@@ -59,10 +59,10 @@ jobs:
         choco install pkgconfiglite
         vcpkg integrate install
         vcpkg install dav1d:x64-windows
-        ((Get-Command vcpkg.exe | select Source -First 1).source | Get-Item).Directory.FullName
-        echo ((Get-Command vcpkg.exe | select Source -First 1).source | Get-Item).Directory.FullName
+        echo "vcpkg install folder: $(((Get-Command vcpkg.exe | select Source -First 1).source | Get-Item).Directory.FullName)"
         $VCPKG_INSTALLATION_ROOT = ((Get-Command vcpkg.exe | select Source -First 1).source | Get-Item).Directory.FullName
         $PKG_CONFIG_PATH = "$VCPKG_INSTALLATION_ROOT/installed/x64-windows/lib/pkgconfig"
+        echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $env:GITHUB_ENV
 
         curl -LO "https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.2/LLVM-15.0.2-win64.exe"
         ./LLVM-15.0.2-win64.exe /S
@@ -109,7 +109,19 @@ jobs:
       run: cargo install cargo-bundle
     - name: Install avif build dependencies (macOS)
       run: |
-        brew install ninja nasm meson
+        brew install meson ninja nasm
+    - name: Build dav1d (macOS)
+      env:
+        DAV1D_DIR: dav1d_dir
+        LIB_PATH: lib/x86_64-linux-gnu
+      run: |
+        git clone --branch 1.0.0 --depth 1 https://code.videolan.org/videolan/dav1d.git
+        cd dav1d
+        meson build -Dprefix=$HOME/$DAV1D_DIR --buildtype release
+        ninja -C build
+        ninja -C build install
+        echo "PKG_CONFIG_PATH=$HOME/$DAV1D_DIR/$LIB_PATH/pkgconfig" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=$HOME/$DAV1D_DIR/$LIB_PATH" >> $GITHUB_ENV
     - name: Create osx app
       run: cargo bundle --release --features=avif
     - name: Install create-dmg
@@ -147,6 +159,18 @@ jobs:
       run: |
         DEBIAN_FRONTEND=noninteractive sudo apt-get update
         DEBIAN_FRONTEND=noninteractive sudo apt-get install -y ninja-build nasm meson
+    - name: Build dav1d - avif dependency (linux)
+      env:
+        DAV1D_DIR: dav1d_dir
+        LIB_PATH: lib/x86_64-linux-gnu
+      run: |
+        git clone --branch 1.0.0 --depth 1 https://code.videolan.org/videolan/dav1d.git
+        cd dav1d
+        meson build -Dprefix=$HOME/$DAV1D_DIR --buildtype release
+        ninja -C build
+        ninja -C build install
+        echo "PKG_CONFIG_PATH=$HOME/$DAV1D_DIR/$LIB_PATH/pkgconfig" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=$HOME/$DAV1D_DIR/$LIB_PATH" >> $GITHUB_ENV
     - name: Create deb package
       run: cargo bundle --release --features=avif
     - name: Rename .deb
