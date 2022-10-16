@@ -66,7 +66,8 @@ jobs:
 
         curl -LO "https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.2/LLVM-15.0.2-win64.exe"
         ./LLVM-15.0.2-win64.exe /S
-        $LIBCLANG_PATH = "$env:ProgramFiles/LLVM/bin"
+        echo "LIBCLANG_PATH is: $LIBCLANG_PATH"
+        $LIBCLANG_PATH = (resolve-path "$env:ProgramFiles/LLVM/bin").Path
         echo "------- CLANG BIN CONTENTS ----------"
         dir $LIBCLANG_PATH
         echo "LIBCLANG_PATH is: $LIBCLANG_PATH"
@@ -76,6 +77,7 @@ jobs:
       run: |
         echo "LIBCLANG_PATH is: $LIBCLANG_PATH"
         echo "env:LIBCLANG_PATH is: $env:LIBCLANG_PATH"
+        $LIBCLANG_PATH = $env:LIBCLANG_PATH
         cargo build --release --features=networking,avif
     - name: Copy executable to distributable folder
       working-directory: ./distribution/windows/
