@@ -70,7 +70,7 @@ jobs:
         echo "------- CLANG BIN CONTENTS ----------"
         dir $LIBCLANG_PATH
         echo "LIBCLANG_PATH is: $LIBCLANG_PATH"
-        echo "LIBCLANG_PATH=`"$LIBCLANG_PATH`"" >> $env:GITHUB_ENV
+        echo "LIBCLANG_PATH=$LIBCLANG_PATH" >> $env:GITHUB_ENV
         
     - name: Build executable
       run: |
