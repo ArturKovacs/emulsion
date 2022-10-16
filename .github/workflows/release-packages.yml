@@ -56,13 +56,17 @@ jobs:
       run: (New-Object System.Net.WebClient).DownloadFile('https://aka.ms/vs/16/release/vc_redist.x64.exe', 'vc_redist.x64.exe')
     - name: Install avif build dependencies (Windows)
       run: |
-        choco install -y ninja
-        pip install meson
-        $NASM_VERSION="2.15.02"
-        $LINK="https://www.nasm.us/pub/nasm/releasebuilds/$NASM_VERSION/win64"
-        curl -LO "$LINK/nasm-$NASM_VERSION-win64.zip"
-        7z e -y "nasm-$NASM_VERSION-win64.zip" -o"C:\nasm"
-        echo "C:\nasm" >> $env:GITHUB_PATH
+        choco install pkgconfiglite
+        vcpkg integrate install
+        vcpkg install dav1d:x64-windows
+        ((Get-Command vcpkg.exe | select Source -First 1).source | Get-Item).Directory.FullName
+        echo ((Get-Command vcpkg.exe | select Source -First 1).source | Get-Item).Directory.FullName
+        $VCPKG_INSTALLATION_ROOT = ((Get-Command vcpkg.exe | select Source -First 1).source | Get-Item).Directory.FullName
+        $PKG_CONFIG_PATH = $VCPKG_INSTALLATION_ROOT/installed/x64-windows/lib/pkgconfig
+
+        curl -LO "https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.2/LLVM-15.0.2-win64.exe"
+        ./LLVM-15.0.2-win64.exe /S
+        
     - name: Build executable
       shell: cmd
       run: |

@@ -24,7 +24,6 @@ pub mod errors {
 			ImageLoadError(image::ImageError);
 			ExifError(exif::Error);
 			SvgError(usvg::Error);
-			AvifError(libavif_image::Error) #[cfg(feature = "avif")];
 		}
 	}
 }
@@ -41,8 +40,6 @@ pub const NON_EXISTENT_REQUEST_ID: u32 = std::u32::MAX;
 pub enum ImgFormat {
 	Image(ImageFormat),
 	Svg,
-	#[cfg(feature = "avif")]
-	Avif,
 }
 
 /// These values define the transformation for a pixel array which is to be displayed.
@@ -91,12 +88,6 @@ pub fn detect_format(path: &Path) -> Result<ImgFormat> {
 
 	// Try to detect the format from the first 512 bytes
 	if file.read_exact(&mut file_start_bytes).is_ok() {
-		#[cfg(feature = "avif")]
-		{
-			if libavif_image::is_avif(&file_start_bytes) {
-				return Ok(ImgFormat::Avif);
-			}
-		}
 		if path.extension() == Some(std::ffi::OsStr::new("svg")) {
 			return Ok(ImgFormat::Svg);
 		}
@@ -215,12 +206,6 @@ where
 		}
 		ImgFormat::Image(image_format) => {
 			let image = simple_load_image(path, image_format)?;
-			process_image(LoadResult::Frame { req_id, image, delay_nano: 0, orientation })?;
-		}
-		#[cfg(feature = "avif")]
-		ImgFormat::Avif => {
-			let buf = fs::read(path)?;
-			let image = libavif_image::read(&buf)?.into_rgba8();
 			process_image(LoadResult::Frame { req_id, image, delay_nano: 0, orientation })?;
 		}
 		ImgFormat::Svg => {
