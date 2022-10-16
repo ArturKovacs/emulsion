@@ -69,12 +69,14 @@ jobs:
         $LIBCLANG_PATH = "$env:ProgramFiles/LLVM/bin"
         echo "------- CLANG BIN CONTENTS ----------"
         dir $LIBCLANG_PATH
-        echo "vcpkg install folder: $LIBCLANG_PATH"
-        echo "LIBCLANG_PATH=$LIBCLANG_PATH" >> $env:GITHUB_ENV
+        echo "LIBCLANG_PATH is: $LIBCLANG_PATH"
+        echo "LIBCLANG_PATH=`"$LIBCLANG_PATH`"" >> $env:GITHUB_ENV
         
     - name: Build executable
       shell: cmd
       run: |
+        echo "LIBCLANG_PATH is: $LIBCLANG_PATH"
+        echo "env:LIBCLANG_PATH is: $env:LIBCLANG_PATH"
         call "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
         cargo build --release --features=networking,avif
     - name: Copy executable to distributable folder
