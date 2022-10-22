@@ -68,6 +68,7 @@ jobs:
         ./LLVM-15.0.2-win64.exe /S
         echo "LIBCLANG_PATH is: $LIBCLANG_PATH"
         $LIBCLANG_PATH = (resolve-path "$env:ProgramFiles/LLVM/bin").Path
+        $LIBCLANG_PATH = $LIBCLANG_PATH.replace("\", "/")
         echo "------- CLANG BIN CONTENTS ----------"
         dir $LIBCLANG_PATH
         echo "LIBCLANG_PATH is: $LIBCLANG_PATH"
