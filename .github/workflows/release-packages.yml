@@ -58,6 +58,7 @@ jobs:
       run: |
         choco install pkgconfiglite
         vcpkg integrate install
+        echo "set(VCPKG_BUILD_TYPE release)" >> $env:VCPKG_INSTALLATION_ROOT\triplets\x64-windows.cmake
         vcpkg install dav1d:x64-windows
         echo "vcpkg install folder: $(((Get-Command vcpkg.exe | select Source -First 1).source | Get-Item).Directory.FullName)"
         $VCPKG_INSTALLATION_ROOT = ((Get-Command vcpkg.exe | select Source -First 1).source | Get-Item).Directory.FullName
