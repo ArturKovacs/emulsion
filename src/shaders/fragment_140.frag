@@ -29,7 +29,7 @@ vec3 colorLevels(vec3 color) {
 }
 
 vec3 edgeLevels(vec3 color) {
-    return levels(color, 0.2, 0.8);
+    return levels(color, 0.25, 0.75);
 }
 
 vec3 edgeSample(vec2 uv) {
@@ -63,18 +63,20 @@ vec3 edgeBlur(vec2 pos, vec2 edge) {
 vec3 comicSample(vec2 uv) {
     vec2 centralEdge = getEdge(uv);
     vec2 centralNormal = vec2(centralEdge.y, -centralEdge.x);
+    vec3 centralColor = texture2D(tex, uv).rgb;
 
     vec2 posA = uv + centralNormal * texel_size;
     vec2 posB = uv - centralNormal * texel_size;
-    vec2 edgeA = getEdge(posA);
-    vec2 edgeB = getEdge(posB);
+    // vec2 edgeA = getEdge(posA);
+    // vec2 edgeB = getEdge(posB);
 
-    // vec3 colorA = colorLevels(texture2D(tex_nearest, posA).rgb);
-    // vec3 colorB = colorLevels(texture2D(tex_nearest, posB).rgb);
-    vec3 colorA = colorLevels(edgeBlur(posA, edgeA).rgb);
-    vec3 colorB = colorLevels(edgeBlur(posB, edgeB).rgb);
+    vec3 colorA = colorLevels(texture2D(tex, posA).rgb);
+    vec3 colorB = colorLevels(texture2D(tex, posB).rgb);
+    // vec3 colorA = colorLevels(edgeBlur(posA, edgeA).rgb);
+    // vec3 colorB = colorLevels(edgeBlur(posB, edgeB).rgb);
     
-    vec3 color = dot(centralEdge, edgeA) > dot(centralEdge, edgeB) ? colorB : colorA;
+    // vec3 color = dot(centralEdge, edgeA) > dot(centralEdge, edgeB) ? colorB : colorA;
+    vec3 color = distance(centralColor, colorA) > distance(centralColor, colorB) ? colorB : colorA;
     return color;
 }
 
