@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 
 use gelatin::cgmath::{Matrix4, Vector2, Vector3};
 use gelatin::glium::glutin::event::{ElementState, ModifiersState, MouseButton};
+use gelatin::glium::uniforms::{MinifySamplerFilter, SamplerWrapFunction};
 use gelatin::glium::{
 	program, uniform, uniforms::MagnifySamplerFilter, Display, Frame, Program, Surface,
 };
@@ -1067,25 +1068,37 @@ fn draw_tex_grid(
 		let sampler = cell_tex
 			.tex
 			.sampled()
-			.minify_filter(gelatin::glium::uniforms::MinifySamplerFilter::LinearMipmapLinear)
-			.wrap_function(gelatin::glium::uniforms::SamplerWrapFunction::Clamp);
+			.minify_filter(MinifySamplerFilter::LinearMipmapLinear)
+			.wrap_function(SamplerWrapFunction::Clamp);
 
-		let filter = match data.antialiasing {
-			Antialias::Auto if data.img_texel_size < AA_TEXEL_SIZE_THRESHOLD => {
-				MagnifySamplerFilter::Linear
-			}
-			Antialias::Auto | Antialias::Never => MagnifySamplerFilter::Nearest,
-			Antialias::Always => MagnifySamplerFilter::Linear,
-		};
+		// let filter = match data.antialiasing {
+		// 	Antialias::Auto if data.img_texel_size < AA_TEXEL_SIZE_THRESHOLD => {
+		// 		MagnifySamplerFilter::Linear
+		// 	}
+		// 	Antialias::Auto | Antialias::Never => MagnifySamplerFilter::Nearest,
+		// 	Antialias::Always => MagnifySamplerFilter::Linear,
+		// };
+		let filter = MagnifySamplerFilter::Linear;
 		let sampler = sampler.magnify_filter(filter);
 
+		let sampler_nearest = cell_tex
+			.tex
+			.sampled()
+			.minify_filter(MinifySamplerFilter::Nearest)
+			.magnify_filter(MagnifySamplerFilter::Nearest)
+			.wrap_function(SamplerWrapFunction::Clamp);
+
 		// building the uniforms
+		let height = cell_tex.tex.get_height().unwrap_or(1);
+		let texel_size = [1.0 / cell_tex.tex.get_width() as f32, 1.0 / height as f32];
 		let lod_level = ((1.0 / data.img_texel_size).log2().max(0.0) + 0.125).floor();
 		let uniforms = uniform! {
 			matrix: Into::<[[f32; 4]; 4]>::into(transform),
 			bright_shade: data.bright_shade,
 			tex: sampler,
+			tex_nearest: sampler_nearest,
 			lod_level: lod_level,
+			texel_size: texel_size,
 		};
 		target
 			.draw(
