@@ -1,5 +1,5 @@
 use crate::Version;
-use clap::{value_parser, Arg, Command};
+use clap::{parser::ValueSource, value_parser, Arg, Command};
 use std::path::Path;
 
 pub struct Args {
@@ -50,8 +50,11 @@ pub fn parse_args(config_path: &Path, cache_path: &Path) -> Args {
 
 	let file_path = matches.get_one::<String>("PATH").cloned();
 
-	let displayed_folders = if matches.contains_id("absolute") {
-		Some(std::u32::MAX)
+	let is_absolute = matches.value_source("absolute") == Some(ValueSource::CommandLine);
+	let displayed_folders = if is_absolute {
+		// Subtract one because we later want to add one to this value, and we don't want
+		// an overflow
+		Some(std::u32::MAX - 1)
 	} else {
 		matches.get_one::<u32>("FOLDER_COUNT").copied()
 	};
