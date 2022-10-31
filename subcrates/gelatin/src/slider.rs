@@ -133,7 +133,7 @@ impl Widget for Slider {
 			// Do this before the shadow so the shadow we draw later will cover this line as well
 			let value_ratio = (borrowed.value as f32 + 0.5) / (borrowed.steps as f32);
 			let slider_pos = Vector3::new(position.x + value_ratio * size.x, position.y, 0.0);
-			let color = [0.25, 0.25, 0.25, 1.0f32];
+			let color = [0.4, 0.4, 0.4, 1.0f32];
 
 			let mut transform = Matrix4::from_nonuniform_scale(1.0, size.y, 1.0);
 			transform = Matrix4::from_translation(slider_pos) * transform;
