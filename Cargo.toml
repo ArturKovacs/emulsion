@@ -79,7 +79,7 @@ lexical-sort = "0.3.1"
 trash = "2.0.1"
 clap = { version = "4.0.15" }
 kamadak-exif = "0.5.3"
-arboard = { version = "3.1.0", features = ["wayland-data-control"] }
+arboard = { version = "2.1.1", features = ["wayland-data-control"] }
 resvg = "0.23.0"
 usvg = "0.23.0"
 tiny-skia = "0.6" # Using the same version that resvg uses.
