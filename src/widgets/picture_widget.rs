@@ -128,7 +128,8 @@ struct PictureWidgetData {
 	clipboard_handler: Option<ClipboardHandler>,
 	clipboard_request_was_pending: bool,
 
-	program: Program,
+	sharp_magnify_program: Program,
+	pixel_magnify_program: Program,
 	bright_shade: f32,
 	/// Size of an image texel in physical display pixels
 	img_texel_size: f32,
@@ -358,6 +359,7 @@ impl PictureWidgetData {
 			cache.image.magnification = magnification;
 		}
 		self.magnification = magnification;
+		self.render_validity.invalidate();
 	}
 
 	pub fn toggle_antialias(&mut self) {
@@ -424,10 +426,22 @@ impl PictureWidget {
 		configuration: Rc<RefCell<Configuration>>,
 		cache: Arc<Mutex<Cache>>,
 	) -> PictureWidget {
-		let program = program!(display,
+
+		let sharp_magnify_fragment_src = shaders::FRAGMENT_140.replace("//DEFINE_HERE SHARP_MAGNIFY", "#define SHARP_MAGNIFY 1");
+		let pixel_magnify_fragment_src = shaders::FRAGMENT_140.replace("//DEFINE_HERE SHARP_MAGNIFY", "#define SHARP_MAGNIFY 0");
+
+		let sharp_magnify_program = program!(display,
 			140 => {
 				vertex: shaders::VERTEX_140,
-				fragment: shaders::FRAGMENT_140
+				fragment: &sharp_magnify_fragment_src
+			},
+		)
+		.unwrap();
+
+		let pixel_magnify_program = program!(display,
+			140 => {
+				vertex: shaders::VERTEX_140,
+				fragment: &pixel_magnify_fragment_src
 			},
 		)
 		.unwrap();
@@ -476,7 +490,8 @@ impl PictureWidget {
 			clipboard_request_was_pending: false,
 			render_validity: Default::default(),
 
-			program,
+			sharp_magnify_program,
+			pixel_magnify_program,
 			bright_shade: 0.95,
 			img_texel_size: 0.0,
 			scaling,
@@ -1083,6 +1098,27 @@ fn draw_tex_grid(
 			.minify_filter(MinifySamplerFilter::LinearMipmapLinear)
 			.wrap_function(SamplerWrapFunction::Clamp);
 
+		let filter = match data.magnification {
+			Magnification::Sharp => {
+				MagnifySamplerFilter::Linear
+			}
+			Magnification::Pixel => {
+				match data.antialiasing {
+					Antialias::Auto if data.img_texel_size < AA_TEXEL_SIZE_THRESHOLD => {
+						MagnifySamplerFilter::Linear
+					}
+					Antialias::Auto | Antialias::Never => MagnifySamplerFilter::Nearest,
+					Antialias::Always => MagnifySamplerFilter::Linear,
+				}
+			}
+		};
+		let program = match data.magnification {
+			Magnification::Sharp => {
+				let is_magnifying = data.img_texel_size > 1.0;
+				if is_magnifying { &data.sharp_magnify_program } else { &data.pixel_magnify_program }
+			}
+			Magnification::Pixel => &data.pixel_magnify_program,
+		};
 		// let filter = match data.antialiasing {
 		// 	Antialias::Auto if data.img_texel_size < AA_TEXEL_SIZE_THRESHOLD => {
 		// 		MagnifySamplerFilter::Linear
@@ -1090,7 +1126,7 @@ fn draw_tex_grid(
 		// 	Antialias::Auto | Antialias::Never => MagnifySamplerFilter::Nearest,
 		// 	Antialias::Always => MagnifySamplerFilter::Linear,
 		// };
-		let filter = MagnifySamplerFilter::Linear;
+		// let filter = MagnifySamplerFilter::Linear;
 		let sampler = sampler.magnify_filter(filter);
 
 		let sampler_nearest = cell_tex
@@ -1116,7 +1152,7 @@ fn draw_tex_grid(
 			.draw(
 				context.unit_quad_vertices,
 				context.unit_quad_indices,
-				&data.program,
+				program,
 				&uniforms,
 				&image_draw_params,
 			)

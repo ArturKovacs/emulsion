@@ -1,6 +1,6 @@
 use super::picture_widget::ScalingMode;
 use crate::{
-	configuration::{Cache, Magnification},
+	configuration::{Magnification},
 	ConfigWindowSection, Configuration, Theme,
 };
 

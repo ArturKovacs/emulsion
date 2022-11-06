@@ -7,6 +7,9 @@ uniform vec2 texel_size;
 in vec2 v_tex_coords;
 out vec4 f_color;
 
+// Do not modify the following comment. It's meant for the application to parse
+//DEFINE_HERE SHARP_MAGNIFY
+
 vec3 srgb2linear(vec3 color) {
     return pow(color, vec3(1.0/2.2));
 }
@@ -15,12 +18,13 @@ vec3 linear2srgb(vec3 color) {
 }
 
 float luminance(vec3 col) {
-    return col.r * 0.2126 + col.g * 0.7152 + col.b * 0.0722;
+    // return col.r * 0.2126 + col.g * 0.7152 + col.b * 0.0722;
+    return col.r * 0.4 + col.g * 0.4 + col.b * 0.2;
 }
 
 vec3 levels(vec3 color, float min_v, float max_v) {
     float diff = max_v - min_v;
-    return max(color - vec3(min_v), vec3(0.0)) / vec3(diff);
+    return min(max(color - vec3(min_v), vec3(0.0)) / vec3(diff), vec3(1.0));
 }
 
 vec3 colorLevels(vec3 color) {
@@ -29,54 +33,57 @@ vec3 colorLevels(vec3 color) {
 }
 
 vec3 edgeLevels(vec3 color) {
-    return levels(color, 0.25, 0.75);
+    return levels(color, 0.2, 0.8);
+    // return levels(color, 0.0, 1.0);
 }
 
 vec3 edgeSample(vec2 uv) {
     return edgeLevels(srgb2linear(texture2D(tex, uv).rgb));
 }
 
-vec2 getEdge(vec2 uv) {
-    vec2 step_hor = vec2(texel_size.x * 0.4, 0.0);
+vec2 getEdgeNormal(vec2 uv) {
+    vec2 step_hor = vec2(texel_size.x * 0.45, 0.0);
     vec3 right = edgeSample(uv + step_hor);
     vec3 left = edgeSample(uv - step_hor);
     float hor = luminance(right) - luminance(left);
 
-    vec2 step_vert = vec2(0.0, texel_size.y * 0.4);
+    vec2 step_vert = vec2(0.0, texel_size.y * 0.45);
     vec3 above = edgeSample(uv + step_vert);
     vec3 below = edgeSample(uv - step_vert);
-    float vert = luminance(below) - luminance(above);
+    float vert = luminance(above) - luminance(below);
 
-    return vec2(vert, hor);
+    return vec2(hor, vert);
 }
 
-vec3 edgeBlur(vec2 pos, vec2 edge) {
-    vec2 nextPos = pos + edge * texel_size;
-    vec2 prevPos = pos - edge * texel_size;
-
-    vec3 curr_col = texture2D(tex_nearest, pos).rgb;
-    vec3 next_col = texture2D(tex_nearest, nextPos).rgb;
-    vec3 prev_col = texture2D(tex_nearest, prevPos).rgb;
-    return (curr_col + next_col + prev_col) * 0.333;
+// vec2 vecCurve(vec2 v) {
+//     vec2 s = sign(v);
+//     return pow(abs(v), vec2(0.5)) * s;
+// }
+vec2 vecCurve(vec2 v) {
+    return (v / (1.0 + length(v))) * 2.0;
 }
 
 vec3 comicSample(vec2 uv) {
-    vec2 centralEdge = getEdge(uv);
-    vec2 centralNormal = vec2(centralEdge.y, -centralEdge.x);
+    // vec2 centralEdge = getEdge(uv);
+    vec2 centralNormal = vec2(0.0);
+    vec2 step_hor = vec2(texel_size.x * 0.25, 0.0);
+    vec2 step_vert = vec2(0.0, texel_size.y * 0.25);
+    centralNormal += getEdgeNormal(uv + step_hor);
+    centralNormal += getEdgeNormal(uv - step_hor);
+    centralNormal += getEdgeNormal(uv + step_vert);
+    centralNormal += getEdgeNormal(uv - step_vert);
+    centralNormal *= 0.25;
+    centralNormal = vecCurve(centralNormal);
+    // return vec3(0.0, (centralNormal * 0.5) + vec2(0.5));
     vec3 centralColor = texture2D(tex, uv).rgb;
 
-    vec2 posA = uv + centralNormal * texel_size;
-    vec2 posB = uv - centralNormal * texel_size;
-    // vec2 edgeA = getEdge(posA);
-    // vec2 edgeB = getEdge(posB);
+    vec2 posA = uv + centralNormal * texel_size * 0.85;
+    vec2 posB = uv - centralNormal * texel_size * 0.85;
 
     vec3 colorA = colorLevels(texture2D(tex, posA).rgb);
     vec3 colorB = colorLevels(texture2D(tex, posB).rgb);
-    // vec3 colorA = colorLevels(edgeBlur(posA, edgeA).rgb);
-    // vec3 colorB = colorLevels(edgeBlur(posB, edgeB).rgb);
     
-    // vec3 color = dot(centralEdge, edgeA) > dot(centralEdge, edgeB) ? colorB : colorA;
-    vec3 color = distance(centralColor, colorA) > distance(centralColor, colorB) ? colorB : colorA;
+    vec3 color = distance(centralColor, colorA) < distance(centralColor, colorB) ? colorA : colorB;
     return color;
 }
 
@@ -89,7 +96,11 @@ vec3 heightSample(vec2 uv) {
 void main() {
     vec4 color = textureLod(tex, v_tex_coords, lod_level);
 
+#if SHARP_MAGNIFY == 1
     vec3 comicColor = comicSample(v_tex_coords);
+#else
+    vec3 comicColor = color.rgb;
+#endif
 
     const float grid_size = 12.0;
     vec4 grid_color;
