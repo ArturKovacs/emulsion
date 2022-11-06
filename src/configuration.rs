@@ -43,10 +43,23 @@ impl Default for Antialias {
 	}
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Magnification {
+	Pixel,
+	Sharp,
+}
+impl Default for Magnification {
+	fn default() -> Self {
+		Magnification::Pixel
+	}
+}
+
 #[derive(Debug, Default, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct CacheImageSection {
 	pub fit_stretches: bool,
 	pub antialiasing: Antialias,
+	pub magnification: Magnification,
 }
 
 #[derive(Debug, Default, Eq, PartialEq, Clone, Deserialize)]
@@ -146,6 +159,14 @@ impl Cache {
 
 	pub fn set_theme(&mut self, theme: Theme) {
 		self.window.dark = theme == Theme::Dark;
+	}
+
+	pub fn toggle_magnification(&mut self) -> Magnification {
+		match self.image.magnification {
+			Magnification::Pixel => self.image.magnification = Magnification::Sharp,
+			Magnification::Sharp => self.image.magnification = Magnification::Pixel,
+		}
+		self.image.magnification
 	}
 
 	pub fn load<P: AsRef<Path>>(file_path: P) -> Result<Cache, String> {

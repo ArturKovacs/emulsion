@@ -1,5 +1,8 @@
 use super::picture_widget::ScalingMode;
-use crate::{ConfigWindowSection, Configuration, Theme};
+use crate::{
+	configuration::{Cache, Magnification},
+	ConfigWindowSection, Configuration, Theme,
+};
 
 use gelatin::{
 	button::Button,
@@ -23,6 +26,10 @@ static FIT_STRETCH: &[u8] = include_bytes!("../../resource/fit-stretch.png");
 static FIT_STRETCH_LIGHT: &[u8] = include_bytes!("../../resource/fit-stretch-light.png");
 static FIT_BEST: &[u8] = include_bytes!("../../resource/fit-min.png");
 static FIT_BEST_LIGHT: &[u8] = include_bytes!("../../resource/fit-min-light.png");
+static MAGNIFY_PIXEL: &[u8] = include_bytes!("../../resource/magnify-pixel.png");
+static MAGNIFY_PIXEL_LIGHT: &[u8] = include_bytes!("../../resource/magnify-pixel-light.png");
+static MAGNIFY_SHARP: &[u8] = include_bytes!("../../resource/magnify-sharp.png");
+static MAGNIFY_SHARP_LIGHT: &[u8] = include_bytes!("../../resource/magnify-sharp-light.png");
 
 const NO_BG_COLOR: [f32; 4] = [0.0, 0.0, 0.0, 0.0];
 const ACTIVE_BG_COLOR: [f32; 4] = [0.3, 0.3, 0.3, 0.5];
@@ -39,6 +46,7 @@ pub struct BottomBar {
 	pub slider: Rc<Slider>,
 	pub theme_button: Rc<Button>,
 	pub help_button: Rc<Button>,
+	pub magnification_button: Rc<Button>,
 
 	/// This is false if the configuration requires this to be invisible
 	// and true otherwise.
@@ -56,6 +64,10 @@ pub struct BottomBar {
 	fit_stretch_light: Rc<Picture>,
 	fit_best: Rc<Picture>,
 	fit_best_light: Rc<Picture>,
+	magnify_pixel: Rc<Picture>,
+	magnify_pixel_light: Rc<Picture>,
+	magnify_sharp: Rc<Picture>,
+	magnify_sharp_light: Rc<Picture>,
 }
 
 impl BottomBar {
@@ -72,6 +84,10 @@ impl BottomBar {
 		let fit_stretch_light = Rc::new(Picture::from_encoded_bytes(FIT_STRETCH_LIGHT));
 		let fit_best = Rc::new(Picture::from_encoded_bytes(FIT_BEST));
 		let fit_best_light = Rc::new(Picture::from_encoded_bytes(FIT_BEST_LIGHT));
+		let magnify_pixel = Rc::new(Picture::from_encoded_bytes(MAGNIFY_PIXEL));
+		let magnify_pixel_light = Rc::new(Picture::from_encoded_bytes(MAGNIFY_PIXEL_LIGHT));
+		let magnify_sharp = Rc::new(Picture::from_encoded_bytes(MAGNIFY_SHARP));
+		let magnify_sharp_light = Rc::new(Picture::from_encoded_bytes(MAGNIFY_SHARP_LIGHT));
 
 		let widget = Rc::new(HorizontalLayoutContainer::new());
 		widget.set_margin_left(0.0);
@@ -85,6 +101,7 @@ impl BottomBar {
 		let slider = make_slider();
 		let theme_button = make_icon_button(Alignment::End);
 		let help_button = make_icon_button(Alignment::End);
+		let magnification_button = make_icon_button(Alignment::End);
 
 		orig_scale_button.set_margin_left(SMALL_BUTTON_GAP);
 		fit_stretch_button.set_margin_right(SMALL_BUTTON_GAP);
@@ -96,6 +113,7 @@ impl BottomBar {
 		widget.add_child(fit_best_button.clone());
 		widget.add_child(fit_stretch_button.clone());
 		widget.add_child(slider.clone());
+		widget.add_child(magnification_button.clone());
 		widget.add_child(theme_button.clone());
 		widget.add_child(help_button.clone());
 
@@ -115,6 +133,7 @@ impl BottomBar {
 			slider,
 			theme_button,
 			help_button,
+			magnification_button,
 			should_show,
 
 			question,
@@ -129,10 +148,14 @@ impl BottomBar {
 			fit_stretch_light,
 			fit_best,
 			fit_best_light,
+			magnify_pixel,
+			magnify_pixel_light,
+			magnify_sharp,
+			magnify_sharp_light,
 		}
 	}
 
-	pub fn set_theme(&self, theme: Theme, update_available: bool) {
+	pub fn set_theme(&self, theme: Theme, update_available: bool, magnification: Magnification) {
 		match theme {
 			Theme::Light => {
 				self.orig_scale_button.set_icon(Some(self.one.clone()));
@@ -142,6 +165,11 @@ impl BottomBar {
 				self.widget.set_bg_color([1.0, 1.0, 1.0, 1.0]);
 				self.slider.set_shadow_color([0.0, 0.0, 0.0]);
 
+				let magnification_icon = match magnification {
+					Magnification::Pixel => self.magnify_pixel.clone(),
+					Magnification::Sharp => self.magnify_sharp.clone(),
+				};
+				self.magnification_button.set_icon(Some(magnification_icon));
 				if update_available {
 					self.help_button.set_icon(Some(self.question_noti.clone()));
 				} else {
@@ -156,6 +184,11 @@ impl BottomBar {
 				self.widget.set_bg_color([0.08, 0.08, 0.08, 1.0]);
 				self.slider.set_shadow_color([0.0, 0.0, 0.0]);
 
+				let magnification_icon = match magnification {
+					Magnification::Pixel => self.magnify_pixel_light.clone(),
+					Magnification::Sharp => self.magnify_sharp_light.clone(),
+				};
+				self.magnification_button.set_icon(Some(magnification_icon));
 				if update_available {
 					self.help_button.set_icon(Some(self.question_light_noti.clone()));
 				} else {

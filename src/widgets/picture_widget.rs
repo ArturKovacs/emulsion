@@ -19,14 +19,14 @@ use gelatin::{
 	application::request_exit, DrawContext, Event, EventKind, Widget, WidgetData, WidgetError,
 };
 
-use crate::input_handling::*;
-use crate::shaders;
-use crate::utils::{virtual_keycode_is_char, virtual_keycode_to_string};
 use crate::{
 	clipboard_handler::ClipboardHandler,
-	configuration::{Antialias, Cache, Configuration},
+	configuration::{Antialias, Cache, Configuration, Magnification},
 	image_cache::{image_loader::Orientation, AnimationFrameTexture},
+	input_handling::*,
 	playback_manager::*,
+	shaders,
+	utils::{virtual_keycode_is_char, virtual_keycode_to_string},
 };
 
 use super::{bottom_bar::BottomBar, copy_notification::CopyNotifications, help_screen::HelpScreen};
@@ -135,6 +135,7 @@ struct PictureWidgetData {
 	scaling: ScalingMode,
 	img_pos: LogicalVector,
 	antialiasing: Antialias,
+	magnification: Magnification,
 
 	hor_pan_input: MovementDir,
 	ver_pan_input: MovementDir,
@@ -351,6 +352,14 @@ impl PictureWidgetData {
 		self.render_validity.invalidate();
 	}
 
+	pub fn set_img_magnification(&mut self, magnification: Magnification) {
+		{
+			let mut cache = self.cache.lock().unwrap();
+			cache.image.magnification = magnification;
+		}
+		self.magnification = magnification;
+	}
+
 	pub fn toggle_antialias(&mut self) {
 		let aa = match self.antialiasing {
 			Antialias::Auto if self.img_texel_size < AA_TEXEL_SIZE_THRESHOLD => Antialias::Never,
@@ -420,10 +429,6 @@ impl PictureWidget {
 				vertex: shaders::VERTEX_140,
 				fragment: shaders::FRAGMENT_140
 			},
-			110 => {
-				vertex: shaders::VERTEX_110,
-				fragment: shaders::FRAGMENT_110
-			},
 		)
 		.unwrap();
 
@@ -455,6 +460,7 @@ impl PictureWidget {
 				Antialias::default()
 			}
 		};
+		let magnification = cache.lock().unwrap().image.magnification;
 
 		let mut data = PictureWidgetData {
 			placement: Default::default(),
@@ -476,6 +482,7 @@ impl PictureWidget {
 			scaling,
 			img_pos: Default::default(),
 			antialiasing,
+			magnification,
 			hor_pan_input: MovementDir::None,
 			ver_pan_input: MovementDir::None,
 			zoom_input: MovementDir::None,
@@ -516,6 +523,11 @@ impl PictureWidget {
 	pub fn set_img_size_to_fit(&self, stretch: bool) {
 		let mut borrowed = self.data.borrow_mut();
 		borrowed.set_img_size_to_fit(stretch);
+	}
+
+	pub fn set_img_magnification(&self, magnification: Magnification) {
+		let mut borrowed = self.data.borrow_mut();
+		borrowed.set_img_magnification(magnification);
 	}
 
 	pub fn jump_to_index(&self, index: u32) {

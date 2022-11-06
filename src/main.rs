@@ -201,6 +201,7 @@ fn main() {
 		let theme = theme.clone();
 		let update_available = update_available.clone();
 		let bottom_bar = bottom_bar.clone();
+		let cache = cache.clone();
 
 		Rc::new(move || {
 			match theme.get() {
@@ -217,7 +218,12 @@ fn main() {
 					update_label.set_icon(Some(update_label_image.clone()));
 				}
 			}
-			bottom_bar.set_theme(theme.get(), update_available.load(Ordering::SeqCst));
+			let magnification = cache.lock().unwrap().image.magnification;
+			bottom_bar.set_theme(
+				theme.get(),
+				update_available.load(Ordering::SeqCst),
+				magnification,
+			);
 		})
 	};
 	set_theme();
@@ -251,8 +257,18 @@ fn main() {
 		});
 	}
 	{
+		let picture_widget = picture_widget.clone();
 		bottom_bar.fit_stretch_button.set_on_click(move || {
 			picture_widget.set_img_size_to_fit(true);
+		});
+	}
+	{
+		let cache = cache.clone();
+		let set_theme = set_theme.clone();
+		bottom_bar.magnification_button.set_on_click(move || {
+			let magnification = cache.lock().unwrap().toggle_magnification();
+			picture_widget.set_img_magnification(magnification);
+			set_theme();
 		});
 	}
 	let help_visible = Cell::new(first_launch);
