@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use usvg::TreeParsing;
 
 use gelatin::image::{
 	self,
@@ -151,8 +152,8 @@ pub fn load_svg(path: &std::path::Path) -> Result<image::RgbaImage> {
 	let opt = usvg::Options::default();
 
 	let svg_data = fs::read(path)?;
-	let rtree = usvg::Tree::from_data(&svg_data, &opt.to_ref())?;
-	let size = rtree.svg_node().size;
+	let utree = usvg::Tree::from_data(&svg_data, &opt)?;
+	let size = utree.size;
 	let (width, height) = (size.width(), size.height());
 	// Scale to fit 4096
 	let zoom = 4096. / width.max(height);
@@ -160,7 +161,8 @@ pub fn load_svg(path: &std::path::Path) -> Result<image::RgbaImage> {
 	// These unwrapped Options are fine as long as the dimensions are correct
 	let mut pixmap = tiny_skia::Pixmap::new(width, height).unwrap();
 	let transform = tiny_skia::Transform::identity();
-	resvg::render(&rtree, usvg::FitTo::Zoom(zoom as f32), transform, pixmap.as_mut()).unwrap();
+	let rtree = resvg::Tree::from_usvg(&utree);
+	rtree.render(transform, &mut pixmap.as_mut());
 	Ok(image::RgbaImage::from_raw(width, height, pixmap.take()).unwrap())
 }
 

@@ -80,8 +80,8 @@ trash = "3.0.3"
 clap = { version = "4.0.15" }
 kamadak-exif = "0.5.3"
 arboard = { version = "3.2.0", features = ["wayland-data-control"] }
-resvg = "0.23.0"
-usvg = "0.23.0"
-tiny-skia = "0.6" # Using the same version that resvg uses.
+resvg = "0.34.1"
+usvg = "0.34.1"
+tiny-skia = "0.10.0" # Using the same version that resvg uses.
 log = "0.4"
 env_logger = "0.10.0"
