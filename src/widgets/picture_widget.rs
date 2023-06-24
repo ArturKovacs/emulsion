@@ -426,9 +426,10 @@ impl PictureWidget {
 		configuration: Rc<RefCell<Configuration>>,
 		cache: Arc<Mutex<Cache>>,
 	) -> PictureWidget {
-
-		let sharp_magnify_fragment_src = shaders::FRAGMENT_140.replace("//DEFINE_HERE SHARP_MAGNIFY", "#define SHARP_MAGNIFY 1");
-		let pixel_magnify_fragment_src = shaders::FRAGMENT_140.replace("//DEFINE_HERE SHARP_MAGNIFY", "#define SHARP_MAGNIFY 0");
+		let sharp_magnify_fragment_src =
+			shaders::FRAGMENT_140.replace("//DEFINE_HERE SHARP_MAGNIFY", "#define SHARP_MAGNIFY 1");
+		let pixel_magnify_fragment_src =
+			shaders::FRAGMENT_140.replace("//DEFINE_HERE SHARP_MAGNIFY", "#define SHARP_MAGNIFY 0");
 
 		let sharp_magnify_program = program!(display,
 			140 => {
@@ -1099,23 +1100,23 @@ fn draw_tex_grid(
 			.wrap_function(SamplerWrapFunction::Clamp);
 
 		let filter = match data.magnification {
-			Magnification::Sharp => {
-				MagnifySamplerFilter::Linear
-			}
-			Magnification::Pixel => {
-				match data.antialiasing {
-					Antialias::Auto if data.img_texel_size < AA_TEXEL_SIZE_THRESHOLD => {
-						MagnifySamplerFilter::Linear
-					}
-					Antialias::Auto | Antialias::Never => MagnifySamplerFilter::Nearest,
-					Antialias::Always => MagnifySamplerFilter::Linear,
+			Magnification::Sharp => MagnifySamplerFilter::Linear,
+			Magnification::Pixel => match data.antialiasing {
+				Antialias::Auto if data.img_texel_size < AA_TEXEL_SIZE_THRESHOLD => {
+					MagnifySamplerFilter::Linear
 				}
-			}
+				Antialias::Auto | Antialias::Never => MagnifySamplerFilter::Nearest,
+				Antialias::Always => MagnifySamplerFilter::Linear,
+			},
 		};
 		let program = match data.magnification {
 			Magnification::Sharp => {
 				let is_magnifying = data.img_texel_size > 1.0;
-				if is_magnifying { &data.sharp_magnify_program } else { &data.pixel_magnify_program }
+				if is_magnifying {
+					&data.sharp_magnify_program
+				} else {
+					&data.pixel_magnify_program
+				}
 			}
 			Magnification::Pixel => &data.pixel_magnify_program,
 		};

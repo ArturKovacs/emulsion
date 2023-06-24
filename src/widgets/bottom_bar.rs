@@ -1,8 +1,5 @@
 use super::picture_widget::ScalingMode;
-use crate::{
-	configuration::{Magnification},
-	ConfigWindowSection, Configuration, Theme,
-};
+use crate::{configuration::Magnification, ConfigWindowSection, Configuration, Theme};
 
 use gelatin::{
 	button::Button,
