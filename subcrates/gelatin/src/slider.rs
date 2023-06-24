@@ -203,7 +203,7 @@ impl Widget for Slider {
 					let relative_cursor_x =
 						event.cursor_pos.vec.x - borrowed.drawn_bounds.pos.vec.x;
 					let proportion =
-						(relative_cursor_x / borrowed.drawn_bounds.size.vec.x).max(0.0).min(1.0);
+						(relative_cursor_x / borrowed.drawn_bounds.size.vec.x).clamp(0.0, 1.0);
 					let stepsf = borrowed.steps as f32;
 					borrowed.value =
 						(proportion * (1.0 + 1.0 / stepsf) * (stepsf - 1.0)).floor() as u32;

@@ -55,7 +55,7 @@ impl PendingRequests {
 
 	/// This returns all the ids including the finished item's
 	pub fn get_all_ids(&self) -> Vec<u32> {
-		self.by_id.iter().map(|(id, _)| *id).collect()
+		self.by_id.keys().copied().collect()
 	}
 
 	pub fn cancelled(&self, id: &u32) -> Option<bool> {

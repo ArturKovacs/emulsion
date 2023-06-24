@@ -192,7 +192,7 @@ impl PictureWidgetData {
 			let widget_phys_size = size * dpi_scale;
 			let fits_in_widget =
 				widget_phys_size.x >= img_phys_w && widget_phys_size.y >= img_pyhs_h;
-			self.img_pos = LogicalVector::new(size.x as f32 * 0.5, size.y as f32 * 0.5);
+			self.img_pos = LogicalVector::new(size.x * 0.5, size.y * 0.5);
 			if fits_in_widget && !stretch {
 				self.img_texel_size = 1.0;
 			} else {
@@ -211,10 +211,8 @@ impl PictureWidgetData {
 		let mut image_texel_size = (self.img_texel_size * delta).max(0.0);
 		if (image_texel_size - 1.0).abs() < 0.01 {
 			image_texel_size = 1.0;
-		} else if image_texel_size < MIN_ZOOM_FACTOR {
-			image_texel_size = MIN_ZOOM_FACTOR;
-		} else if image_texel_size > MAX_ZOOM_FACTOR {
-			image_texel_size = MAX_ZOOM_FACTOR;
+		} else {
+			image_texel_size = image_texel_size.clamp(MIN_ZOOM_FACTOR, MAX_ZOOM_FACTOR)
 		}
 		self.img_pos = (image_texel_size / self.img_texel_size) * (self.img_pos - anchor) + anchor;
 		self.img_texel_size = image_texel_size;
@@ -598,7 +596,7 @@ impl PictureWidget {
 		}
 		if triggered!(IMG_DEL_NAME) {
 			if let Some(path) = borrowed.playback_manager.shown_file_path() {
-				if let Err(e) = trash::delete(&path) {
+				if let Err(e) = trash::delete(path) {
 					eprintln!("Error while moving file '{:?}' to trash: {:?}", path, e);
 				}
 				if let Err(e) = borrowed.playback_manager.update_directory() {

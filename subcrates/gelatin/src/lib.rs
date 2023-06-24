@@ -124,7 +124,7 @@ pub trait WidgetData {
 			Length::Stretch { min, max } => {
 				let mut width = available_space.size.vec.x;
 				width -= self.placement().margin_left + self.placement().margin_right;
-				width = width.max(min).min(max);
+				width = width.clamp(min, max);
 				self.drawn_bounds().size.vec.x = width;
 				if width < max {
 					self.apply_horizontal_alignement(available_space, width);
@@ -141,7 +141,7 @@ pub trait WidgetData {
 			Length::Stretch { min, max } => {
 				let mut height = available_space.size.vec.y;
 				height -= self.placement().margin_top + self.placement().margin_bottom;
-				height = height.max(min).min(max);
+				height = height.clamp(min, max);
 				self.drawn_bounds().size.vec.y = height;
 				if height > max {
 					self.apply_vertical_alignement(available_space, height);

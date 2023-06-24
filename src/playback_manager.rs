@@ -152,7 +152,7 @@ impl PlaybackManager {
 		};
 
 		let thread_count = match sys_info::cpu_num() {
-			Ok(value) => value.max(2).min(4),
+			Ok(value) => value.clamp(2, 4),
 			_ => 4,
 		};
 
@@ -411,7 +411,7 @@ impl<P: Playback> ImgSequencePlayer<P> {
 						let mut target = None;
 						for _ in 0..frame_step {
 							target = self.present_remaining.pop();
-							if target == None {
+							if target.is_none() {
 								// Restart
 								// WARNING we silently assume that the folder is fully
 								// filtered at this point.
