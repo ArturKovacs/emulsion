@@ -59,10 +59,10 @@ jobs:
         choco install pkgconfiglite
         vcpkg integrate install
         echo "set(VCPKG_BUILD_TYPE release)" >> $env:VCPKG_INSTALLATION_ROOT\triplets\x64-windows.cmake
-        vcpkg install dav1d:x64-windows
+        vcpkg install --triplet=x64-windows
         echo "vcpkg install folder: $(((Get-Command vcpkg.exe | select Source -First 1).source | Get-Item).Directory.FullName)"
-        $VCPKG_INSTALLATION_ROOT = ((Get-Command vcpkg.exe | select Source -First 1).source | Get-Item).Directory.FullName
-        $PKG_CONFIG_PATH = "$VCPKG_INSTALLATION_ROOT/installed/x64-windows/lib/pkgconfig"
+        $PKG_CONFIG_PATH = "$((Resolve-Path ".").Path)/vcpkg_installed/x64-windows/lib/pkgconfig"
+        $PKG_CONFIG_PATH = $PKG_CONFIG_PATH.replace("\", "/")
         echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $env:GITHUB_ENV
 
         curl -LO "https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.2/LLVM-15.0.2-win64.exe"
