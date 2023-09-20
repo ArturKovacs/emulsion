@@ -865,7 +865,7 @@ checksum = "a26ae43d7bcc3b814de94796a5e736d4029efb0ee900c12e2d54c993ad1a1e07"
 
 [[package]]
 name = "emulsion"
-version = "10.3.0"
+version = "10.4.0"
 dependencies = [
  "arboard",
  "backtrace",
