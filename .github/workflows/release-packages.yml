@@ -55,29 +55,6 @@ jobs:
       working-directory: ./distribution/windows/prerequisites
       run: (New-Object System.Net.WebClient).DownloadFile('https://aka.ms/vs/16/release/vc_redist.x64.exe', 'vc_redist.x64.exe')
 
-    - name: Install avif build dependencies (Windows)
-      run: |
-        choco install pkgconfiglite
-        vcpkg integrate install
-        echo "set(VCPKG_BUILD_TYPE release)" >> $env:VCPKG_INSTALLATION_ROOT\triplets\x64-windows.cmake
-        vcpkg install --triplet=x64-windows
-        echo "vcpkg install folder: $(((Get-Command vcpkg.exe | select Source -First 1).source | Get-Item).Directory.FullName)"
-        $PKG_CONFIG_PATH = "$((Resolve-Path "./vcpkg_installed/x64-windows/lib/pkgconfig").Path)"
-        $PKG_CONFIG_PATH = $PKG_CONFIG_PATH.replace("\", "/")
-        echo "pkg config path is $PKG_CONFIG_PATH"
-        Get-ChildItem ./vcpkg_installed/x64-windows/lib
-        Get-Content .\vcpkg_installed\x64-windows\lib\pkgconfig\dav1d.pc
-        echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $env:GITHUB_ENV
-
-        curl -LO "https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.2/LLVM-15.0.2-win64.exe"
-        ./LLVM-15.0.2-win64.exe /S
-        echo "LIBCLANG_PATH is: $LIBCLANG_PATH"
-        $LIBCLANG_PATH = (resolve-path "$env:ProgramFiles/LLVM/bin").Path
-        echo "------- CLANG BIN CONTENTS ----------"
-        dir $LIBCLANG_PATH
-        echo "LIBCLANG_PATH is: $LIBCLANG_PATH"
-        echo "LIBCLANG_PATH=$LIBCLANG_PATH" >> $env:GITHUB_ENV
-    
     - name: Build executable
       run: |
         echo "LIBCLANG_PATH is: $LIBCLANG_PATH"
@@ -85,7 +62,7 @@ jobs:
         $LIBCLANG_PATH = $env:LIBCLANG_PATH
         echo "------- CLANG BIN CONTENTS ----------"
         dir $LIBCLANG_PATH
-        cargo build --release --features=networking,avif
+        cargo build --release --features=networking
     - name: Copy executable to distributable folder
       working-directory: ./distribution/windows/
       shell: cmd
