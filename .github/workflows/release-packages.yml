@@ -58,16 +58,7 @@ jobs:
     - name: Install avif build dependencies (Windows)
       run: |
         choco install pkgconfiglite
-        vcpkg integrate install
-        echo "set(VCPKG_BUILD_TYPE release)" >> $env:VCPKG_INSTALLATION_ROOT\triplets\x64-windows.cmake
-        vcpkg install --triplet=x64-windows
-        echo "vcpkg install folder: $(((Get-Command vcpkg.exe | select Source -First 1).source | Get-Item).Directory.FullName)"
-        $PKG_CONFIG_PATH = "$((Resolve-Path "./vcpkg_installed/x64-windows/lib/pkgconfig").Path)"
-        $PKG_CONFIG_PATH = $PKG_CONFIG_PATH.replace("\", "/")
-        echo "pkg config path is $PKG_CONFIG_PATH"
-        Get-ChildItem ./vcpkg_installed/x64-windows/lib
-        Get-Content .\vcpkg_installed\x64-windows\lib\pkgconfig\dav1d.pc
-        echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $env:GITHUB_ENV
+        
         curl -LO "https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.2/LLVM-15.0.2-win64.exe"
         ./LLVM-15.0.2-win64.exe /S
         echo "LIBCLANG_PATH is: $LIBCLANG_PATH"
@@ -76,7 +67,10 @@ jobs:
         dir $LIBCLANG_PATH
         echo "LIBCLANG_PATH is: $LIBCLANG_PATH"
         echo "LIBCLANG_PATH=$LIBCLANG_PATH" >> $env:GITHUB_ENV
-        
+
+        echo "SYSTEM_DEPS_DAV1D_LINK=static" >> $env:GITHUB_ENV
+        echo "SYSTEM_DEPS_DAV1D_BUILD_INTERNAL=auto" >> $env:GITHUB_ENV
+
     - name: Build executable
       run: |
         echo "LIBCLANG_PATH is: $LIBCLANG_PATH"
@@ -123,18 +117,14 @@ jobs:
     - name: Install avif build dependencies (macOS)
       run: |
         brew install meson ninja nasm
-    - name: Build dav1d (macOS)
+    - name: Setup dav1d (macOS)
       env:
         DAV1D_DIR: dav1d_dir
         LIB_PATH: lib
       run: |
-        git clone --branch 1.3.0 --depth 1 https://code.videolan.org/videolan/dav1d.git
-        cd dav1d
-        meson build -Dprefix=$HOME/$DAV1D_DIR --buildtype release
-        ninja -C build
-        ninja -C build install
-        echo "PKG_CONFIG_PATH=$HOME/$DAV1D_DIR/$LIB_PATH/pkgconfig" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=$HOME/$DAV1D_DIR/$LIB_PATH" >> $GITHUB_ENV
+        echo "SYSTEM_DEPS_DAV1D_LINK=static" >> $GITHUB_ENV
+        echo "SYSTEM_DEPS_DAV1D_BUILD_INTERNAL=auto" >> $GITHUB_ENV
+
     - name: Create osx app
       run: cargo bundle --release --features=avif
     - name: Install create-dmg
@@ -172,18 +162,13 @@ jobs:
       run: |
         DEBIAN_FRONTEND=noninteractive sudo apt-get update
         DEBIAN_FRONTEND=noninteractive sudo apt-get install -y ninja-build nasm meson
-    - name: Build dav1d - avif dependency (linux)
+    - name: Setup dav1d - avif dependency (linux)
       env:
         DAV1D_DIR: dav1d_dir
         LIB_PATH: lib/x86_64-linux-gnu
       run: |
-        git clone --branch 1.3.0 --depth 1 https://code.videolan.org/videolan/dav1d.git
-        cd dav1d
-        meson build -Dprefix=$HOME/$DAV1D_DIR --buildtype release
-        ninja -C build
-        ninja -C build install
-        echo "PKG_CONFIG_PATH=$HOME/$DAV1D_DIR/$LIB_PATH/pkgconfig" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=$HOME/$DAV1D_DIR/$LIB_PATH" >> $GITHUB_ENV
+        echo "SYSTEM_DEPS_DAV1D_LINK=static" >> $GITHUB_ENV
+        echo "SYSTEM_DEPS_DAV1D_BUILD_INTERNAL=auto" >> $GITHUB_ENV
     - name: Create deb package
       run: cargo bundle --release --features=avif
     - name: Rename .deb
