@@ -82,6 +82,9 @@ jobs:
         echo "------- CLANG BIN CONTENTS ----------"
         dir $LIBCLANG_PATH
         cargo build --release --features=networking,avif
+        echo "------- meson log ----------"
+        Get-Content -Path target\release\build\dav1d-sys-12b1c54132bc63c1\out\dav1d\build\meson-logs\meson-log.txt
+
     - name: Copy executable to distributable folder
       working-directory: ./distribution/windows/
       shell: cmd
