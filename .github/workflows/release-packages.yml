@@ -62,7 +62,7 @@ jobs:
         $LIBCLANG_PATH = $env:LIBCLANG_PATH
         echo "------- CLANG BIN CONTENTS ----------"
         dir $LIBCLANG_PATH
-        cargo build --release --features=networking
+        cargo build --release --features=networking,avif
     - name: Copy executable to distributable folder
       working-directory: ./distribution/windows/
       shell: cmd
