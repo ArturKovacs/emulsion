@@ -4,7 +4,7 @@
     "dependencies": [
         {
             "name": "dav1d",
-            "version>=": "1.0.0"
+            "version>=": "1.3.0"
         }
     ],
     "builtin-baseline": "a2261f65ea979eebf56074f604776160f0074b09"
