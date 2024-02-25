@@ -59,6 +59,7 @@ jobs:
       run: |
         choco install pkgconfiglite
         python -m pip install meson
+        python -m pip install nasm
         
         curl -LO "https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.2/LLVM-15.0.2-win64.exe"
         ./LLVM-15.0.2-win64.exe /S
