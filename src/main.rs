@@ -1,4 +1,4 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(all(not(feature = "benchmark"), not(debug_assertions)), windows_subsystem = "windows")]
 
 #[macro_use]
 extern crate error_chain;

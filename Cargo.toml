@@ -59,6 +59,7 @@ lto = "thin"
 default = []
 networking = ["ureq"]
 avif = ["gelatin/avif"]
+benchmark = ["gelatin/benchmark"]
 
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1.11"
