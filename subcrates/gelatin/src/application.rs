@@ -102,13 +102,13 @@ impl Application {
 		let mut at_exit = self.at_exit;
 		let mut global_handlers = self.global_handlers;
 		let mut control_flow_source = *windows.keys().next().unwrap();
-		#[cfg(feature="benchmark")]
+		#[cfg(feature = "benchmark")]
 		let mut last_draw_time = std::time::Instant::now();
-		#[cfg(feature="benchmark")]
+		#[cfg(feature = "benchmark")]
 		let mut prev_draw_dts = vec![0f32; 64];
-		#[cfg(feature="benchmark")]
+		#[cfg(feature = "benchmark")]
 		let mut prev_draw_dt_index = 0;
-		#[cfg(feature="benchmark")]
+		#[cfg(feature = "benchmark")]
 		let mut update_draw_dt = move || {
 			let now = std::time::Instant::now();
 			let delta_time = now.duration_since(last_draw_time).as_secs_f32();
@@ -117,7 +117,12 @@ impl Application {
 			prev_draw_dt_index = (prev_draw_dt_index + 1) % prev_draw_dts.len();
 			if prev_draw_dt_index == 0 {
 				let max_dt = prev_draw_dts.iter().fold(0.0f32, |a, &b| a.max(b));
-				println!("{} redraws finsished, max delta time in that duration was: {}ms, {} FPS", prev_draw_dts.len(), (max_dt * 1000.0).round() as i32, (1.0 / max_dt).round() as i32);
+				println!(
+					"{} redraws finsished, max delta time in that duration was: {}ms, {} FPS",
+					prev_draw_dts.len(),
+					(max_dt * 1000.0).round() as i32,
+					(1.0 / max_dt).round() as i32
+				);
 			}
 		};
 		self.event_loop.run(move |event, _event_loop, control_flow| {
@@ -179,7 +184,7 @@ impl Application {
 						control_flow,
 						new_control_flow,
 					);
-					#[cfg(feature="benchmark")]
+					#[cfg(feature = "benchmark")]
 					update_draw_dt();
 					// println!("RedrawRequested, set control flow to: {control_flow:?}");
 				}
