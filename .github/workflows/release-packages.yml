@@ -35,10 +35,10 @@ jobs:
       EMULSION_VERSION: ${{ needs.create_release.outputs.version }}
       INSTALLER_NAME: ${{ format('Emulsion-Windows-{0}.exe', needs.create_release.outputs.version) }}
     steps:
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
     - name: Print installer name
       run: |
         Write-Host $Env:INSTALLER_NAME
@@ -49,8 +49,6 @@ jobs:
         scoop install nsis
     - name: Print NSIS version
       run: makensis -VERSION
-    - name: Checkout code
-      uses: actions/checkout@v4
     - name: Fetch Prerequisites
       working-directory: ./distribution/windows/prerequisites
       run: (New-Object System.Net.WebClient).DownloadFile('https://aka.ms/vs/16/release/vc_redist.x64.exe', 'vc_redist.x64.exe')
