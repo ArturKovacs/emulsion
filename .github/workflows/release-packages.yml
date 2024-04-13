@@ -41,12 +41,12 @@ jobs:
       run: |
         echo "Currently PATH is:"
         echo "$env:PATH"
-    - name: Setup MSVC for building
-      uses: ilammy/msvc-dev-cmd@v1 
-    - name: Print PATH
-      run: |
-        echo "Currently PATH is:"
-        echo "$env:PATH"
+    # - name: Setup MSVC for building
+    #   uses: ilammy/msvc-dev-cmd@v1 
+    # - name: Print PATH
+    #   run: |
+    #     echo "Currently PATH is:"
+    #     echo "$env:PATH"
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@stable
     - name: Print PATH
@@ -84,12 +84,28 @@ jobs:
         echo "SYSTEM_DEPS_BUILD_INTERNAL=always" >> $env:GITHUB_ENV
         echo "SYSTEM_DEPS_LINK=static" >> $env:GITHUB_ENV
 
+        # ---------------------------------------------------------
+        # Remove from the PATH the god damn gcc toolchains and
+        # other shit that conflict with building dav1d with msvc
+
+        $pathsToRemove = @("C:\Program Files\Git\bin;", "C:\Program Files\Git\mingw64\bin;", "C:\mingw64\bin;", "C:\Strawberry\c\bin;", "C:\Program Files\LLVM\bin;")
+
+        # Read the content of the file
+        $content = Get-Content $env:GITHUB_PATH
+
+        # Loop through each path to remove
+        foreach ($path in $pathsToRemove) {
+          # Remove lines containing the path (case-insensitive)
+          $content = $content -ireplace [regex]::Escape("$path"), ""
+        }
+        Set-Content -Path $env:GITHUB_PATH -Value $content
+
       # Everything after this step is within the "Developer Command Prompt for Microsoft Visual C++".
       # This is required for dav1d to build correctly, using msvc
     - name: Build the executable
       run: |
+        Get-Command gcc
         cargo build --release --features=networking,avif
-        exit
 
     - name: Copy executable to distributable folder
       working-directory: ./distribution/windows/
