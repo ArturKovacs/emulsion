@@ -59,8 +59,16 @@ jobs:
       run: |
         choco install pkgconfiglite nasm ninja
         python -m pip install meson
+
+        $newPath = "$($env:SystemDrive)\Program Files\NASM\"
+        $currentPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
         
-        Install-ChocolateyPath "$($env:SystemDrive)\Program Files\NASM\" -PathType 'Machine'
+        # Add the new path to the existing PATH
+        $newPath = "$newPath;$currentPath"
+
+        # Set the updated PATH environment variable
+        [Environment]::SetEnvironmentVariable("Path", $newPath, "Machine")
+
         echo "PATH set to: $Env:PATH"
 
         # From: https://docs.rs/system-deps/6.2.2/system_deps/index.html
