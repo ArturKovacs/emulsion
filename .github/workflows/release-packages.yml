@@ -68,11 +68,14 @@ jobs:
 
     - name: Build executable
       run: |
-        echo "SYSTEM_DEPS_LINK is: $SYSTEM_DEPS_LINK"
+        echo "SYSTEM_DEPS_LINK is: $Env:SYSTEM_DEPS_LINK"
 
         cargo build --release --features=networking,avif
-        # echo "------- meson log ----------"
-        # Get-Content -Path target\release\build\dav1d-sys-12b1c54132bc63c1\out\dav1d\build\meson-logs\meson-log.txt
+        echo "------- meson log ----------"
+        Get-Content -Path target\release\build\dav1d-sys-2f728b71249a252c\out\dav1d\build\meson-logs\meson-log.txt
+
+        echo "--------- nasm -v ----------"
+        nasm -v
 
     - name: Copy executable to distributable folder
       working-directory: ./distribution/windows/
