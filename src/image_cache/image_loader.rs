@@ -143,7 +143,8 @@ pub fn simple_load_image(path: &Path, image_format: ImageFormat) -> Result<image
 /// Returns an iterator over the animation frames of a GIF file
 pub fn load_gif(path: &Path, req_id: u32) -> Result<impl Iterator<Item = Result<LoadResult>>> {
 	let file = fs::File::open(path)?;
-	let decoder = GifDecoder::new(file)?;
+	let reader = BufReader::new(file);
+	let decoder = GifDecoder::new(reader)?;
 	Ok(load_animation(req_id, decoder))
 }
 
@@ -192,9 +193,10 @@ where
 		}
 		ImgFormat::Image(ImageFormat::Png) => {
 			let file = fs::File::open(path)?;
-			let decoder = PngDecoder::new(file)?;
-			if decoder.is_apng() {
-				let mut animation = load_animation(req_id, decoder.apng());
+			let reader = BufReader::new(file);
+			let decoder = PngDecoder::new(reader)?;
+			if decoder.is_apng()? {
+				let mut animation = load_animation(req_id, decoder.apng()?);
 				if allow_animation {
 					for frame in animation {
 						process_image(frame?)?;
