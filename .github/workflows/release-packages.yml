@@ -84,6 +84,18 @@ jobs:
         echo "SYSTEM_DEPS_BUILD_INTERNAL=always" >> $env:GITHUB_ENV
         echo "SYSTEM_DEPS_LINK=static" >> $env:GITHUB_ENV
 
+    - name: where gcc 
+      run: |
+        echo $Env:PATH
+        echo $(where gcc)
+
+      # Everything after this step is within the "Developer Command Prompt for Microsoft Visual C++".
+      # This is required for dav1d to build correctly, using msvc
+    - name: Build the executable
+      run: |
+        echo $Env:PATH
+        Get-Command gcc
+        
         # ---------------------------------------------------------
         # Remove from the PATH the god damn gcc toolchains and
         # other shit that conflict with building dav1d with msvc
@@ -98,21 +110,11 @@ jobs:
           # Remove lines containing the path (case-insensitive)
           $content = $content -ireplace [regex]::Escape("$path"), ""
         }
-        Set-Content -Path $env:GITHUB_PATH -Value $content
+        # Set-Content -Path $env:GITHUB_PATH -Value $content
         echo "Wrote the following path"
         echo $content
+        $Env:PATH = $content
 
-    - name: where gcc 
-      run: |
-        echo $Env:PATH
-        echo $(where gcc)
-
-      # Everything after this step is within the "Developer Command Prompt for Microsoft Visual C++".
-      # This is required for dav1d to build correctly, using msvc
-    - name: Build the executable
-      run: |
-        echo $Env:PATH
-        Get-Command gcc
         cargo build --release --features=networking,avif
 
     - name: Copy executable to distributable folder
