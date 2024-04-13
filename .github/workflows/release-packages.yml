@@ -57,10 +57,7 @@ jobs:
 
     - name: Install avif build dependencies (Windows)
       run: |
-        choco install pkgconfiglite
-        python -m pip install meson
-        python -m pip install nasm
-        python -m pip install ninja
+        choco install pkgconfiglite nasm ninja meson
         
         # From: https://docs.rs/system-deps/6.2.2/system_deps/index.html
         echo "SYSTEM_DEPS_BUILD_INTERNAL=always" >> $env:GITHUB_ENV
@@ -72,10 +69,10 @@ jobs:
 
         cargo build --release --features=networking,avif
         echo "------- meson log ----------"
-        Get-Content -Path target\release\build\dav1d-sys-2f728b71249a252c\out\dav1d\build\meson-logs\meson-log.txt
+        # Get-Content -Path target\release\build\dav1d-sys-2f728b71249a252c\out\dav1d\build\meson-logs\meson-log.txt
 
-        echo "--------- nasm -v ----------"
-        nasm -v
+        # echo "--------- nasm -v ----------"
+        # nasm -v
 
     - name: Copy executable to distributable folder
       working-directory: ./distribution/windows/
