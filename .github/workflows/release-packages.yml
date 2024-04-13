@@ -57,7 +57,8 @@ jobs:
 
     - name: Install avif build dependencies (Windows)
       run: |
-        choco install pkgconfiglite nasm ninja meson
+        choco install pkgconfiglite nasm ninja
+        python -m pip install meson
         
         # From: https://docs.rs/system-deps/6.2.2/system_deps/index.html
         echo "SYSTEM_DEPS_BUILD_INTERNAL=always" >> $env:GITHUB_ENV
