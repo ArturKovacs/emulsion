@@ -94,8 +94,8 @@ jobs:
     - name: Build the executable
       run: |
         echo $Env:PATH
-        Get-Command gcc
-        
+        # Get-Command gcc
+
         # ---------------------------------------------------------
         # Remove from the PATH the god damn gcc toolchains and
         # other shit that conflict with building dav1d with msvc
@@ -103,7 +103,7 @@ jobs:
         $pathsToRemove = @("C:\Program Files\Git\bin;", "C:\Program Files\Git\mingw64\bin;", "C:\mingw64\bin;", "C:\Strawberry\c\bin;", "C:\Program Files\LLVM\bin;")
 
         # Read the content of the file
-        $content = Get-Content $env:GITHUB_PATH
+        $content = $Env:PATH
 
         # Loop through each path to remove
         foreach ($path in $pathsToRemove) {
