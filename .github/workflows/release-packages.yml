@@ -108,6 +108,9 @@ jobs:
       run: |
         echo $Env:PATH
         Get-Command gcc
+        Get-Alias gcc
+        Get-Function gcc
+        where gcc
         cargo build --release --features=networking,avif
 
     - name: Copy executable to distributable folder
