@@ -102,15 +102,22 @@ jobs:
         echo "Wrote the following path"
         echo $content
 
+    - name: Get function 
+      run: |
+        echo $Env:PATH
+        echo $(Get-Function gcc)
+
+    - name: where gcc 
+      run: |
+        echo $Env:PATH
+        echo $(where gcc)
+
       # Everything after this step is within the "Developer Command Prompt for Microsoft Visual C++".
       # This is required for dav1d to build correctly, using msvc
     - name: Build the executable
       run: |
         echo $Env:PATH
         Get-Command gcc
-        Get-Alias gcc
-        Get-Function gcc
-        where gcc
         cargo build --release --features=networking,avif
 
     - name: Copy executable to distributable folder
