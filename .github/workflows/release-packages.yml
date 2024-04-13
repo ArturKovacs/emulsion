@@ -37,10 +37,22 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+    - name: Print PATH
+      run: |
+        echo "Currently PATH is:"
+        echo "$env:PATH"
     - name: Setup MSVC for building
       uses: ilammy/msvc-dev-cmd@v1 
+    - name: Print PATH
+      run: |
+        echo "Currently PATH is:"
+        echo "$env:PATH"
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@stable
+    - name: Print PATH
+      run: |
+        echo "Currently PATH is:"
+        echo "$env:PATH"
     - name: Print installer name
       run: |
         Write-Host $Env:INSTALLER_NAME
