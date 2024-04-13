@@ -37,22 +37,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    - name: Print PATH
-      run: |
-        echo "Currently PATH is:"
-        echo "$env:PATH"
-    # - name: Setup MSVC for building
-    #   uses: ilammy/msvc-dev-cmd@v1 
-    # - name: Print PATH
-    #   run: |
-    #     echo "Currently PATH is:"
-    #     echo "$env:PATH"
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@stable
-    - name: Print PATH
-      run: |
-        echo "Currently PATH is:"
-        echo "$env:PATH"
     - name: Print installer name
       run: |
         Write-Host $Env:INSTALLER_NAME
@@ -73,9 +59,8 @@ jobs:
         python -m pip install meson
 
         $newPath = "$($env:SystemDrive)\Program Files\NASM\"
-        $currentPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
-
-        echo "$newPath;$currentPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        $currentPath = $Env:PATH
+        Set-Content -Path $env:GITHUB_PATH -Value "$newPath;$currentPath"
 
         echo "Set the PATH environment variable to:"
         echo "$newPath;$currentPath"
@@ -145,12 +130,10 @@ jobs:
     env:
       INSTALLER_NAME: ${{ format('Emulsion-OSX-{0}.dmg', needs.create_release.outputs.version) }}
     steps:
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
     - name: Install cargo bundle
       run: cargo install cargo-bundle
     - name: Install avif build dependencies (macOS)
@@ -161,8 +144,8 @@ jobs:
         DAV1D_DIR: dav1d_dir
         LIB_PATH: lib
       run: |
-        echo "SYSTEM_DEPS_DAV1D_LINK=static" >> $GITHUB_ENV
-        echo "SYSTEM_DEPS_DAV1D_BUILD_INTERNAL=auto" >> $GITHUB_ENV
+        echo "SYSTEM_DEPS_BUILD_INTERNAL=always" >> $env:GITHUB_ENV
+        echo "SYSTEM_DEPS_LINK=static" >> $env:GITHUB_ENV
 
     - name: Create osx app
       run: cargo bundle --release --features=avif
@@ -189,12 +172,10 @@ jobs:
     env:
       INSTALLER_NAME: ${{ format('Emulsion-Linux.deb-{0}.deb', needs.create_release.outputs.version) }}
     steps:
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
     - name: Install cargo bundle
       run: cargo install cargo-bundle
     - name: Install avif build dependencies (linux)
@@ -206,8 +187,8 @@ jobs:
         DAV1D_DIR: dav1d_dir
         LIB_PATH: lib/x86_64-linux-gnu
       run: |
-        echo "SYSTEM_DEPS_DAV1D_LINK=static" >> $GITHUB_ENV
-        echo "SYSTEM_DEPS_DAV1D_BUILD_INTERNAL=auto" >> $GITHUB_ENV
+        echo "SYSTEM_DEPS_BUILD_INTERNAL=always" >> $env:GITHUB_ENV
+        echo "SYSTEM_DEPS_LINK=static" >> $env:GITHUB_ENV
     - name: Create deb package
       run: cargo bundle --release --features=avif
     - name: Rename .deb
