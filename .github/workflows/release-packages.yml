@@ -102,11 +102,6 @@ jobs:
         echo "Wrote the following path"
         echo $content
 
-    - name: Get function 
-      run: |
-        echo $Env:PATH
-        echo $(Get-Function gcc)
-
     - name: where gcc 
       run: |
         echo $Env:PATH
