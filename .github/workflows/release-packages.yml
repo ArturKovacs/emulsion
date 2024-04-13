@@ -60,6 +60,9 @@ jobs:
         choco install pkgconfiglite nasm ninja
         python -m pip install meson
         
+        Install-ChocolateyPath "$($env:SystemDrive)\Program Files\NASM\" -PathType 'Machine'
+        echo "PATH set to: $Env:PATH"
+
         # From: https://docs.rs/system-deps/6.2.2/system_deps/index.html
         echo "SYSTEM_DEPS_BUILD_INTERNAL=always" >> $env:GITHUB_ENV
         echo "SYSTEM_DEPS_LINK=static" >> $env:GITHUB_ENV
