@@ -73,12 +73,22 @@ jobs:
         echo "SYSTEM_DEPS_LINK=static" >> $env:GITHUB_ENV
 
     - name: Build executable
+      # Everythin in this step is within the "Developer Command Prompt for Microsoft Visual C++".
+      # This is required for dav1d to build correctly, using msvc
+      uses: ilammy/msvc-dev-cmd@v1 
       run: |
-        echo "SYSTEM_DEPS_LINK is: $Env:SYSTEM_DEPS_LINK"
-        echo "PATH is: $Env:PATH"
+        # echo "SYSTEM_DEPS_LINK is: $Env:SYSTEM_DEPS_LINK"
+        # echo "PATH is: $Env:PATH"
+
+        # Execute cmd.exe with given arguments. Below this line every command will be executed within this cmd process (until exit)
+        # Invoke-Expression -Command "$(Join-Path $Env:windir "\System32\cmd.exe") /d /k ""$($env:SystemDrive)\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"""
 
         cargo build --release --features=networking,avif
-        echo "------- meson log ----------"
+
+        # rem "exit the cmd process created above"
+        # exit
+
+        # echo "------- meson log ----------"
         # Get-Content -Path target\release\build\dav1d-sys-2f728b71249a252c\out\dav1d\build\meson-logs\meson-log.txt
 
         # echo "--------- nasm -v ----------"
