@@ -62,14 +62,11 @@ jobs:
 
         $newPath = "$($env:SystemDrive)\Program Files\NASM\"
         $currentPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
-        
-        # Add the new path to the existing PATH
-        $newPath = "$newPath;$currentPath"
 
-        # Set the updated PATH environment variable
-        [Environment]::SetEnvironmentVariable("Path", $newPath, "Machine")
+        echo "$newPath;$currentPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-        echo "PATH set to: $Env:PATH"
+        echo "Set the PATH environment variable to:"
+        echo "$newPath;$currentPath"
 
         # From: https://docs.rs/system-deps/6.2.2/system_deps/index.html
         echo "SYSTEM_DEPS_BUILD_INTERNAL=always" >> $env:GITHUB_ENV
@@ -78,6 +75,7 @@ jobs:
     - name: Build executable
       run: |
         echo "SYSTEM_DEPS_LINK is: $Env:SYSTEM_DEPS_LINK"
+        echo "PATH is: $Env:PATH"
 
         cargo build --release --features=networking,avif
         echo "------- meson log ----------"
