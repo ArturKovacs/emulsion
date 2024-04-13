@@ -72,7 +72,7 @@ jobs:
         echo "SYSTEM_DEPS_BUILD_INTERNAL=always" >> $env:GITHUB_ENV
         echo "SYSTEM_DEPS_LINK=static" >> $env:GITHUB_ENV
 
-    - name: Build executable
+    - name: Build the executable
       # Everythin in this step is within the "Developer Command Prompt for Microsoft Visual C++".
       # This is required for dav1d to build correctly, using msvc
       uses: ilammy/msvc-dev-cmd@v1 
