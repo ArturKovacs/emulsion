@@ -99,11 +99,14 @@ jobs:
           $content = $content -ireplace [regex]::Escape("$path"), ""
         }
         Set-Content -Path $env:GITHUB_PATH -Value $content
+        echo "Wrote the following path"
+        echo $content
 
       # Everything after this step is within the "Developer Command Prompt for Microsoft Visual C++".
       # This is required for dav1d to build correctly, using msvc
     - name: Build the executable
       run: |
+        echo $Env:PATH
         Get-Command gcc
         cargo build --release --features=networking,avif
 
