@@ -50,7 +50,7 @@ jobs:
     - name: Print NSIS version
       run: makensis -VERSION
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
     - name: Fetch Prerequisites
       working-directory: ./distribution/windows/prerequisites
       run: (New-Object System.Net.WebClient).DownloadFile('https://aka.ms/vs/16/release/vc_redist.x64.exe', 'vc_redist.x64.exe')
