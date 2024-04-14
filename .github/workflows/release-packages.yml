@@ -144,8 +144,8 @@ jobs:
         DAV1D_DIR: dav1d_dir
         LIB_PATH: lib
       run: |
-        echo "SYSTEM_DEPS_BUILD_INTERNAL=always" >> $env:GITHUB_ENV
-        echo "SYSTEM_DEPS_LINK=static" >> $env:GITHUB_ENV
+        echo "SYSTEM_DEPS_DAV1D_LINK=static" >> $GITHUB_ENV
+        echo "SYSTEM_DEPS_DAV1D_BUILD_INTERNAL=always" >> $GITHUB_ENV
 
     - name: Create osx app
       run: cargo bundle --release --features=avif
@@ -187,8 +187,8 @@ jobs:
         DAV1D_DIR: dav1d_dir
         LIB_PATH: lib/x86_64-linux-gnu
       run: |
-        echo "SYSTEM_DEPS_BUILD_INTERNAL=always" >> $env:GITHUB_ENV
-        echo "SYSTEM_DEPS_LINK=static" >> $env:GITHUB_ENV
+        echo "SYSTEM_DEPS_DAV1D_LINK=static" >> $GITHUB_ENV
+        echo "SYSTEM_DEPS_DAV1D_BUILD_INTERNAL=always" >> $GITHUB_ENV
     - name: Create deb package
       run: cargo bundle --release --features=avif
     - name: Rename .deb
