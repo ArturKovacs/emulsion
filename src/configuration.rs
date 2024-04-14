@@ -30,17 +30,13 @@ impl Theme {
 	}
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Antialias {
+	#[default]
 	Auto,
 	Always,
 	Never,
-}
-impl Default for Antialias {
-	fn default() -> Self {
-		Antialias::Auto
-	}
 }
 
 #[derive(Debug, Default, Eq, PartialEq, Clone, Serialize, Deserialize)]

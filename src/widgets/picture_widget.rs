@@ -914,11 +914,8 @@ impl Widget for PictureWidget {
 				let mut borrowed = self.data.borrow_mut();
 				match borrowed.hover_state {
 					HoverState::None => {
-						let curr_path = borrowed
-							.playback_manager
-							.shown_file_path()
-							.clone()
-							.unwrap_or_else(PathBuf::new);
+						let curr_path =
+							borrowed.playback_manager.shown_file_path().clone().unwrap_or_default();
 						borrowed.hover_state = HoverState::ItemHovered { prev_path: curr_path };
 					}
 					HoverState::ItemHovered { .. } => {}

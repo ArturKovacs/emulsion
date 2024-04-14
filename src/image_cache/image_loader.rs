@@ -49,9 +49,10 @@ pub enum ImgFormat {
 /// image. This is represented by the value `Deg0`. All other cases must be interpreted as relative
 /// to this. The rotation part is counter-clockwise. When there's a flip it's always interpreted as
 /// if it happened after the rotation.
-#[derive(Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone)]
 pub enum Orientation {
 	/// Exif 1
+	#[default]
 	Deg0,
 
 	/// Exif 2
@@ -74,11 +75,6 @@ pub enum Orientation {
 
 	/// Exif 8
 	Deg90,
-}
-impl Default for Orientation {
-	fn default() -> Self {
-		Orientation::Deg0
-	}
 }
 
 /// Detects the format of an image file. It looks at the first 512 bytes;

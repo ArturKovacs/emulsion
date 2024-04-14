@@ -162,16 +162,12 @@ impl Default for Length {
 		Length::Fixed(256.0)
 	}
 }
-#[derive(Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone)]
 pub enum Alignment {
+	#[default]
 	Start,
 	Center,
 	End,
-}
-impl Default for Alignment {
-	fn default() -> Alignment {
-		Alignment::Start
-	}
 }
 
 #[derive(Default, Debug, Copy, Clone)]
