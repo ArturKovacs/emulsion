@@ -888,7 +888,7 @@ checksum = "a26ae43d7bcc3b814de94796a5e736d4029efb0ee900c12e2d54c993ad1a1e07"
 
 [[package]]
 name = "emulsion"
-version = "10.4.0"
+version = "10.5.0"
 dependencies = [
  "arboard",
  "backtrace",
@@ -1147,7 +1147,7 @@ checksum = "3dcaa9ae7725d12cdb85b3ad99a434db70b468c09ded17e012d86b5c1010f7a7"
 
 [[package]]
 name = "gelatin"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "cgmath",
  "derive_builder",
