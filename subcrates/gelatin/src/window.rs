@@ -1,9 +1,22 @@
 use cgmath::{Matrix4, Vector3};
+use glium::{
+	glutin::{
+		self,
+		context::NotCurrentGlContext,
+		display::{GetGlDisplay, GlDisplay},
+		surface::WindowSurface,
+	},
+	program, uniform, Blend, BlendingFunction, Display, Frame, IndexBuffer, Program, Rect, Surface,
+	VertexBuffer,
+};
 use raw_window_handle::HasRawWindowHandle;
 use winit::{
-	dpi::{PhysicalPosition, PhysicalSize}, event::WindowEvent, event_loop::EventLoop, keyboard::ModifiersState, window::{CursorIcon, Fullscreen, Icon, WindowBuilder, WindowId}
+	dpi::{PhysicalPosition, PhysicalSize},
+	event::WindowEvent,
+	event_loop::EventLoop,
+	keyboard::ModifiersState,
+	window::{CursorIcon, Fullscreen, Icon, WindowBuilder, WindowId},
 };
-use glium::{glutin::{self, context::NotCurrentGlContext, display::{GetGlDisplay, GlDisplay}, surface::WindowSurface}, program, uniform, Blend, BlendingFunction, Display, Frame, IndexBuffer, Program, Rect, Surface, VertexBuffer};
 
 #[cfg(not(any(target_os = "macos", windows)))]
 use winit::platform::x11::WindowBuilderExtX11;
@@ -11,7 +24,14 @@ use winit::platform::x11::WindowBuilderExtX11;
 #[cfg(not(any(target_os = "macos", windows)))]
 use winit::platform::wayland::WindowBuilderExtWayland;
 
-use std::{cell::{Cell, RefCell, RefMut}, cmp::Eq, hash::{Hash, Hasher}, num::NonZeroU32, ops::{Deref, DerefMut}, rc::Rc};
+use std::{
+	cell::{Cell, RefCell, RefMut},
+	cmp::Eq,
+	hash::{Hash, Hasher},
+	num::NonZeroU32,
+	ops::{Deref, DerefMut},
+	rc::Rc,
+};
 
 use cgmath::ortho;
 use derive_builder::Builder;
@@ -66,7 +86,7 @@ impl<'a> DerefMut for WindowDisplayRefMut<'a> {
 }
 
 pub struct WinitWindowRefMut<'a> {
-	window_ref: RefMut<'a, WindowData>
+	window_ref: RefMut<'a, WindowData>,
 }
 impl<'a> Deref for WinitWindowRefMut<'a> {
 	type Target = winit::window::Window;
@@ -156,9 +176,10 @@ impl Window {
 			.with_inner_size(desc.size)
 			.with_window_icon(desc.icon)
 			.with_visible(desc.position.is_none());
-		
+
 		let window_builder = if let Some(app_id) = desc.app_id {
-			let is_wayland = std::env::var("XDG_SESSION_TYPE").map_or(false, |var| var.to_lowercase().contains("wayland"));
+			let is_wayland = std::env::var("XDG_SESSION_TYPE")
+				.map_or(false, |var| var.to_lowercase().contains("wayland"));
 			if is_wayland {
 				WindowBuilderExtWayland::with_name(window_builder, &app_id, app_id.to_lowercase())
 			} else {
@@ -167,7 +188,7 @@ impl Window {
 		} else {
 			window_builder
 		};
-		
+
 		// let window = window.build(&application.event_loop).unwrap();
 		let (window, display) = Self::build_winit_window(window_builder, &application.event_loop);
 
@@ -263,38 +284,51 @@ impl Window {
 		resulting_window
 	}
 
-
 	/// This is mostly copy-pasted from `glutin::SimpleWindowBuilder::build`
 	/// but I use some custom configuration settings here
-	fn build_winit_window(builder: WindowBuilder, event_loop: &EventLoop<()>) -> (winit::window::Window, Display<WindowSurface>) {
+	fn build_winit_window(
+		builder: WindowBuilder,
+		event_loop: &EventLoop<()>,
+	) -> (winit::window::Window, Display<WindowSurface>) {
 		// First we start by opening a new Window
-        let display_builder = glutin_winit::DisplayBuilder::new().with_window_builder(Some(builder));
-        let config_template_builder = glutin::config::ConfigTemplateBuilder::new();
-        let (window, gl_config) = display_builder
-            .build(event_loop, config_template_builder, |mut configs| {
-                // Just use the first configuration since we don't have any special preferences here
-                configs.next().unwrap()
-            })
-            .unwrap();
-        let window = window.unwrap();
+		let display_builder =
+			glutin_winit::DisplayBuilder::new().with_window_builder(Some(builder));
+		let config_template_builder = glutin::config::ConfigTemplateBuilder::new();
+		let (window, gl_config) = display_builder
+			.build(event_loop, config_template_builder, |mut configs| {
+				// Just use the first configuration since we don't have any special preferences here
+				configs.next().unwrap()
+			})
+			.unwrap();
+		let window = window.unwrap();
 
-        // Now we get the window size to use as the initial size of the Surface
-        let (width, height): (u32, u32) = window.inner_size().into();
-        let attrs = glutin::surface::SurfaceAttributesBuilder::<glutin::surface::WindowSurface>::new().build(
-            window.raw_window_handle(),
-            NonZeroU32::new(width).unwrap(),
-            NonZeroU32::new(height).unwrap(),
-        );
+		// Now we get the window size to use as the initial size of the Surface
+		let (width, height): (u32, u32) = window.inner_size().into();
+		let attrs =
+			glutin::surface::SurfaceAttributesBuilder::<glutin::surface::WindowSurface>::new()
+				.build(
+					window.raw_window_handle(),
+					NonZeroU32::new(width).unwrap(),
+					NonZeroU32::new(height).unwrap(),
+				);
 
-        // Finally we can create a Surface, use it to make a PossiblyCurrentContext and create the glium Display
-        let surface = unsafe { gl_config.display().create_window_surface(&gl_config, &attrs).unwrap() };
-        let context_attributes = glutin::context::ContextAttributesBuilder::new().build(Some(window.raw_window_handle()));
-        let current_context = Some(unsafe {
-            gl_config.display().create_context(&gl_config, &context_attributes).expect("failed to create context")
-        }).unwrap().make_current(&surface).unwrap();
-        let display = Display::from_context_surface(current_context, surface).unwrap();
+		// Finally we can create a Surface, use it to make a PossiblyCurrentContext and create the glium Display
+		let surface =
+			unsafe { gl_config.display().create_window_surface(&gl_config, &attrs).unwrap() };
+		let context_attributes = glutin::context::ContextAttributesBuilder::new()
+			.build(Some(window.raw_window_handle()));
+		let current_context = Some(unsafe {
+			gl_config
+				.display()
+				.create_context(&gl_config, &context_attributes)
+				.expect("failed to create context")
+		})
+		.unwrap()
+		.make_current(&surface)
+		.unwrap();
+		let display = Display::from_context_surface(current_context, surface).unwrap();
 
-        (window, display)
+		(window, display)
 	}
 
 	// fn winit_window_handle_to_glutin(handle: winit::raw_window_handle::RawWindowHandle) -> raw_window_handle::RawWindowHandle {
@@ -317,7 +351,7 @@ impl Window {
 	// 		}
 	// 		winit::raw_window_handle::RawWindowHandle::Xlib(handle) => {
 	// 			let mut new_handle = XlibWindowHandle::empty();
-	// 			new_handle.visual_id = 
+	// 			new_handle.visual_id =
 	// 			raw_window_handle::RawWindowHandle::Xlib()
 	// 		}
 	// 		winit::raw_window_handle::RawWindowHandle::Xcb(handle) => {
@@ -562,8 +596,7 @@ impl Window {
 		// Can't change the window during drawing phase. Deal with it.
 		let borrowed = self.data.borrow();
 		let dimensions = target.get_dimensions();
-		let phys_dimensions =
-			PhysicalSize::new(dimensions.0 as f32, dimensions.1 as f32);
+		let phys_dimensions = PhysicalSize::new(dimensions.0 as f32, dimensions.1 as f32);
 		let phys_width = phys_dimensions.width;
 		let phys_height = phys_dimensions.height;
 		let logical_dimensions = LogicalVector::from_physical(phys_dimensions, dpi_scaling as f32);

@@ -1,12 +1,38 @@
-use std::{cell::{Ref, RefCell}, path::PathBuf, rc::{Rc, Weak}, sync::{Arc, Mutex}, time::{Duration, Instant}};
+use std::{
+	cell::{Ref, RefCell},
+	path::PathBuf,
+	rc::{Rc, Weak},
+	sync::{Arc, Mutex},
+	time::{Duration, Instant},
+};
 
-use gelatin::{cgmath::{Matrix4, Vector2, Vector3}, glium::{
-	program, uniform, uniforms::MagnifySamplerFilter, Frame, Program, Surface,
-}, winit::{event::{ElementState, MouseButton}, platform::modifier_supplement::KeyEventExtModifierSupplement}};
+use gelatin::{
+	cgmath::{Matrix4, Vector2, Vector3},
+	glium::{program, uniform, uniforms::MagnifySamplerFilter, Frame, Program, Surface},
+	winit::{
+		event::{ElementState, MouseButton},
+		platform::modifier_supplement::KeyEventExtModifierSupplement,
+	},
+};
 
-use gelatin::{add_common_widget_functions, application::request_exit, misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement}, window::{RenderValidity, Window}, winit::keyboard::ModifiersState, Display, DrawContext, Event, EventKind, NextUpdate, Widget, WidgetData, WidgetError};
+use gelatin::{
+	add_common_widget_functions,
+	application::request_exit,
+	misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement},
+	window::{RenderValidity, Window},
+	winit::keyboard::ModifiersState,
+	Display, DrawContext, Event, EventKind, NextUpdate, Widget, WidgetData, WidgetError,
+};
 
-use crate::{clipboard_handler::ClipboardHandler, configuration::{Antialias, Cache, Configuration}, image_cache::{image_loader::Orientation, AnimationFrameTexture}, input_handling::*, playback_manager::*, shaders, utils::virtual_keycode_to_string};
+use crate::{
+	clipboard_handler::ClipboardHandler,
+	configuration::{Antialias, Cache, Configuration},
+	image_cache::{image_loader::Orientation, AnimationFrameTexture},
+	input_handling::*,
+	playback_manager::*,
+	shaders,
+	utils::virtual_keycode_to_string,
+};
 
 use super::{bottom_bar::BottomBar, copy_notification::CopyNotifications, help_screen::HelpScreen};
 
@@ -809,8 +835,6 @@ impl Widget for PictureWidget {
 				) {
 					borrowed.panning_hor = is_pressed;
 				}
-
-				
 
 				macro_rules! movement_trigger {
 					($input:expr, $vel:expr, $name:expr, $dir:expr) => {

@@ -5,12 +5,21 @@ pub use glium;
 pub use image;
 pub use winit;
 
-use std::{any::Any, error::Error, fmt, ops::Deref, path::PathBuf, rc::Rc, time::Instant, vec::Vec};
+use std::{
+	any::Any, error::Error, fmt, ops::Deref, path::PathBuf, rc::Rc, time::Instant, vec::Vec,
+};
 
-use winit::{event::{ElementState, KeyEvent, MouseButton}, event_loop::ControlFlow, keyboard::ModifiersState};
+use winit::{
+	event::{ElementState, KeyEvent, MouseButton},
+	event_loop::ControlFlow,
+	keyboard::ModifiersState,
+};
 
 use cgmath::{Matrix4, Vector3};
-use glium::{glutin::surface::WindowSurface, implement_vertex, uniform, Blend, BlendingFunction, Frame, IndexBuffer, LinearBlendingFactor, Program, Rect, Surface, VertexBuffer};
+use glium::{
+	glutin::surface::WindowSurface, implement_vertex, uniform, Blend, BlendingFunction, Frame,
+	IndexBuffer, LinearBlendingFactor, Program, Rect, Surface, VertexBuffer,
+};
 
 use misc::*;
 

@@ -1,7 +1,14 @@
-use glium::{backend::Facade, texture::{RawImage2d, SrgbTexture2d}};
+use glium::{
+	backend::Facade,
+	texture::{RawImage2d, SrgbTexture2d},
+};
 use image::{error::ImageError, RgbaImage};
 
-use std::{cell::{Ref, RefCell}, ops::Deref, path};
+use std::{
+	cell::{Ref, RefCell},
+	ops::Deref,
+	path,
+};
 
 pub struct PictureTextureRef<'a> {
 	pic_data: Ref<'a, PictureData>,

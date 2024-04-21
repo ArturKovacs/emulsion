@@ -1,4 +1,13 @@
-use std::{borrow::Cow, collections::BTreeMap, ffi::{OsStr, OsString}, fs, mem, path::{Path, PathBuf}, rc::Rc, sync::atomic::Ordering, time::SystemTime};
+use std::{
+	borrow::Cow,
+	collections::BTreeMap,
+	ffi::{OsStr, OsString},
+	fs, mem,
+	path::{Path, PathBuf},
+	rc::Rc,
+	sync::atomic::Ordering,
+	time::SystemTime,
+};
 
 use log::trace;
 

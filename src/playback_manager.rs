@@ -10,8 +10,8 @@ use rand::thread_rng;
 
 use log::{debug, trace};
 
-use gelatin::Display;
 use gelatin::window::Window;
+use gelatin::Display;
 
 use crate::image_cache::{self, AnimationFrameTexture, ImageCache};
 

@@ -1,6 +1,14 @@
-use std::{collections::hash_map::HashMap, rc::Rc, sync::atomic::{AtomicBool, Ordering}};
+use std::{
+	collections::hash_map::HashMap,
+	rc::Rc,
+	sync::atomic::{AtomicBool, Ordering},
+};
 
-use winit::{event::{Event, WindowEvent}, event_loop::{ControlFlow, EventLoop}, window::WindowId};
+use winit::{
+	event::{Event, WindowEvent},
+	event_loop::{ControlFlow, EventLoop},
+	window::WindowId,
+};
 
 use crate::{window::Window, NextUpdate};
 
@@ -114,90 +122,92 @@ impl Application {
 				);
 			}
 		};
-		self.event_loop.run(move |event, event_loop| {
-			let mut control_flow = event_loop.control_flow();
-			for handler in global_handlers.iter_mut() {
-				aggregate_control_flow(&mut control_flow, handler(&event).into());
-			}
-			match event {
-				Event::WindowEvent { event, window_id } => {
-					if let WindowEvent::RedrawRequested = event {
-						let new_control_flow = windows.get(&window_id).unwrap().redraw().into();
-						update_control_flow(
-							&mut control_flow_source,
-							window_id,
-							&mut control_flow,
-							new_control_flow,
-						);
-						#[cfg(feature = "benchmark")]
-						update_draw_dt();
-					}
-					if let WindowEvent::CloseRequested = event {
-						// This actually wouldn't be okay for a general pupose ui toolkit,
-						// but gelatin is specifically made for emulsion so this is fine hehe
-						request_exit();
-					}
-					let destroyed;
-					if let WindowEvent::Destroyed = event {
-						destroyed = true;
-					} else {
-						destroyed = false;
-					}
-					windows.get(&window_id).unwrap().process_event(event);
-					if destroyed {
-						windows.remove(&window_id);
-					}
+		self.event_loop
+			.run(move |event, event_loop| {
+				let mut control_flow = event_loop.control_flow();
+				for handler in global_handlers.iter_mut() {
+					aggregate_control_flow(&mut control_flow, handler(&event).into());
 				}
-				Event::AboutToWait => {
-					if !EXIT_REQUESTED.load(Ordering::Relaxed) {
-						let mut should_sleep = !matches!(&mut control_flow, ControlFlow::Poll);
-						for (window_id, window) in windows.iter() {
-							let new_control_flow = window.main_events_cleared().into();
+				match event {
+					Event::WindowEvent { event, window_id } => {
+						if let WindowEvent::RedrawRequested = event {
+							let new_control_flow = windows.get(&window_id).unwrap().redraw().into();
 							update_control_flow(
 								&mut control_flow_source,
-								*window_id,
+								window_id,
 								&mut control_flow,
 								new_control_flow,
 							);
-							should_sleep = should_sleep && window.should_sleep();
-							if window.redraw_needed() {
-								window.request_redraw();
+							#[cfg(feature = "benchmark")]
+							update_draw_dt();
+						}
+						if let WindowEvent::CloseRequested = event {
+							// This actually wouldn't be okay for a general pupose ui toolkit,
+							// but gelatin is specifically made for emulsion so this is fine hehe
+							request_exit();
+						}
+						let destroyed;
+						if let WindowEvent::Destroyed = event {
+							destroyed = true;
+						} else {
+							destroyed = false;
+						}
+						windows.get(&window_id).unwrap().process_event(event);
+						if destroyed {
+							windows.remove(&window_id);
+						}
+					}
+					Event::AboutToWait => {
+						if !EXIT_REQUESTED.load(Ordering::Relaxed) {
+							let mut should_sleep = !matches!(&mut control_flow, ControlFlow::Poll);
+							for (window_id, window) in windows.iter() {
+								let new_control_flow = window.main_events_cleared().into();
+								update_control_flow(
+									&mut control_flow_source,
+									*window_id,
+									&mut control_flow,
+									new_control_flow,
+								);
+								should_sleep = should_sleep && window.should_sleep();
+								if window.redraw_needed() {
+									window.request_redraw();
+								}
 							}
+							// println!("MainEventsCleared, set control flow to: {control_flow:?}");
+							if should_sleep && !matches!(control_flow, ControlFlow::WaitUntil(_)) {
+								// println!("! Should sleep was true, setting control flow to WAIT UNTIL");
+								let now = std::time::Instant::now();
+								control_flow = ControlFlow::WaitUntil(now + MAX_SLEEP_DURATION);
+							}
+						} else {
+							event_loop.exit()
 						}
-						// println!("MainEventsCleared, set control flow to: {control_flow:?}");
-						if should_sleep && !matches!(control_flow, ControlFlow::WaitUntil(_)) {
-							// println!("! Should sleep was true, setting control flow to WAIT UNTIL");
-							let now = std::time::Instant::now();
-							control_flow = ControlFlow::WaitUntil(now + MAX_SLEEP_DURATION);
-						}
-					} else {
-						event_loop.exit()
+					}
+					_ => {
+						// println!("! Unknown event, setting control flow to WAIT");
+						// *control_flow = ControlFlow::Wait;
 					}
 				}
-				_ => {
-					// println!("! Unknown event, setting control flow to WAIT");
-					// *control_flow = ControlFlow::Wait;
+				if event_loop.exiting() {
+					if let Some(at_exit) = at_exit.take() {
+						at_exit();
+					}
+					// Drop 'em all!
+					//windows.clear();
 				}
-			}
-			if event_loop.exiting() {
-				if let Some(at_exit) = at_exit.take() {
-					at_exit();
+
+				#[cfg(all(unix, not(target_os = "macos")))]
+				if matches!(control_flow, ControlFlow::Poll) {
+					// This is an ugly workaround for the X server completely freezing
+					// sometimes.
+					// See: https://github.com/ArturKovacs/emulsion/issues/172
+					let now = std::time::Instant::now();
+					control_flow = ControlFlow::WaitUntil(now + MAX_SLEEP_DURATION);
 				}
-				// Drop 'em all!
-				//windows.clear();
-			}
 
-			#[cfg(all(unix, not(target_os = "macos")))]
-			if matches!(control_flow, ControlFlow::Poll) {
-				// This is an ugly workaround for the X server completely freezing
-				// sometimes.
-				// See: https://github.com/ArturKovacs/emulsion/issues/172
-				let now = std::time::Instant::now();
-				control_flow = ControlFlow::WaitUntil(now + MAX_SLEEP_DURATION);
-			}
-
-			event_loop.set_control_flow(control_flow);
-		}).unwrap();
+				event_loop.set_control_flow(control_flow);
+			})
+			.unwrap();
 	}
 }
 
