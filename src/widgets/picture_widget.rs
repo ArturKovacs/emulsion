@@ -806,6 +806,7 @@ impl Widget for PictureWidget {
 				let is_pressed = input.state == ElementState::Pressed;
 				//println!("Got input for {:?}", key);
 				let input_key_str = virtual_keycode_to_string(&key).to_lowercase();
+				let input_key_str = char_to_input_key(&input_key_str);
 				if is_pressed {
 					self.handle_key_input(input_key_str.as_str(), event.modifiers);
 				}

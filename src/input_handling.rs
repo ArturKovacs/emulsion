@@ -53,16 +53,16 @@ lazy_static! {
 	};
 }
 
-pub fn char_to_input_key(ch: char) -> String {
+pub fn char_to_input_key(ch: &str) -> String {
 	let mut input_key = String::with_capacity(8);
-	if ch == ' ' {
+	if ch == " " {
 		input_key.push_str("space");
-	} else if ch == '+' {
+	} else if ch == "+" {
 		input_key.push_str("add");
-	} else if ch == '-' {
+	} else if ch == "-" {
 		input_key.push_str("subtract");
 	} else {
-		input_key.push(ch);
+		input_key.push_str(ch);
 	}
 	input_key
 }

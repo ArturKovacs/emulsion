@@ -2,7 +2,8 @@ use cgmath::{Matrix4, Vector3};
 use glium::{
 	glutin::{
 		self,
-		context::NotCurrentGlContext,
+		config::{Api, ConfigSurfaceTypes, GlConfig},
+		context::{ContextApi, GlProfile, NotCurrentGlContext, Version},
 		display::{GetGlDisplay, GlDisplay},
 		surface::WindowSurface,
 	},
@@ -293,11 +294,21 @@ impl Window {
 		// First we start by opening a new Window
 		let display_builder =
 			glutin_winit::DisplayBuilder::new().with_window_builder(Some(builder));
-		let config_template_builder = glutin::config::ConfigTemplateBuilder::new();
+		let config_template_builder = glutin::config::ConfigTemplateBuilder::new()
+			.prefer_hardware_accelerated(Some(true))
+			.with_surface_type(ConfigSurfaceTypes::WINDOW)
+			.with_api(Api::OPENGL);
 		let (window, gl_config) = display_builder
 			.build(event_loop, config_template_builder, |mut configs| {
-				// Just use the first configuration since we don't have any special preferences here
-				configs.next().unwrap()
+				// Pick the first srgb capable config
+				let mut target = configs.next().unwrap();
+				for cfg in configs {
+					if target.srgb_capable() {
+						break;
+					}
+					target = cfg;
+				}
+				return target;
 			})
 			.unwrap();
 		let window = window.unwrap();
@@ -306,6 +317,7 @@ impl Window {
 		let (width, height): (u32, u32) = window.inner_size().into();
 		let attrs =
 			glutin::surface::SurfaceAttributesBuilder::<glutin::surface::WindowSurface>::new()
+				.with_srgb(Some(true))
 				.build(
 					window.raw_window_handle(),
 					NonZeroU32::new(width).unwrap(),
@@ -316,6 +328,9 @@ impl Window {
 		let surface =
 			unsafe { gl_config.display().create_window_surface(&gl_config, &attrs).unwrap() };
 		let context_attributes = glutin::context::ContextAttributesBuilder::new()
+			.with_profile(GlProfile::Core)
+			.with_context_api(ContextApi::OpenGl(Some(Version::new(3, 2))))
+			.with_release_behavior(glutin::context::ReleaseBehavior::None)
 			.build(Some(window.raw_window_handle()));
 		let current_context = Some(unsafe {
 			gl_config
