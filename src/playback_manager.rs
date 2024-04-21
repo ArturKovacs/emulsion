@@ -10,7 +10,7 @@ use rand::thread_rng;
 
 use log::{debug, trace};
 
-use gelatin::glium::Display;
+use gelatin::Display;
 use gelatin::window::Window;
 
 use crate::image_cache::{self, AnimationFrameTexture, ImageCache};

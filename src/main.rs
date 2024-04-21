@@ -16,7 +16,7 @@ use lazy_static::lazy_static;
 
 use log::trace;
 
-use gelatin::glium::glutin::{
+use gelatin::winit::{
 	dpi::{PhysicalPosition, PhysicalSize},
 	event::WindowEvent,
 	window::Icon,
@@ -131,7 +131,7 @@ fn main() {
 		let window = Window::new(&mut application, window_desc);
 		// This is just to fix the bug on Linux that the window doesn't start up at
 		// the specified position when the position is specified during initialization
-		window.display_mut().gl_window().window().set_outer_position(pos);
+		window.window_mut().set_outer_position(pos);
 
 		if let Some(ConfigWindowSection { start_maximized: Some(true), .. }) = window_cfg {
 			window.set_maximized(true);

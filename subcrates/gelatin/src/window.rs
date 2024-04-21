@@ -1,23 +1,17 @@
 use cgmath::{Matrix4, Vector3};
-use glium::glutin::window::Icon;
-use glium::glutin::{
-	self,
-	dpi::{PhysicalPosition, PhysicalSize},
-	event::WindowEvent,
-	window::{CursorIcon, WindowId},
+use raw_window_handle::HasRawWindowHandle;
+use winit::{
+	dpi::{PhysicalPosition, PhysicalSize}, event::WindowEvent, event_loop::EventLoop, keyboard::ModifiersState, window::{CursorIcon, Fullscreen, Icon, WindowBuilder, WindowId}
 };
-use glium::{program, uniform, Display, Frame, IndexBuffer, Program, Rect, Surface, VertexBuffer};
-use glium::{Blend, BlendingFunction};
+use glium::{glutin::{self, context::NotCurrentGlContext, display::{GetGlDisplay, GlDisplay}, surface::WindowSurface}, program, uniform, Blend, BlendingFunction, Display, Frame, IndexBuffer, Program, Rect, Surface, VertexBuffer};
 
 #[cfg(not(any(target_os = "macos", windows)))]
-use winit::platform::unix::WindowBuilderExtUnix;
+use winit::platform::x11::WindowBuilderExtX11;
 
-use std::cell::Cell;
-use std::cell::{RefCell, RefMut};
-use std::cmp::Eq;
-use std::hash::{Hash, Hasher};
-use std::ops::{Deref, DerefMut};
-use std::rc::Rc;
+#[cfg(not(any(target_os = "macos", windows)))]
+use winit::platform::wayland::WindowBuilderExtWayland;
+
+use std::{cell::{Cell, RefCell, RefMut}, cmp::Eq, hash::{Hash, Hasher}, num::NonZeroU32, ops::{Deref, DerefMut}, rc::Rc};
 
 use cgmath::ortho;
 use derive_builder::Builder;
@@ -60,7 +54,7 @@ pub struct WindowDisplayRefMut<'a> {
 	window_ref: RefMut<'a, WindowData>,
 }
 impl<'a> Deref for WindowDisplayRefMut<'a> {
-	type Target = Display;
+	type Target = Display<WindowSurface>;
 	fn deref(&self) -> &Self::Target {
 		&self.window_ref.display
 	}
@@ -68,6 +62,21 @@ impl<'a> Deref for WindowDisplayRefMut<'a> {
 impl<'a> DerefMut for WindowDisplayRefMut<'a> {
 	fn deref_mut(&mut self) -> &mut Self::Target {
 		&mut self.window_ref.display
+	}
+}
+
+pub struct WinitWindowRefMut<'a> {
+	window_ref: RefMut<'a, WindowData>
+}
+impl<'a> Deref for WinitWindowRefMut<'a> {
+	type Target = winit::window::Window;
+	fn deref(&self) -> &Self::Target {
+		&self.window_ref.window
+	}
+}
+impl<'a> DerefMut for WinitWindowRefMut<'a> {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.window_ref.window
 	}
 }
 
@@ -93,7 +102,9 @@ pub struct WindowDescriptor {
 pub type EventHandler = dyn FnMut(&WindowEvent);
 
 struct WindowData {
-	display: glium::Display,
+	display: glium::Display<WindowSurface>,
+	window: winit::window::Window,
+
 	size_before_fullscreen: PhysicalSize<u32>,
 	fullscreen: bool,
 	last_mouse_move_update_time: std::time::Instant,
@@ -105,7 +116,7 @@ struct WindowData {
 
 	render_validity: RenderValidity,
 	cursor_pos: LogicalVector,
-	modifiers: glutin::event::ModifiersState,
+	modifiers: ModifiersState,
 	root_widget: Rc<dyn Widget>,
 	bg_color: [f32; 4],
 
@@ -139,26 +150,33 @@ impl Window {
 		//use glium::glutin::window::Icon;
 		//let exe_parent = std::env::current_exe().unwrap().parent().unwrap().to_owned();
 
-		let window = glutin::window::WindowBuilder::new()
+		let window_builder = WindowBuilder::new()
 			.with_title("Loading")
 			.with_fullscreen(None)
 			.with_inner_size(desc.size)
 			.with_window_icon(desc.icon)
 			.with_visible(desc.position.is_none());
-
-		#[cfg(not(any(target_os = "macos", windows)))]
-		let window = if let Some(app_id) = desc.app_id { window.with_app_id(app_id) } else { window };
-
-		let context =
-			glutin::ContextBuilder::new().with_gl_profile(glutin::GlProfile::Core).with_vsync(true);
-		let display = glium::Display::new(window, context, &application.event_loop).unwrap();
+		
+		let window_builder = if let Some(app_id) = desc.app_id {
+			let is_wayland = std::env::var("XDG_SESSION_TYPE").map_or(false, |var| var.to_lowercase().contains("wayland"));
+			if is_wayland {
+				WindowBuilderExtWayland::with_name(window_builder, &app_id, app_id.to_lowercase())
+			} else {
+				WindowBuilderExtX11::with_name(window_builder, &app_id, app_id.to_lowercase())
+			}
+		} else {
+			window_builder
+		};
+		
+		// let window = window.build(&application.event_loop).unwrap();
+		let (window, display) = Self::build_winit_window(window_builder, &application.event_loop);
 
 		if let Some(pos) = desc.position {
-			display.gl_window().window().set_outer_position(pos);
-			display.gl_window().window().set_visible(true);
+			window.set_outer_position(pos);
+			window.set_visible(true);
 		}
 
-		display.gl_window().window().set_cursor_icon(CursorIcon::Default);
+		window.set_cursor_icon(CursorIcon::Default);
 
 		// All the draw stuff
 		use glium::index::PrimitiveType;
@@ -217,6 +235,7 @@ impl Window {
 		let resulting_window = Rc::new(Window {
 			data: RefCell::new(WindowData {
 				display,
+				window,
 				size_before_fullscreen: desc.size,
 				fullscreen: false,
 				last_mouse_move_update_time: std::time::Instant::now(),
@@ -225,7 +244,7 @@ impl Window {
 				should_sleep: false,
 				new_title: None,
 				cursor_pos: Default::default(),
-				modifiers: glutin::event::ModifiersState::empty(),
+				modifiers: ModifiersState::empty(),
 				render_validity: RenderValidity { validity: Rc::new(Cell::new(false)) },
 				root_widget: Rc::new(crate::line_layout_container::VerticalLayoutContainer::new()),
 				bg_color: [0.85, 0.85, 0.85, 1.0],
@@ -243,6 +262,100 @@ impl Window {
 		application.register_window(resulting_window.clone());
 		resulting_window
 	}
+
+
+	/// This is mostly copy-pasted from `glutin::SimpleWindowBuilder::build`
+	/// but I use some custom configuration settings here
+	fn build_winit_window(builder: WindowBuilder, event_loop: &EventLoop<()>) -> (winit::window::Window, Display<WindowSurface>) {
+		// First we start by opening a new Window
+        let display_builder = glutin_winit::DisplayBuilder::new().with_window_builder(Some(builder));
+        let config_template_builder = glutin::config::ConfigTemplateBuilder::new();
+        let (window, gl_config) = display_builder
+            .build(event_loop, config_template_builder, |mut configs| {
+                // Just use the first configuration since we don't have any special preferences here
+                configs.next().unwrap()
+            })
+            .unwrap();
+        let window = window.unwrap();
+
+        // Now we get the window size to use as the initial size of the Surface
+        let (width, height): (u32, u32) = window.inner_size().into();
+        let attrs = glutin::surface::SurfaceAttributesBuilder::<glutin::surface::WindowSurface>::new().build(
+            window.raw_window_handle(),
+            NonZeroU32::new(width).unwrap(),
+            NonZeroU32::new(height).unwrap(),
+        );
+
+        // Finally we can create a Surface, use it to make a PossiblyCurrentContext and create the glium Display
+        let surface = unsafe { gl_config.display().create_window_surface(&gl_config, &attrs).unwrap() };
+        let context_attributes = glutin::context::ContextAttributesBuilder::new().build(Some(window.raw_window_handle()));
+        let current_context = Some(unsafe {
+            gl_config.display().create_context(&gl_config, &context_attributes).expect("failed to create context")
+        }).unwrap().make_current(&surface).unwrap();
+        let display = Display::from_context_surface(current_context, surface).unwrap();
+
+        (window, display)
+	}
+
+	// fn winit_window_handle_to_glutin(handle: winit::raw_window_handle::RawWindowHandle) -> raw_window_handle::RawWindowHandle {
+	// 	match handle {
+	// 		winit::raw_window_handle::RawWindowHandle::UiKit(handle) => {
+	// 			let mut new_handle = UiKitWindowHandle::empty();
+	// 			new_handle.ui_window = null_mut();
+	// 			new_handle.ui_view = handle.ui_view.as_ptr();
+	// 			new_handle.ui_view_controller = handle.ui_view_controller.map_or(null_mut(), |p| p.as_ptr());
+	// 			raw_window_handle::RawWindowHandle::UiKit(new_handle)
+	// 		}
+	// 		winit::raw_window_handle::RawWindowHandle::AppKit(handle) => {
+	// 			let mut new_handle = AppKitWindowHandle::empty();
+	// 			new_handle.ns_view = handle.ns_view.as_ptr();
+	// 			new_handle.ns_window = null_mut();
+	// 			raw_window_handle::RawWindowHandle::AppKit(new_handle)
+	// 		}
+	// 		winit::raw_window_handle::RawWindowHandle::Orbital(handle) => {
+	// 			todo!()
+	// 		}
+	// 		winit::raw_window_handle::RawWindowHandle::Xlib(handle) => {
+	// 			let mut new_handle = XlibWindowHandle::empty();
+	// 			new_handle.visual_id = 
+	// 			raw_window_handle::RawWindowHandle::Xlib()
+	// 		}
+	// 		winit::raw_window_handle::RawWindowHandle::Xcb(handle) => {
+	// 			raw_window_handle::RawWindowHandle::Xcb(handle)
+	// 		}
+	// 		winit::raw_window_handle::RawWindowHandle::Wayland(handle) => {
+	// 			raw_window_handle::RawWindowHandle::Wayland(handle)
+	// 		}
+	// 		winit::raw_window_handle::RawWindowHandle::Drm(handle) => {
+	// 			raw_window_handle::RawWindowHandle::Drm(handle)
+	// 		}
+	// 		winit::raw_window_handle::RawWindowHandle::Gbm(handle) => {
+	// 			raw_window_handle::RawWindowHandle::Gbm(handle)
+	// 		}
+	// 		winit::raw_window_handle::RawWindowHandle::Win32(handle) => {
+	// 			raw_window_handle::RawWindowHandle::Win32(handle)
+	// 		}
+	// 		winit::raw_window_handle::RawWindowHandle::WinRt(handle) => {
+	// 			raw_window_handle::RawWindowHandle::WinRt(handle)
+	// 		}
+	// 		winit::raw_window_handle::RawWindowHandle::Web(handle) => {
+	// 			todo!()
+	// 		}
+	// 		winit::raw_window_handle::RawWindowHandle::WebCanvas(handle) => {
+	// 			todo!()
+	// 		}
+	// 		winit::raw_window_handle::RawWindowHandle::WebOffscreenCanvas(handle) => {
+	// 			todo!()
+	// 		}
+	// 		winit::raw_window_handle::RawWindowHandle::AndroidNdk(handle) => {
+	// 			todo!()
+	// 		}
+	// 		winit::raw_window_handle::RawWindowHandle::Haiku(handle) => {
+	// 			todo!()
+	// 		}
+	// 		_ => todo!(),
+	// 	}
+	// }
 
 	pub fn add_global_event_handler<F: FnMut(&WindowEvent) + 'static>(&self, fun: F) {
 		let mut borrowed = self.data.borrow_mut();
@@ -262,7 +375,7 @@ impl Window {
 	}
 
 	pub fn process_event(&self, native_event: WindowEvent) {
-		use glutin::event::MouseScrollDelta;
+		use winit::event::MouseScrollDelta;
 
 		let event;
 		{
@@ -271,6 +384,14 @@ impl Window {
 				handler(&native_event);
 			}
 			match native_event {
+				WindowEvent::Resized(size) => {
+					event = None;
+					if size.width < 1 || size.height < 1 {
+						return;
+					}
+					borrowed.display.resize((size.width, size.height));
+					borrowed.window.request_redraw();
+				}
 				WindowEvent::CloseRequested => {
 					event = Some(Event {
 						cursor_pos: borrowed.cursor_pos,
@@ -278,27 +399,17 @@ impl Window {
 						kind: EventKind::CloseRequested,
 					});
 				}
-				WindowEvent::KeyboardInput { input, .. } => {
+				WindowEvent::KeyboardInput { event: key_event, .. } => {
 					event = Some(Event {
 						cursor_pos: borrowed.cursor_pos,
 						modifiers: borrowed.modifiers,
-						kind: EventKind::KeyInput { input },
-					});
-				}
-				WindowEvent::ReceivedCharacter(ch) => {
-					event = Some(Event {
-						cursor_pos: borrowed.cursor_pos,
-						modifiers: borrowed.modifiers,
-						kind: EventKind::ReceivedCharacter(ch),
+						kind: EventKind::KeyInput { input: key_event },
 					});
 				}
 				WindowEvent::CursorMoved { position, .. } => {
 					let logical_pos;
 					{
-						let gl_window = borrowed.display.gl_window();
-						let window = gl_window.window();
-
-						let scaling = window.scale_factor() as f32;
+						let scaling = borrowed.window.scale_factor() as f32;
 
 						logical_pos = LogicalVector::from_physical(position, scaling);
 						//logical_pos.vec.y = logical_dimensions.vec.y - logical_pos.vec.y;
@@ -368,7 +479,7 @@ impl Window {
 					});
 				}
 				WindowEvent::ModifiersChanged(modifiers) => {
-					borrowed.modifiers = modifiers;
+					borrowed.modifiers = modifiers.state();
 					event = None;
 				}
 				_ => event = None,
@@ -407,12 +518,16 @@ impl Window {
 		WindowDisplayRefMut { window_ref: self.data.borrow_mut() }
 	}
 
+	pub fn window_mut(&self) -> WinitWindowRefMut<'_> {
+		WinitWindowRefMut { window_ref: self.data.borrow_mut() }
+	}
+
 	pub fn get_id(&self) -> WindowId {
-		self.data.borrow().display.gl_window().window().id()
+		self.data.borrow().window.id()
 	}
 
 	pub fn request_redraw(&self) {
-		self.data.borrow_mut().display.gl_window().window().request_redraw();
+		self.data.borrow_mut().window.request_redraw();
 	}
 
 	pub fn main_events_cleared(&self) -> NextUpdate {
@@ -436,19 +551,19 @@ impl Window {
 		{
 			let mut borrowed = self.data.borrow_mut();
 			if let Some(new_title) = borrowed.new_title.take() {
-				borrowed.display.gl_window().window().set_title(&new_title);
+				borrowed.window.set_title(&new_title);
 			}
 			borrowed.last_event_invalidated = false;
 		}
 		// this way self.data is not borrowed while before draw is running.
-		let dpi_scaling = self.data.borrow().display.gl_window().window().scale_factor();
+		let dpi_scaling = self.data.borrow().window.scale_factor();
 		let mut target = self.data.borrow().display.draw();
 
 		// Can't change the window during drawing phase. Deal with it.
 		let borrowed = self.data.borrow();
 		let dimensions = target.get_dimensions();
 		let phys_dimensions =
-			glutin::dpi::PhysicalSize::new(dimensions.0 as f32, dimensions.1 as f32);
+			PhysicalSize::new(dimensions.0 as f32, dimensions.1 as f32);
 		let phys_width = phys_dimensions.width;
 		let phys_height = phys_dimensions.height;
 		let logical_dimensions = LogicalVector::from_physical(phys_dimensions, dpi_scaling as f32);
@@ -514,20 +629,18 @@ impl Window {
 		let monitor = if fullscreen {
 			let curr_mon;
 			borrowed.size_before_fullscreen = {
-				let gl_win = borrowed.display.gl_window();
-				curr_mon = gl_win.window().current_monitor();
-				gl_win.window().inner_size()
+				curr_mon = borrowed.window.current_monitor();
+				borrowed.window.inner_size()
 			};
-			Some(glutin::window::Fullscreen::Borderless(curr_mon))
+			Some(Fullscreen::Borderless(curr_mon))
 		} else {
 			None
 		};
-		let gl_win = borrowed.display.gl_window();
-		gl_win.window().set_fullscreen(monitor);
+		borrowed.window.set_fullscreen(monitor);
 	}
 
 	pub fn set_maximized(&self, maximized: bool) {
-		self.display_mut().gl_window().window().set_maximized(maximized);
+		self.data.borrow_mut().window.set_maximized(maximized);
 	}
 
 	/// Sets the alpha values by drawing a quad covering the entire framebuffer

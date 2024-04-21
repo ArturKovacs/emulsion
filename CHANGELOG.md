@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Changed
+
+- **Breaking**: The name of some keys (used for key bindings) have changed. For example `Return` has changed to `Enter`. As of writing this, a list of all supported key names can be found in the `virtual_keycode_to_string` function in the source code.
+
 ## 10.3 on 2022-10-23
 
 No change is made to emulsion, this release is only made to fix errors

@@ -1,16 +1,8 @@
-use std::collections::hash_map::HashMap;
-use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::{collections::hash_map::HashMap, rc::Rc, sync::atomic::{AtomicBool, Ordering}};
 
-use glium::glutin::{
-	self,
-	event::{Event, WindowEvent},
-	event_loop::ControlFlow,
-	window::WindowId,
-};
+use winit::{event::{Event, WindowEvent}, event_loop::{ControlFlow, EventLoop}, window::WindowId};
 
-use crate::window::Window;
-use crate::NextUpdate;
+use crate::{window::Window, NextUpdate};
 
 const MAX_SLEEP_DURATION: std::time::Duration = std::time::Duration::from_millis(4);
 static EXIT_REQUESTED: AtomicBool = AtomicBool::new(false);
@@ -21,11 +13,8 @@ pub fn request_exit() {
 
 /// Returns true if original was replaced by new
 fn aggregate_control_flow(original: &mut ControlFlow, new: ControlFlow) -> bool {
-	if *original == ControlFlow::Exit {
-		return false;
-	}
 	match new {
-		ControlFlow::Exit | ControlFlow::Poll => {
+		ControlFlow::Poll => {
 			*original = new;
 			return true;
 		}
@@ -55,9 +44,7 @@ fn update_control_flow(
 ) {
 	if *prev_control_flow_source == new_control_flow_source {
 		*control_flow = new_control_flow;
-	} else if *control_flow != ControlFlow::Exit
-		&& aggregate_control_flow(control_flow, new_control_flow)
-	{
+	} else if aggregate_control_flow(control_flow, new_control_flow) {
 		*prev_control_flow_source = new_control_flow_source;
 	}
 }
@@ -65,7 +52,7 @@ fn update_control_flow(
 pub type EventHandler = dyn FnMut(&Event<()>) -> NextUpdate;
 
 pub struct Application {
-	pub event_loop: glutin::event_loop::EventLoop<()>,
+	pub event_loop: EventLoop<()>,
 	windows: HashMap<WindowId, Rc<Window>>,
 	global_handlers: Vec<Box<EventHandler>>,
 	at_exit: Option<Box<dyn FnOnce()>>,
@@ -74,7 +61,7 @@ pub struct Application {
 impl Application {
 	pub fn new() -> Application {
 		Application {
-			event_loop: glutin::event_loop::EventLoop::<()>::new(),
+			event_loop: EventLoop::<()>::new().unwrap(),
 			windows: HashMap::new(),
 			global_handlers: Vec::new(),
 			at_exit: None,
@@ -99,7 +86,7 @@ impl Application {
 		self.global_handlers.push(Box::new(fun));
 	}
 
-	pub fn start_event_loop(self) -> ! {
+	pub fn start_event_loop(self) {
 		let mut windows = self.windows;
 		let mut at_exit = self.at_exit;
 		let mut global_handlers = self.global_handlers;
@@ -127,14 +114,23 @@ impl Application {
 				);
 			}
 		};
-		self.event_loop.run(move |event, _event_loop, control_flow| {
+		self.event_loop.run(move |event, event_loop| {
+			let mut control_flow = event_loop.control_flow();
 			for handler in global_handlers.iter_mut() {
-				aggregate_control_flow(control_flow, handler(&event).into());
+				aggregate_control_flow(&mut control_flow, handler(&event).into());
 			}
 			match event {
 				Event::WindowEvent { event, window_id } => {
-					if let WindowEvent::Resized { .. } = event {
-						windows.get(&window_id).unwrap().request_redraw();
+					if let WindowEvent::RedrawRequested = event {
+						let new_control_flow = windows.get(&window_id).unwrap().redraw().into();
+						update_control_flow(
+							&mut control_flow_source,
+							window_id,
+							&mut control_flow,
+							new_control_flow,
+						);
+						#[cfg(feature = "benchmark")]
+						update_draw_dt();
 					}
 					if let WindowEvent::CloseRequested = event {
 						// This actually wouldn't be okay for a general pupose ui toolkit,
@@ -152,15 +148,15 @@ impl Application {
 						windows.remove(&window_id);
 					}
 				}
-				Event::MainEventsCleared => {
+				Event::AboutToWait => {
 					if !EXIT_REQUESTED.load(Ordering::Relaxed) {
-						let mut should_sleep = !matches!(control_flow, ControlFlow::Poll);
+						let mut should_sleep = !matches!(&mut control_flow, ControlFlow::Poll);
 						for (window_id, window) in windows.iter() {
 							let new_control_flow = window.main_events_cleared().into();
 							update_control_flow(
 								&mut control_flow_source,
 								*window_id,
-								control_flow,
+								&mut control_flow,
 								new_control_flow,
 							);
 							should_sleep = should_sleep && window.should_sleep();
@@ -172,27 +168,10 @@ impl Application {
 						if should_sleep && !matches!(control_flow, ControlFlow::WaitUntil(_)) {
 							// println!("! Should sleep was true, setting control flow to WAIT UNTIL");
 							let now = std::time::Instant::now();
-							*control_flow = ControlFlow::WaitUntil(now + MAX_SLEEP_DURATION);
+							control_flow = ControlFlow::WaitUntil(now + MAX_SLEEP_DURATION);
 						}
 					} else {
-						*control_flow = ControlFlow::Exit;
-					}
-				}
-				Event::RedrawRequested(window_id) => {
-					let new_control_flow = windows.get(&window_id).unwrap().redraw().into();
-					update_control_flow(
-						&mut control_flow_source,
-						window_id,
-						control_flow,
-						new_control_flow,
-					);
-					#[cfg(feature = "benchmark")]
-					update_draw_dt();
-					// println!("RedrawRequested, set control flow to: {control_flow:?}");
-				}
-				Event::RedrawEventsCleared => {
-					if EXIT_REQUESTED.load(Ordering::Relaxed) {
-						*control_flow = ControlFlow::Exit;
+						event_loop.exit()
 					}
 				}
 				_ => {
@@ -200,7 +179,7 @@ impl Application {
 					// *control_flow = ControlFlow::Wait;
 				}
 			}
-			if *control_flow == ControlFlow::Exit {
+			if event_loop.exiting() {
 				if let Some(at_exit) = at_exit.take() {
 					at_exit();
 				}
@@ -214,9 +193,11 @@ impl Application {
 				// sometimes.
 				// See: https://github.com/ArturKovacs/emulsion/issues/172
 				let now = std::time::Instant::now();
-				*control_flow = ControlFlow::WaitUntil(now + MAX_SLEEP_DURATION);
+				control_flow = ControlFlow::WaitUntil(now + MAX_SLEEP_DURATION);
 			}
-		});
+
+			event_loop.set_control_flow(control_flow);
+		}).unwrap();
 	}
 }
 

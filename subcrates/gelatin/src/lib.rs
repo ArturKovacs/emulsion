@@ -3,22 +3,14 @@
 pub use cgmath;
 pub use glium;
 pub use image;
+pub use winit;
+
+use std::{any::Any, error::Error, fmt, ops::Deref, path::PathBuf, rc::Rc, time::Instant, vec::Vec};
+
+use winit::{event::{ElementState, KeyEvent, MouseButton}, event_loop::ControlFlow, keyboard::ModifiersState};
 
 use cgmath::{Matrix4, Vector3};
-use glium::glutin;
-use glium::{
-	implement_vertex, uniform, Blend, BlendingFunction, Display, Frame, IndexBuffer,
-	LinearBlendingFactor, Program, Rect, Surface, VertexBuffer,
-};
-use glutin::event_loop::ControlFlow;
-use std::any::Any;
-use std::error::Error;
-use std::fmt;
-use std::ops::Deref;
-use std::path::PathBuf;
-use std::rc::Rc;
-use std::time::Instant;
-use std::vec::Vec;
+use glium::{glutin::surface::WindowSurface, implement_vertex, uniform, Blend, BlendingFunction, Frame, IndexBuffer, LinearBlendingFactor, Program, Rect, Surface, VertexBuffer};
 
 use misc::*;
 
@@ -31,6 +23,8 @@ pub mod picture;
 pub mod shaders;
 pub mod slider;
 pub mod window;
+
+pub type Display = glium::Display<WindowSurface>;
 
 #[derive(Debug)]
 pub enum WidgetError {
@@ -324,15 +318,14 @@ pub struct Event {
 	/// The position of the cursor in virtual pixels
 	/// relative to the top left corner of the window.
 	pub cursor_pos: LogicalVector,
-	pub modifiers: glutin::event::ModifiersState,
+	pub modifiers: ModifiersState,
 	pub kind: EventKind,
 }
 pub enum EventKind {
 	MouseMove,
-	MouseButton { state: glutin::event::ElementState, button: glutin::event::MouseButton },
+	MouseButton { state: ElementState, button: MouseButton },
 	MouseScroll { delta: LogicalVector },
-	KeyInput { input: glutin::event::KeyboardInput },
-	ReceivedCharacter(char),
+	KeyInput { input: KeyEvent },
 	DroppedFile(PathBuf),
 	HoveredFile(PathBuf),
 	HoveredFileCancelled,

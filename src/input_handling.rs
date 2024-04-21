@@ -4,7 +4,7 @@ use std::process::Command;
 use std::rc::Rc;
 
 use crate::configuration::Configuration;
-use gelatin::glium::glutin::event::ModifiersState;
+use gelatin::winit::keyboard::ModifiersState;
 use lazy_static::lazy_static;
 
 pub static TOGGLE_FULLSCREEN_NAME: &str = "toggle_fullscreen";
@@ -34,7 +34,7 @@ pub static PAN_DOWN_NAME: &str = "pan_down";
 lazy_static! {
 	pub static ref DEFAULT_BINDINGS: HashMap<&'static str, Vec<&'static str>> = {
 		let mut m = HashMap::new();
-		m.insert(TOGGLE_FULLSCREEN_NAME, vec!["F11", "Return"]);
+		m.insert(TOGGLE_FULLSCREEN_NAME, vec!["F11", "Enter"]);
 		m.insert(ESCAPE_NAME, vec!["Escape"]);
 		m.insert(IMG_NEXT_NAME, vec!["D", "Right", "PageDown"]);
 		m.insert(IMG_PREV_NAME, vec!["A", "Left", "PageUp"]);
@@ -143,9 +143,9 @@ pub fn keys_triggered<S: AsRef<str>>(
 				_ => (),
 			}
 		}
-		if has_alt == modifiers.alt()
-			&& has_ctrl == modifiers.ctrl()
-			&& has_logo == modifiers.logo()
+		if has_alt == modifiers.alt_key()
+			&& has_ctrl == modifiers.control_key()
+			&& has_logo == modifiers.super_key()
 		{
 			return true;
 		}

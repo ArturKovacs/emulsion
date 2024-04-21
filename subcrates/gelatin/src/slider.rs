@@ -1,9 +1,8 @@
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 use cgmath::{Matrix4, Vector3};
-use glium::glutin::event::{ElementState, MouseButton};
 use glium::{uniform, Frame, Surface};
+use winit::event::{ElementState, MouseButton};
 
 use crate::add_common_widget_functions;
 use crate::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};

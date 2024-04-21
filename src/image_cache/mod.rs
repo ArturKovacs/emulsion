@@ -1,12 +1,4 @@
-use std::borrow::Cow;
-use std::collections::BTreeMap;
-use std::ffi::{OsStr, OsString};
-use std::fs;
-use std::mem;
-use std::path::{Path, PathBuf};
-use std::rc::Rc;
-use std::sync::atomic::Ordering;
-use std::time::SystemTime;
+use std::{borrow::Cow, collections::BTreeMap, ffi::{OsStr, OsString}, fs, mem, path::{Path, PathBuf}, rc::Rc, sync::atomic::Ordering, time::SystemTime};
 
 use log::trace;
 
@@ -78,7 +70,7 @@ pub fn get_anim_size_estimate(frames: &[AnimationFrameTexture]) -> isize {
 /// requests
 enum RequestKind<'a> {
 	NonPriority,
-	Priority { display: &'a glium::Display },
+	Priority { display: &'a gelatin::Display },
 }
 
 impl<'a> RequestKind<'a> {
@@ -123,7 +115,7 @@ pub struct AnimationFrameTexture {
 }
 impl AnimationFrameTexture {
 	pub fn from_image(
-		display: &glium::Display,
+		display: &gelatin::Display,
 		image: image::RgbaImage,
 		delay_nano: u64,
 		orientation: Orientation,
@@ -183,7 +175,7 @@ impl AnimationFrameTexture {
 /// img_bytes has to be an rgba8 buffer.
 #[allow(clippy::too_many_arguments)]
 fn texture_from_img_rect(
-	display: &glium::Display,
+	display: &gelatin::Display,
 	img_w: u32,
 	img_h: u32,
 	img_bytes: &[u8],
@@ -369,7 +361,7 @@ impl ImageCache {
 
 	pub fn load_at_index(
 		&mut self,
-		display: &glium::Display,
+		display: &gelatin::Display,
 		index: usize,
 		frame_id: Option<isize>,
 	) -> Result<(AnimationFrameTexture, PathBuf)> {
@@ -388,7 +380,7 @@ impl ImageCache {
 	/// when the image
 	pub fn load_specific(
 		&mut self,
-		display: &glium::Display,
+		display: &gelatin::Display,
 		path: &Path,
 		frame_id: Option<isize>,
 	) -> Result<AnimationFrameTexture> {
@@ -471,20 +463,20 @@ impl ImageCache {
 
 	pub fn load_next(
 		&mut self,
-		display: &glium::Display,
+		display: &gelatin::Display,
 	) -> Result<(AnimationFrameTexture, PathBuf)> {
 		self.load_jump(display, 1, 0)
 	}
 	pub fn load_prev(
 		&mut self,
-		display: &glium::Display,
+		display: &gelatin::Display,
 	) -> Result<(AnimationFrameTexture, PathBuf)> {
 		self.load_jump(display, -1, 0)
 	}
 
 	pub fn load_jump(
 		&mut self,
-		display: &glium::Display,
+		display: &gelatin::Display,
 		file_jump_count: i32,
 		frame_jump_count: isize,
 	) -> Result<(AnimationFrameTexture, PathBuf)> {
@@ -538,7 +530,7 @@ impl ImageCache {
 		}
 	}
 
-	pub fn process_prefetched(&mut self, display: &glium::Display) -> Result<()> {
+	pub fn process_prefetched(&mut self, display: &gelatin::Display) -> Result<()> {
 		self.receive_prefetched();
 		let mut uploaded_one = false;
 		let req_ids = self.pending_requests.get_all_ids();
@@ -579,7 +571,7 @@ impl ImageCache {
 	/// bounds are allowed and will be wraped around if needed within this function.
 	fn try_getting_requested_image(
 		&mut self,
-		display: &glium::Display,
+		display: &gelatin::Display,
 		frame_id: isize,
 	) -> Result<AnimationFrameTexture> {
 		trace!("Begin `try_getting_requested_image` in `image_cache`");
@@ -638,7 +630,7 @@ impl ImageCache {
 
 	fn upload_to_texture(
 		&mut self,
-		display: &glium::Display,
+		display: &gelatin::Display,
 		load_result: LoadResult,
 	) -> Result<Option<AnimationFrameTexture>> {
 		use std::collections::btree_map::Entry;
