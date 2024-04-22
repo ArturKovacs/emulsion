@@ -37,8 +37,11 @@ use std::{
 use cgmath::ortho;
 use derive_builder::Builder;
 
-use crate::{application::Application, shaders::{shader_from_source, ShaderDescriptor}};
 use crate::shaders;
+use crate::{
+	application::Application,
+	shaders::{shader_from_source, ShaderDescriptor},
+};
 use crate::{
 	misc::{FromPhysical, LogicalRect, LogicalVector},
 	DrawContext, Event, EventKind, NextUpdate, Vertex, Widget,
@@ -228,8 +231,9 @@ impl Window {
 				fragment_shader: shaders::TEXTURE_SHADOW_F_140,
 				outputs_srgb: false,
 				..Default::default()
-			}
-		).unwrap();
+			},
+		)
+		.unwrap();
 
 		let colored_shadowed_program = shader_from_source(
 			&display,
@@ -238,8 +242,9 @@ impl Window {
 				fragment_shader: shaders::COLOR_SHADOW_F_140,
 				outputs_srgb: false,
 				..Default::default()
-			}
-		).unwrap();
+			},
+		)
+		.unwrap();
 
 		let colored_program = shader_from_source(
 			&display,
@@ -248,8 +253,9 @@ impl Window {
 				fragment_shader: shaders::COLOR_F_140,
 				outputs_srgb: false,
 				..Default::default()
-			}
-		).unwrap();
+			},
+		)
+		.unwrap();
 
 		let resulting_window = Rc::new(Window {
 			data: RefCell::new(WindowData {
@@ -421,7 +427,11 @@ impl Window {
 	}
 
 	// allowing event_loop to be unused because it's only used on some platforms
-	pub fn process_event(&self, native_event: WindowEvent, #[allow(unused_variables)] event_loop: &EventLoopWindowTarget<()>) {
+	pub fn process_event(
+		&self,
+		native_event: WindowEvent,
+		#[allow(unused_variables)] event_loop: &EventLoopWindowTarget<()>,
+	) {
 		use winit::event::MouseScrollDelta;
 
 		let event;

@@ -1,7 +1,8 @@
 use std::{
 	collections::hash_map::HashMap,
 	rc::Rc,
-	sync::atomic::{AtomicBool, Ordering}, time::{Duration, Instant},
+	sync::atomic::{AtomicBool, Ordering},
+	time::{Duration, Instant},
 };
 
 use winit::{

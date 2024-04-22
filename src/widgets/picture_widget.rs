@@ -7,10 +7,13 @@ use std::{
 };
 
 use gelatin::{
-	cgmath::{Matrix4, Vector2, Vector3}, glium::{program, uniform, uniforms::MagnifySamplerFilter, Frame, Program, Surface}, shaders::ShaderDescriptor, winit::{
+	cgmath::{Matrix4, Vector2, Vector3},
+	glium::{program, uniform, uniforms::MagnifySamplerFilter, Frame, Program, Surface},
+	shaders::ShaderDescriptor,
+	winit::{
 		event::{ElementState, MouseButton},
 		platform::modifier_supplement::KeyEventExtModifierSupplement,
-	}
+	},
 };
 
 use gelatin::{
@@ -435,8 +438,9 @@ impl PictureWidget {
 				fragment_shader: shaders::FRAGMENT_140,
 				outputs_srgb: false,
 				..Default::default()
-			}
-		).unwrap();
+			},
+		)
+		.unwrap();
 
 		let scaling;
 		{
