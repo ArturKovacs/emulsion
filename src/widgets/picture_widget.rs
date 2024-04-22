@@ -7,12 +7,10 @@ use std::{
 };
 
 use gelatin::{
-	cgmath::{Matrix4, Vector2, Vector3},
-	glium::{program, uniform, uniforms::MagnifySamplerFilter, Frame, Program, Surface},
-	winit::{
+	cgmath::{Matrix4, Vector2, Vector3}, glium::{program, uniform, uniforms::MagnifySamplerFilter, Frame, Program, Surface}, shaders::ShaderDescriptor, winit::{
 		event::{ElementState, MouseButton},
 		platform::modifier_supplement::KeyEventExtModifierSupplement,
-	},
+	}
 };
 
 use gelatin::{
@@ -418,17 +416,27 @@ impl PictureWidget {
 		configuration: Rc<RefCell<Configuration>>,
 		cache: Arc<Mutex<Cache>>,
 	) -> PictureWidget {
-		let program = program!(display,
-			140 => {
-				vertex: shaders::VERTEX_140,
-				fragment: shaders::FRAGMENT_140
-			},
-			110 => {
-				vertex: shaders::VERTEX_110,
-				fragment: shaders::FRAGMENT_110
-			},
-		)
-		.unwrap();
+		// let program = program!(display,
+		// 	140 => {
+		// 		vertex: shaders::VERTEX_140,
+		// 		fragment: shaders::FRAGMENT_140
+		// 	},
+		// 	110 => {
+		// 		vertex: shaders::VERTEX_110,
+		// 		fragment: shaders::FRAGMENT_110
+		// 	},
+		// )
+		// .unwrap();
+
+		let program = gelatin::shaders::shader_from_source(
+			display,
+			ShaderDescriptor {
+				vertex_shader: shaders::VERTEX_140,
+				fragment_shader: shaders::FRAGMENT_140,
+				outputs_srgb: false,
+				..Default::default()
+			}
+		).unwrap();
 
 		let scaling;
 		{

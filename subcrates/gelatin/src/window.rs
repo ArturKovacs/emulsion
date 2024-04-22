@@ -37,7 +37,7 @@ use std::{
 use cgmath::ortho;
 use derive_builder::Builder;
 
-use crate::application::Application;
+use crate::{application::Application, shaders::{shader_from_source, ShaderDescriptor}};
 use crate::shaders;
 use crate::{
 	misc::{FromPhysical, LogicalRect, LogicalVector},
@@ -178,6 +178,7 @@ impl Window {
 			.with_window_icon(desc.icon)
 			.with_visible(desc.position.is_none());
 
+		#[cfg(not(any(target_os = "macos", windows)))]
 		let window_builder = if let Some(app_id) = desc.app_id {
 			let is_wayland = std::env::var("XDG_SESSION_TYPE")
 				.map_or(false, |var| var.to_lowercase().contains("wayland"));
@@ -220,39 +221,35 @@ impl Window {
 			IndexBuffer::new(&display, PrimitiveType::TriangleStrip, &[1_u16, 2, 0, 3]).unwrap();
 
 		// compiling shaders and linking them together
-		let textured_program = program!(&display,
-			140 => {
-				vertex: shaders::VERTEX_140,
-				fragment: shaders::TEXTURE_SHADOW_F_140
-			},
-			110 => {
-				vertex: shaders::VERTEX_110,
-				fragment: shaders::TEXTURE_SHADOW_F_110
-			},
-		)
-		.unwrap();
-		let colored_shadowed_program = program!(&display,
-			140 => {
-				vertex: shaders::VERTEX_140,
-				fragment: shaders::COLOR_SHADOW_F_140
-			},
-			110 => {
-				vertex: shaders::VERTEX_110,
-				fragment: shaders::COLOR_SHADOW_F_110
-			},
-		)
-		.unwrap();
-		let colored_program = program!(&display,
-			140 => {
-				vertex: shaders::VERTEX_140,
-				fragment: shaders::COLOR_F_140
-			},
-			110 => {
-				vertex: shaders::VERTEX_110,
-				fragment: shaders::COLOR_F_110
-			},
-		)
-		.unwrap();
+		let textured_program = shader_from_source(
+			&display,
+			ShaderDescriptor {
+				vertex_shader: shaders::VERTEX_140,
+				fragment_shader: shaders::TEXTURE_SHADOW_F_140,
+				outputs_srgb: false,
+				..Default::default()
+			}
+		).unwrap();
+
+		let colored_shadowed_program = shader_from_source(
+			&display,
+			ShaderDescriptor {
+				vertex_shader: shaders::VERTEX_140,
+				fragment_shader: shaders::COLOR_SHADOW_F_140,
+				outputs_srgb: false,
+				..Default::default()
+			}
+		).unwrap();
+
+		let colored_program = shader_from_source(
+			&display,
+			ShaderDescriptor {
+				vertex_shader: shaders::VERTEX_140,
+				fragment_shader: shaders::COLOR_F_140,
+				outputs_srgb: false,
+				..Default::default()
+			}
+		).unwrap();
 
 		let resulting_window = Rc::new(Window {
 			data: RefCell::new(WindowData {
@@ -328,8 +325,8 @@ impl Window {
 		let surface =
 			unsafe { gl_config.display().create_window_surface(&gl_config, &attrs).unwrap() };
 		let context_attributes = glutin::context::ContextAttributesBuilder::new()
-			.with_profile(GlProfile::Core)
-			.with_context_api(ContextApi::OpenGl(Some(Version::new(3, 2))))
+			.with_profile(GlProfile::Core) // requires OpenGL 3.3
+			.with_context_api(ContextApi::OpenGl(Some(Version::new(3, 3))))
 			.with_release_behavior(glutin::context::ReleaseBehavior::None)
 			.build(Some(window.raw_window_handle()));
 		let current_context = Some(unsafe {
