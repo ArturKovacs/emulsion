@@ -13,7 +13,7 @@ use winit::{
 
 use crate::{window::Window, NextUpdate};
 
-const MAX_SLEEP_DURATION: std::time::Duration = std::time::Duration::from_millis(1000);
+// const MAX_SLEEP_DURATION: std::time::Duration = std::time::Duration::from_millis(4);
 static EXIT_REQUESTED: AtomicBool = AtomicBool::new(false);
 
 pub fn request_exit() {
@@ -104,7 +104,6 @@ impl Application {
 		let mut windows: HashMap<WindowId, Rc<Window>> = self.windows;
 		let mut at_exit = self.at_exit;
 		let mut global_handlers = self.global_handlers;
-		let mut control_flow_source = *windows.keys().next().unwrap();
 		#[cfg(feature = "benchmark")]
 		let mut last_draw_time = std::time::Instant::now();
 		#[cfg(feature = "benchmark")]
@@ -129,8 +128,6 @@ impl Application {
 			}
 		};
 
-		let mut dbg_count = 0;
-
 		self.event_loop
 			.run(move |event, event_loop| {
 				sanitize_control_flow(event_loop);
@@ -147,8 +144,6 @@ impl Application {
 						if let WindowEvent::RedrawRequested = event {
 							let new_control_flow = windows.get(&window_id).unwrap().redraw().into();
 							aggregate_control_flow(event_loop, new_control_flow);
-							// println!("DRAW SAYS...");
-							// dbg!(new_control_flow);
 							#[cfg(feature = "benchmark")]
 							update_draw_dt();
 						}
@@ -169,7 +164,6 @@ impl Application {
 						}
 					}
 					Event::AboutToWait => {
-						// println!("\n-------------\n");
 						if EXIT_REQUESTED.load(Ordering::Relaxed) {
 							event_loop.exit();
 							return;
@@ -185,7 +179,7 @@ impl Application {
 							}
 							let control_flow = event_loop.control_flow();
 							if should_sleep && !matches!(control_flow, ControlFlow::WaitUntil(_)) {
-								let now = std::time::Instant::now();
+								// let now = std::time::Instant::now();
 								event_loop.set_control_flow(ControlFlow::Wait);
 							}
 						}
@@ -195,9 +189,8 @@ impl Application {
 							at_exit();
 						}
 					}
-					_ => {
-						// println!("! Unknown event, setting control flow to WAIT");
-						// *control_flow = ControlFlow::Wait;
+					event => {
+						log::debug!("Ignoring event: {event:?}");
 					}
 				}
 
@@ -209,8 +202,6 @@ impl Application {
 					let now = std::time::Instant::now();
 					control_flow = ControlFlow::WaitUntil(now + MAX_SLEEP_DURATION);
 				}
-
-				// dbg!(control_flow);
 			})
 			.unwrap();
 	}

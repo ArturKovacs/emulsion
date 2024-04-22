@@ -1174,6 +1174,7 @@ dependencies = [
  "glium",
  "glutin-winit",
  "image 0.25.1",
+ "log",
  "raw-window-handle 0.5.2",
  "winit",
 ]

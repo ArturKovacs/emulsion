@@ -8,7 +8,7 @@ use std::{
 
 use gelatin::{
 	cgmath::{Matrix4, Vector2, Vector3},
-	glium::{program, uniform, uniforms::MagnifySamplerFilter, Frame, Program, Surface},
+	glium::{uniform, uniforms::MagnifySamplerFilter, Frame, Program, Surface},
 	shaders::ShaderDescriptor,
 	winit::{
 		event::{ElementState, MouseButton},

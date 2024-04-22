@@ -7,7 +7,7 @@ use glium::{
 		display::{GetGlDisplay, GlDisplay},
 		surface::WindowSurface,
 	},
-	program, uniform, Blend, BlendingFunction, Display, Frame, IndexBuffer, Program, Rect, Surface,
+	uniform, Blend, BlendingFunction, Display, Frame, IndexBuffer, Program, Rect, Surface,
 	VertexBuffer,
 };
 use raw_window_handle::HasRawWindowHandle;
