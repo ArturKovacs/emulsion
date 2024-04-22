@@ -14,7 +14,7 @@ use raw_window_handle::HasRawWindowHandle;
 use winit::{
 	dpi::{PhysicalPosition, PhysicalSize},
 	event::WindowEvent,
-	event_loop::EventLoop,
+	event_loop::{EventLoop, EventLoopWindowTarget},
 	keyboard::ModifiersState,
 	window::{CursorIcon, Fullscreen, Icon, WindowBuilder, WindowId},
 };
@@ -420,7 +420,8 @@ impl Window {
 		borrowed.bg_color = color;
 	}
 
-	pub fn process_event(&self, native_event: WindowEvent) {
+	// allowing event_loop to be unused because it's only used on some platforms
+	pub fn process_event(&self, native_event: WindowEvent, #[allow(unused_variables)] event_loop: &EventLoopWindowTarget<()>) {
 		use winit::event::MouseScrollDelta;
 
 		let event;
@@ -435,7 +436,12 @@ impl Window {
 					if size.width < 1 || size.height < 1 {
 						return;
 					}
-					borrowed.display.resize((size.width, size.height));
+
+					#[cfg(all(unix, not(target_os = "macos")))]
+					if event_loop.is_wayland() {
+						// We need to set the framebuffer size explicitly on Wayland (god knows why)
+						borrowed.display.resize((size.width, size.height));
+					}
 					borrowed.window.request_redraw();
 				}
 				WindowEvent::CloseRequested => {
@@ -576,13 +582,12 @@ impl Window {
 		self.data.borrow_mut().window.request_redraw();
 	}
 
-	pub fn main_events_cleared(&self) -> NextUpdate {
+	pub fn main_events_cleared(&self) {
 		// this way self.data is not borrowed while `before_draw` is running.
 		let root_widget = self.data.borrow().root_widget.clone();
 		if let Some(event) = self.data.borrow_mut().unprocessed_move_event.take() {
 			root_widget.handle_event(&event);
 		}
-		root_widget.before_draw(self)
 	}
 
 	pub fn redraw_needed(&self) -> bool {
@@ -593,7 +598,14 @@ impl Window {
 	/// This means that trying to borrow the window *mutably* in a widget's
 	/// draw function will fail.
 	pub fn redraw(&self) -> crate::NextUpdate {
-		// Using a scope to only borrow the data mutable for the very beggining.
+		let mut next_update = NextUpdate::Latest;
+		{
+			let root_widget = self.data.borrow().root_widget.clone();
+			let before_draw_next_update = root_widget.before_draw(self);
+			next_update = next_update.aggregate(before_draw_next_update);
+		}
+
+		// Using a scope to only borrow the data mutably for the very beggining.
 		{
 			let mut borrowed = self.data.borrow_mut();
 			if let Some(new_title) = borrowed.new_title.take() {
@@ -651,7 +663,8 @@ impl Window {
 
 		// Using the cloned root instead of self.root_widget doesn't make much difference
 		// because self is being borrowed by through the draw_context anyways but it's fine.
-		let retval = borrowed.root_widget.draw(&mut target, &draw_context).unwrap();
+		let draw_next_update = borrowed.root_widget.draw(&mut target, &draw_context).unwrap();
+		next_update = next_update.aggregate(draw_next_update);
 
 		// After all widgets are drawn, let's set the alpha values of all the pixels to 1.
 		// This is required on Wayland because the Wayland compositor very kindly takes
@@ -661,7 +674,7 @@ impl Window {
 
 		target.finish().unwrap();
 		borrowed.render_validity.make_valid();
-		retval
+		next_update
 	}
 
 	pub fn fullscreen(&self) -> bool {

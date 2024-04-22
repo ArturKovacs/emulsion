@@ -1,40 +1,54 @@
 use std::{
 	collections::hash_map::HashMap,
 	rc::Rc,
-	sync::atomic::{AtomicBool, Ordering},
+	sync::atomic::{AtomicBool, Ordering}, time::{Duration, Instant},
 };
 
 use winit::{
-	event::{Event, WindowEvent},
-	event_loop::{ControlFlow, EventLoop},
+	event::{Event, StartCause, WindowEvent},
+	event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget},
 	window::WindowId,
 };
 
 use crate::{window::Window, NextUpdate};
 
-const MAX_SLEEP_DURATION: std::time::Duration = std::time::Duration::from_millis(4);
+const MAX_SLEEP_DURATION: std::time::Duration = std::time::Duration::from_millis(1000);
 static EXIT_REQUESTED: AtomicBool = AtomicBool::new(false);
 
 pub fn request_exit() {
 	EXIT_REQUESTED.store(true, Ordering::Relaxed);
 }
 
+fn set_control_flow(event_loop: &EventLoopWindowTarget<()>, control_flow: ControlFlow) {
+	if let ControlFlow::WaitUntil(time) = control_flow {
+		let very_short_time_from_now = Instant::now() + Duration::from_micros(100);
+		if time < very_short_time_from_now {
+			event_loop.set_control_flow(ControlFlow::Poll);
+		} else {
+			event_loop.set_control_flow(control_flow);
+		}
+	} else {
+		event_loop.set_control_flow(control_flow);
+	}
+}
+
 /// Returns true if original was replaced by new
-fn aggregate_control_flow(original: &mut ControlFlow, new: ControlFlow) -> bool {
+fn aggregate_control_flow(event_loop: &EventLoopWindowTarget<()>, new: ControlFlow) -> bool {
+	let original = event_loop.control_flow();
 	match new {
 		ControlFlow::Poll => {
-			*original = new;
+			set_control_flow(event_loop, new);
 			return true;
 		}
-		ControlFlow::WaitUntil(new_time) => match *original {
+		ControlFlow::WaitUntil(new_time) => match original {
 			ControlFlow::WaitUntil(orig_time) => {
 				if new_time < orig_time {
-					*original = new;
+					set_control_flow(event_loop, new);
 					return true;
 				}
 			}
 			ControlFlow::Wait => {
-				*original = new;
+				set_control_flow(event_loop, new);
 				return true;
 			}
 			_ => (),
@@ -44,17 +58,8 @@ fn aggregate_control_flow(original: &mut ControlFlow, new: ControlFlow) -> bool 
 	false
 }
 
-fn update_control_flow(
-	prev_control_flow_source: &mut WindowId,
-	new_control_flow_source: WindowId,
-	control_flow: &mut ControlFlow,
-	new_control_flow: ControlFlow,
-) {
-	if *prev_control_flow_source == new_control_flow_source {
-		*control_flow = new_control_flow;
-	} else if aggregate_control_flow(control_flow, new_control_flow) {
-		*prev_control_flow_source = new_control_flow_source;
-	}
+fn sanitize_control_flow(event_loop: &EventLoopWindowTarget<()>) {
+	set_control_flow(event_loop, event_loop.control_flow());
 }
 
 pub type EventHandler = dyn FnMut(&Event<()>) -> NextUpdate;
@@ -95,7 +100,7 @@ impl Application {
 	}
 
 	pub fn start_event_loop(self) {
-		let mut windows = self.windows;
+		let mut windows: HashMap<WindowId, Rc<Window>> = self.windows;
 		let mut at_exit = self.at_exit;
 		let mut global_handlers = self.global_handlers;
 		let mut control_flow_source = *windows.keys().next().unwrap();
@@ -122,22 +127,27 @@ impl Application {
 				);
 			}
 		};
+
+		let mut dbg_count = 0;
+
 		self.event_loop
 			.run(move |event, event_loop| {
-				let mut control_flow = event_loop.control_flow();
+				sanitize_control_flow(event_loop);
 				for handler in global_handlers.iter_mut() {
-					aggregate_control_flow(&mut control_flow, handler(&event).into());
+					let handler_next_update = handler(&event);
+					aggregate_control_flow(event_loop, handler_next_update.into());
 				}
+				// dbg!(&event);
 				match event {
+					Event::NewEvents(StartCause::Init) => {
+						event_loop.set_control_flow(ControlFlow::Wait);
+					}
 					Event::WindowEvent { event, window_id } => {
 						if let WindowEvent::RedrawRequested = event {
 							let new_control_flow = windows.get(&window_id).unwrap().redraw().into();
-							update_control_flow(
-								&mut control_flow_source,
-								window_id,
-								&mut control_flow,
-								new_control_flow,
-							);
+							aggregate_control_flow(event_loop, new_control_flow);
+							// println!("DRAW SAYS...");
+							// dbg!(new_control_flow);
 							#[cfg(feature = "benchmark")]
 							update_draw_dt();
 						}
@@ -152,48 +162,42 @@ impl Application {
 						} else {
 							destroyed = false;
 						}
-						windows.get(&window_id).unwrap().process_event(event);
+						windows.get(&window_id).unwrap().process_event(event, event_loop);
 						if destroyed {
 							windows.remove(&window_id);
 						}
 					}
 					Event::AboutToWait => {
-						if !EXIT_REQUESTED.load(Ordering::Relaxed) {
-							let mut should_sleep = !matches!(&mut control_flow, ControlFlow::Poll);
-							for (window_id, window) in windows.iter() {
-								let new_control_flow = window.main_events_cleared().into();
-								update_control_flow(
-									&mut control_flow_source,
-									*window_id,
-									&mut control_flow,
-									new_control_flow,
-								);
+						// println!("\n-------------\n");
+						if EXIT_REQUESTED.load(Ordering::Relaxed) {
+							event_loop.exit();
+							return;
+						} else {
+							let mut should_sleep = true;
+							for window in windows.values() {
+								window.main_events_cleared();
 								should_sleep = should_sleep && window.should_sleep();
 								if window.redraw_needed() {
 									window.request_redraw();
+									should_sleep = false;
 								}
 							}
-							// println!("MainEventsCleared, set control flow to: {control_flow:?}");
+							let control_flow = event_loop.control_flow();
 							if should_sleep && !matches!(control_flow, ControlFlow::WaitUntil(_)) {
-								// println!("! Should sleep was true, setting control flow to WAIT UNTIL");
 								let now = std::time::Instant::now();
-								control_flow = ControlFlow::WaitUntil(now + MAX_SLEEP_DURATION);
+								event_loop.set_control_flow(ControlFlow::Wait);
 							}
-						} else {
-							event_loop.exit()
+						}
+					}
+					Event::LoopExiting => {
+						if let Some(at_exit) = at_exit.take() {
+							at_exit();
 						}
 					}
 					_ => {
 						// println!("! Unknown event, setting control flow to WAIT");
 						// *control_flow = ControlFlow::Wait;
 					}
-				}
-				if event_loop.exiting() {
-					if let Some(at_exit) = at_exit.take() {
-						at_exit();
-					}
-					// Drop 'em all!
-					//windows.clear();
 				}
 
 				#[cfg(all(unix, not(target_os = "macos")))]
@@ -205,7 +209,7 @@ impl Application {
 					control_flow = ControlFlow::WaitUntil(now + MAX_SLEEP_DURATION);
 				}
 
-				event_loop.set_control_flow(control_flow);
+				// dbg!(control_flow);
 			})
 			.unwrap();
 	}

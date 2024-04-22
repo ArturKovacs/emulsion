@@ -676,6 +676,8 @@ impl Widget for PictureWidget {
 		let curr_file_index = data.playback_manager.current_file_index();
 		let curr_dir_len = data.playback_manager.current_dir_len();
 		if let (Some(curr_file_index), Some(curr_dir_len)) = (curr_file_index, curr_dir_len) {
+			// dbg!(curr_file_index);
+			// dbg!(curr_dir_len);
 			data.bottom_bar.slider.set_steps(curr_dir_len as u32, curr_file_index as u32);
 		}
 		//data.slider.set_step_bg(data.playback_manager.cached_from_dir());
