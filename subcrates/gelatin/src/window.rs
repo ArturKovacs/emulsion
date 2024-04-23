@@ -135,7 +135,6 @@ struct WindowData {
 	last_mouse_move_update_time: std::time::Instant,
 	unprocessed_move_event: Option<Event>,
 	last_event_invalidated: bool,
-	should_sleep: bool,
 
 	new_title: Option<String>,
 
@@ -270,7 +269,6 @@ impl Window {
 				last_mouse_move_update_time: std::time::Instant::now(),
 				unprocessed_move_event: None,
 				last_event_invalidated: true,
-				should_sleep: false,
 				new_title: None,
 				cursor_pos: Default::default(),
 				modifiers: ModifiersState::empty(),
@@ -502,19 +500,10 @@ impl Window {
 			let cloned = self.data.borrow().root_widget.clone();
 			cloned.handle_event(&event);
 			let mut borrowed = self.data.borrow_mut();
-			borrowed.should_sleep = false;
-			if borrowed.render_validity.get() {
-				if let EventKind::MouseMove = event.kind {
-					borrowed.should_sleep = true;
-				}
-			} else {
+			if !borrowed.render_validity.get() {
 				borrowed.last_event_invalidated = true;
 			}
 		}
-	}
-
-	pub fn should_sleep(&self) -> bool {
-		self.data.borrow().should_sleep
 	}
 
 	pub fn set_title(&self, title: String) {

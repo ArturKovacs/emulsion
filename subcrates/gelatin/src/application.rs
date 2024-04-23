@@ -185,20 +185,13 @@ where
 							event_loop.exit();
 							return;
 						} else {
-							let mut should_sleep = true;
 							for window in windows.values() {
 								window.main_events_cleared();
-								should_sleep = should_sleep && window.should_sleep();
 								if window.redraw_needed() {
 									window.request_redraw();
-									should_sleep = false;
 								}
 							}
-							let control_flow = event_loop.control_flow();
-							if should_sleep && !matches!(control_flow, ControlFlow::WaitUntil(_)) {
-								// let now = std::time::Instant::now();
-								event_loop.set_control_flow(ControlFlow::Wait);
-							}
+							event_loop.set_control_flow(ControlFlow::Wait);
 						}
 					}
 					Event::LoopExiting => {
@@ -207,17 +200,20 @@ where
 						}
 					}
 					event => {
-						// log::debug!("Ignoring event: {event:?}");
+						log::trace!("Ignoring event: {event:?}");
 					}
 				}
 
 				#[cfg(all(unix, not(target_os = "macos")))]
 				if matches!(control_flow, ControlFlow::Poll) {
+					const MAX_SLEEP_DURATION: std::time::Duration =
+						std::time::Duration::from_millis(4);
+
 					// This is an ugly workaround for the X server completely freezing
 					// sometimes.
 					// See: https://github.com/ArturKovacs/emulsion/issues/172
 					let now = std::time::Instant::now();
-					control_flow = ControlFlow::WaitUntil(now + MAX_SLEEP_DURATION);
+					event_loop.set_control_flow(ControlFlow::WaitUntil(now + MAX_SLEEP_DURATION));
 				}
 			})
 			.unwrap();
