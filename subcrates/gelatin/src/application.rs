@@ -154,10 +154,8 @@ where
 				}
 				// dbg!(&event);
 				match event {
-					Event::NewEvents(start_cause) => {
-						if start_cause == StartCause::Init {
-							event_loop.set_control_flow(ControlFlow::Wait);
-						}
+					Event::NewEvents(_) => {
+						event_loop.set_control_flow(ControlFlow::Wait);
 						for window in windows.values() {
 							let new_control_flow = window.handle_loop_wake_up().into();
 							aggregate_control_flow(event_loop, new_control_flow);
@@ -197,7 +195,7 @@ where
 									window.request_redraw();
 								}
 							}
-							event_loop.set_control_flow(ControlFlow::Wait);
+							// event_loop.set_control_flow(ControlFlow::Wait);
 						}
 					}
 					Event::LoopExiting => {
@@ -210,17 +208,17 @@ where
 					}
 				}
 
-				#[cfg(all(unix, not(target_os = "macos")))]
-				if matches!(control_flow, ControlFlow::Poll) {
-					const MAX_SLEEP_DURATION: std::time::Duration =
-						std::time::Duration::from_millis(4);
+				// #[cfg(all(unix, not(target_os = "macos")))]
+				// if matches!(control_flow, ControlFlow::Poll) {
+				// 	const MAX_SLEEP_DURATION: std::time::Duration =
+				// 		std::time::Duration::from_millis(4);
 
-					// This is an ugly workaround for the X server completely freezing
-					// sometimes.
-					// See: https://github.com/ArturKovacs/emulsion/issues/172
-					let now = std::time::Instant::now();
-					event_loop.set_control_flow(ControlFlow::WaitUntil(now + MAX_SLEEP_DURATION));
-				}
+				// 	// This is an ugly workaround for the X server completely freezing
+				// 	// sometimes.
+				// 	// See: https://github.com/ArturKovacs/emulsion/issues/172
+				// 	let now = std::time::Instant::now();
+				// 	event_loop.set_control_flow(ControlFlow::WaitUntil(now + MAX_SLEEP_DURATION));
+				// }
 			})
 			.unwrap();
 	}

@@ -21,10 +21,10 @@ use winit::{
 };
 
 #[cfg(not(any(target_os = "macos", windows)))]
-use winit::platform::x11::WindowBuilderExtX11;
-
-#[cfg(not(any(target_os = "macos", windows)))]
-use winit::platform::wayland::WindowBuilderExtWayland;
+use winit::platform::{
+	wayland::{EventLoopWindowTargetExtWayland, WindowBuilderExtWayland},
+	x11::WindowBuilderExtX11,
+};
 
 use std::{
 	cell::{Cell, RefCell, RefMut},
