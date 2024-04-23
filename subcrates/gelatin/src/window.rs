@@ -5,11 +5,12 @@ use glium::{
 		config::{Api, ConfigSurfaceTypes, GlConfig},
 		context::{ContextApi, GlProfile, NotCurrentGlContext, Version},
 		display::{GetGlDisplay, GlDisplay},
-		surface::WindowSurface,
+		surface::{GlSurface, WindowSurface},
 	},
 	uniform, Blend, BlendingFunction, Display, Frame, IndexBuffer, Program, Rect, Surface,
 	VertexBuffer,
 };
+use log::error;
 use raw_window_handle::HasRawWindowHandle;
 use winit::{
 	dpi::{PhysicalPosition, PhysicalSize},
@@ -299,6 +300,7 @@ impl Window {
 		// First we start by opening a new Window
 		let display_builder =
 			glutin_winit::DisplayBuilder::new().with_window_builder(Some(builder));
+
 		let config_template_builder = glutin::config::ConfigTemplateBuilder::new()
 			.prefer_hardware_accelerated(Some(true))
 			.with_surface_type(ConfigSurfaceTypes::WINDOW)
@@ -332,6 +334,7 @@ impl Window {
 		// Finally we can create a Surface, use it to make a PossiblyCurrentContext and create the glium Display
 		let surface =
 			unsafe { gl_config.display().create_window_surface(&gl_config, &attrs).unwrap() };
+
 		let context_attributes = glutin::context::ContextAttributesBuilder::new()
 			.with_profile(GlProfile::Core) // requires OpenGL 3.3
 			.with_context_api(ContextApi::OpenGl(Some(Version::new(3, 3))))
@@ -346,6 +349,13 @@ impl Window {
 		.unwrap()
 		.make_current(&surface)
 		.unwrap();
+
+		// Set up vsync
+		let swap_interval = glutin::surface::SwapInterval::Wait(NonZeroU32::new(1).unwrap());
+		if let Err(error) = surface.set_swap_interval(&current_context, swap_interval) {
+			error!("Failed to set vsync, error returned by set_swap_interval: {}", error);
+		}
+
 		let display = Display::from_context_surface(current_context, surface).unwrap();
 
 		(window, display)
