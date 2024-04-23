@@ -26,7 +26,13 @@ use winit::platform::x11::WindowBuilderExtX11;
 use winit::platform::wayland::WindowBuilderExtWayland;
 
 use std::{
-	cell::{Cell, RefCell, RefMut}, cmp::Eq, fmt::Debug, hash::{Hash, Hasher}, num::NonZeroU32, ops::{Deref, DerefMut}, rc::Rc
+	cell::{Cell, RefCell, RefMut},
+	cmp::Eq,
+	fmt::Debug,
+	hash::{Hash, Hasher},
+	num::NonZeroU32,
+	ops::{Deref, DerefMut},
+	rc::Rc,
 };
 
 use cgmath::ortho;
@@ -165,7 +171,10 @@ impl PartialEq for Window {
 impl Eq for Window {}
 
 impl Window {
-	pub fn new<UserEvent: Debug>(application: &mut Application<UserEvent>, desc: WindowDescriptor) -> Rc<Self> {
+	pub fn new<UserEvent: Debug>(
+		application: &mut Application<UserEvent>,
+		desc: WindowDescriptor,
+	) -> Rc<Self> {
 		//use glium::glutin::window::Icon;
 		//let exe_parent = std::env::current_exe().unwrap().parent().unwrap().to_owned();
 

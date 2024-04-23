@@ -1,5 +1,9 @@
 use std::{
-	collections::hash_map::HashMap, fmt::Debug, rc::Rc, sync::atomic::{AtomicBool, Ordering}, time::{Duration, Instant}
+	collections::hash_map::HashMap,
+	fmt::Debug,
+	rc::Rc,
+	sync::atomic::{AtomicBool, Ordering},
+	time::{Duration, Instant},
 };
 
 use winit::{
@@ -64,7 +68,7 @@ pub type EventHandler<UserEvent> = dyn FnMut(&Event<UserEvent>) -> NextUpdate;
 
 pub struct Application<UserEvent>
 where
-	UserEvent: Debug + 'static
+	UserEvent: Debug + 'static,
 {
 	pub event_loop: EventLoop<UserEvent>,
 	windows: HashMap<WindowId, Rc<Window>>,
@@ -72,9 +76,9 @@ where
 	at_exit: Option<Box<dyn FnOnce()>>,
 }
 
-impl<UserEvent> Application<UserEvent> 
+impl<UserEvent> Application<UserEvent>
 where
-	UserEvent: Debug + 'static
+	UserEvent: Debug + 'static,
 {
 	pub fn new() -> Self {
 		Application {
@@ -146,7 +150,7 @@ where
 				match event {
 					Event::NewEvents(start_cause) => {
 						if start_cause == StartCause::Init {
-							event_loop.set_control_flow(ControlFlow::Wait);		
+							event_loop.set_control_flow(ControlFlow::Wait);
 						}
 						for window in windows.values() {
 							let new_control_flow = window.handle_loop_wake_up().into();
@@ -220,9 +224,9 @@ where
 	}
 }
 
-impl<UserEvent> Default for Application<UserEvent> 
+impl<UserEvent> Default for Application<UserEvent>
 where
-	UserEvent: Debug + 'static
+	UserEvent: Debug + 'static,
 {
 	fn default() -> Self {
 		Self::new()

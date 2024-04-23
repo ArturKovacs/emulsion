@@ -69,7 +69,7 @@ static LEFT_TO_PAN: &[u8] = include_bytes!("../resource/use-left-to-pan.png");
 pub enum EmulsionEvent {
 	/// Used to signal the event loop to wake up, because an image was loaded
 	/// and the UI may need to update to display the image
-	ImageLoaded
+	ImageLoaded,
 }
 
 // ========================================================
