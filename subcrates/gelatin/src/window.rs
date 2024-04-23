@@ -549,13 +549,6 @@ impl Window {
 	/// This means that trying to borrow the window *mutably* in a widget's
 	/// draw function will fail.
 	pub fn redraw(&self) -> crate::NextUpdate {
-		let mut next_update = NextUpdate::Latest;
-		{
-			let root_widget = self.data.borrow().root_widget.clone();
-			let before_draw_next_update = root_widget.before_draw(self);
-			next_update = next_update.aggregate(before_draw_next_update);
-		}
-
 		// Using a scope to only borrow the data mutably for the very beggining.
 		{
 			let mut borrowed = self.data.borrow_mut();
@@ -614,8 +607,7 @@ impl Window {
 
 		// Using the cloned root instead of self.root_widget doesn't make much difference
 		// because self is being borrowed by through the draw_context anyways but it's fine.
-		let draw_next_update = borrowed.root_widget.draw(&mut target, &draw_context).unwrap();
-		next_update = next_update.aggregate(draw_next_update);
+		let next_update = borrowed.root_widget.draw(&mut target, &draw_context).unwrap();
 
 		// After all widgets are drawn, let's set the alpha values of all the pixels to 1.
 		// This is required on Wayland because the Wayland compositor very kindly takes
