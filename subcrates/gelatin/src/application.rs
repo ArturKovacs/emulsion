@@ -7,7 +7,7 @@ use std::{
 };
 
 use winit::{
-	event::{Event, StartCause, WindowEvent},
+	event::{Event, WindowEvent},
 	event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy, EventLoopWindowTarget},
 	window::WindowId,
 };
@@ -207,18 +207,6 @@ where
 						log::trace!("Ignoring event: {event:?}");
 					}
 				}
-
-				// #[cfg(all(unix, not(target_os = "macos")))]
-				// if matches!(control_flow, ControlFlow::Poll) {
-				// 	const MAX_SLEEP_DURATION: std::time::Duration =
-				// 		std::time::Duration::from_millis(4);
-
-				// 	// This is an ugly workaround for the X server completely freezing
-				// 	// sometimes.
-				// 	// See: https://github.com/ArturKovacs/emulsion/issues/172
-				// 	let now = std::time::Instant::now();
-				// 	event_loop.set_control_flow(ControlFlow::WaitUntil(now + MAX_SLEEP_DURATION));
-				// }
 			})
 			.unwrap();
 	}
