@@ -1,12 +1,25 @@
 use gelatin::winit::keyboard::{Key, NamedKey};
 use log::warn;
 
+/// Returns the textual name of the key as written in the config file.
+/// 
+/// (Right side, eg "Return" is the string that should be used in the config file)
 pub fn virtual_keycode_to_string(key: &Key) -> String {
 	match key {
 		Key::Unidentified(_) => Default::default(),
 		Key::Character(ch) => ch.to_string(),
 		Key::Dead(ch) => ch.map_or(Default::default(), |ch| ch.into()),
 		Key::Named(named_key) => match named_key {
+
+			// ------------------------------------------------------
+			// Cases where the variant name doesn't match the config string
+			NamedKey::Enter => "Return".into(),
+			NamedKey::ArrowDown => "Down".into(),
+			NamedKey::ArrowLeft => "Left".into(),
+			NamedKey::ArrowRight => "Right".into(),
+			NamedKey::ArrowUp => "Up".into(),
+			// ------------------------------------------------------
+
 			NamedKey::Alt => "Alt".into(),
 			NamedKey::AltGraph => "AltGraph".into(),
 			NamedKey::CapsLock => "CapsLock".into(),
@@ -21,13 +34,8 @@ pub fn virtual_keycode_to_string(key: &Key) -> String {
 			NamedKey::Meta => "Meta".into(),
 			NamedKey::Hyper => "Hyper".into(),
 			NamedKey::Super => "Super".into(),
-			NamedKey::Enter => "Enter".into(),
 			NamedKey::Tab => "Tab".into(),
 			NamedKey::Space => "Space".into(),
-			NamedKey::ArrowDown => "ArrowDown".into(),
-			NamedKey::ArrowLeft => "ArrowLeft".into(),
-			NamedKey::ArrowRight => "ArrowRight".into(),
-			NamedKey::ArrowUp => "ArrowUp".into(),
 			NamedKey::End => "End".into(),
 			NamedKey::Home => "Home".into(),
 			NamedKey::PageDown => "PageDown".into(),
