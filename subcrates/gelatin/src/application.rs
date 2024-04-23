@@ -60,6 +60,12 @@ fn aggregate_control_flow<E>(event_loop: &EventLoopWindowTarget<E>, new: Control
 	false
 }
 
+/// On Windows, there's a bug that causes the event loop to get stuck in a
+/// repeated "Poll-like" loop with the control flow set to WaitUntil but the
+/// loops keeps running iterations immediately after each other.
+///
+/// We use this function to check if the time specified in WaitUntil has already
+/// been passed and if it is, then we change the control flow, to get "un-stuck"
 fn sanitize_control_flow<E>(event_loop: &EventLoopWindowTarget<E>) {
 	set_control_flow(event_loop, event_loop.control_flow());
 }
