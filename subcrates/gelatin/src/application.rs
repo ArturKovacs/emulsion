@@ -1,13 +1,10 @@
 use std::{
-	collections::hash_map::HashMap,
-	rc::Rc,
-	sync::atomic::{AtomicBool, Ordering},
-	time::{Duration, Instant},
+	collections::hash_map::HashMap, fmt::Debug, rc::Rc, sync::atomic::{AtomicBool, Ordering}, time::{Duration, Instant}
 };
 
 use winit::{
 	event::{Event, StartCause, WindowEvent},
-	event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget},
+	event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy, EventLoopWindowTarget},
 	window::WindowId,
 };
 
@@ -20,7 +17,7 @@ pub fn request_exit() {
 	EXIT_REQUESTED.store(true, Ordering::Relaxed);
 }
 
-fn set_control_flow(event_loop: &EventLoopWindowTarget<()>, control_flow: ControlFlow) {
+fn set_control_flow<E>(event_loop: &EventLoopWindowTarget<E>, control_flow: ControlFlow) {
 	if let ControlFlow::WaitUntil(time) = control_flow {
 		let very_short_time_from_now = Instant::now() + Duration::from_micros(100);
 		if time < very_short_time_from_now {
@@ -34,7 +31,7 @@ fn set_control_flow(event_loop: &EventLoopWindowTarget<()>, control_flow: Contro
 }
 
 /// Returns true if original was replaced by new
-fn aggregate_control_flow(event_loop: &EventLoopWindowTarget<()>, new: ControlFlow) -> bool {
+fn aggregate_control_flow<E>(event_loop: &EventLoopWindowTarget<E>, new: ControlFlow) -> bool {
 	let original = event_loop.control_flow();
 	match new {
 		ControlFlow::Poll => {
@@ -59,23 +56,29 @@ fn aggregate_control_flow(event_loop: &EventLoopWindowTarget<()>, new: ControlFl
 	false
 }
 
-fn sanitize_control_flow(event_loop: &EventLoopWindowTarget<()>) {
+fn sanitize_control_flow<E>(event_loop: &EventLoopWindowTarget<E>) {
 	set_control_flow(event_loop, event_loop.control_flow());
 }
 
-pub type EventHandler = dyn FnMut(&Event<()>) -> NextUpdate;
+pub type EventHandler<UserEvent> = dyn FnMut(&Event<UserEvent>) -> NextUpdate;
 
-pub struct Application {
-	pub event_loop: EventLoop<()>,
+pub struct Application<UserEvent>
+where
+	UserEvent: Debug + 'static
+{
+	pub event_loop: EventLoop<UserEvent>,
 	windows: HashMap<WindowId, Rc<Window>>,
-	global_handlers: Vec<Box<EventHandler>>,
+	global_handlers: Vec<Box<EventHandler<UserEvent>>>,
 	at_exit: Option<Box<dyn FnOnce()>>,
 }
 
-impl Application {
-	pub fn new() -> Application {
+impl<UserEvent> Application<UserEvent> 
+where
+	UserEvent: Debug + 'static
+{
+	pub fn new() -> Self {
 		Application {
-			event_loop: EventLoop::<()>::new().unwrap(),
+			event_loop: EventLoopBuilder::<UserEvent>::with_user_event().build().unwrap(),
 			windows: HashMap::new(),
 			global_handlers: Vec::new(),
 			at_exit: None,
@@ -93,11 +96,15 @@ impl Application {
 		self.windows.insert(window.get_id(), window);
 	}
 
-	pub fn add_global_event_handler<F: FnMut(&Event<()>) -> NextUpdate + 'static>(
+	pub fn add_global_event_handler<F: FnMut(&Event<UserEvent>) -> NextUpdate + 'static>(
 		&mut self,
 		fun: F,
 	) {
 		self.global_handlers.push(Box::new(fun));
+	}
+
+	pub fn create_loop_proxy(&self) -> EventLoopProxy<UserEvent> {
+		self.event_loop.create_proxy()
 	}
 
 	pub fn start_event_loop(self) {
@@ -137,8 +144,14 @@ impl Application {
 				}
 				// dbg!(&event);
 				match event {
-					Event::NewEvents(StartCause::Init) => {
-						event_loop.set_control_flow(ControlFlow::Wait);
+					Event::NewEvents(start_cause) => {
+						if start_cause == StartCause::Init {
+							event_loop.set_control_flow(ControlFlow::Wait);		
+						}
+						for window in windows.values() {
+							let new_control_flow = window.handle_loop_wake_up().into();
+							aggregate_control_flow(event_loop, new_control_flow);
+						}
 					}
 					Event::WindowEvent { event, window_id } => {
 						if let WindowEvent::RedrawRequested = event {
@@ -190,7 +203,7 @@ impl Application {
 						}
 					}
 					event => {
-						log::debug!("Ignoring event: {event:?}");
+						// log::debug!("Ignoring event: {event:?}");
 					}
 				}
 
@@ -207,7 +220,10 @@ impl Application {
 	}
 }
 
-impl Default for Application {
+impl<UserEvent> Default for Application<UserEvent> 
+where
+	UserEvent: Debug + 'static
+{
 	fn default() -> Self {
 		Self::new()
 	}

@@ -7,7 +7,7 @@ use std::f32;
 use std::rc::Rc;
 
 fn main() {
-	let mut application = Application::new();
+	let mut application = Application::<()>::new();
 	// A window
 	let window = Window::new(&mut application, WindowDescriptorBuilder::default().build().unwrap());
 	let container = Rc::new(HorizontalLayoutContainer::new());

@@ -65,6 +65,13 @@ static VISIT_SITE: &[u8] = include_bytes!("../resource/visit-site.png");
 static USAGE: &[u8] = include_bytes!("../resource/usage.png");
 static LEFT_TO_PAN: &[u8] = include_bytes!("../resource/use-left-to-pan.png");
 
+#[derive(Debug)]
+pub enum EmulsionEvent {
+	/// Used to signal the event loop to wake up, because an image was loaded
+	/// and the UI may need to update to display the image
+	ImageLoaded
+}
+
 // ========================================================
 // Not-so glorious main function
 // ========================================================
@@ -90,7 +97,7 @@ fn main() {
 			args.displayed_folders;
 	}
 
-	let mut application = Application::new();
+	let mut application = Application::<()>::new();
 	let window: Rc<Window> = {
 		let window_cache = &mut cache.lock().unwrap().window;
 		let window_cfg = &config.borrow().window;

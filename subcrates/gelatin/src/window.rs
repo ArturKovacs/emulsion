@@ -26,12 +26,7 @@ use winit::platform::x11::WindowBuilderExtX11;
 use winit::platform::wayland::WindowBuilderExtWayland;
 
 use std::{
-	cell::{Cell, RefCell, RefMut},
-	cmp::Eq,
-	hash::{Hash, Hasher},
-	num::NonZeroU32,
-	ops::{Deref, DerefMut},
-	rc::Rc,
+	cell::{Cell, RefCell, RefMut}, cmp::Eq, fmt::Debug, hash::{Hash, Hasher}, num::NonZeroU32, ops::{Deref, DerefMut}, rc::Rc
 };
 
 use cgmath::ortho;
@@ -170,7 +165,7 @@ impl PartialEq for Window {
 impl Eq for Window {}
 
 impl Window {
-	pub fn new(application: &mut Application, desc: WindowDescriptor) -> Rc<Self> {
+	pub fn new<UserEvent: Debug>(application: &mut Application<UserEvent>, desc: WindowDescriptor) -> Rc<Self> {
 		//use glium::glutin::window::Icon;
 		//let exe_parent = std::env::current_exe().unwrap().parent().unwrap().to_owned();
 
@@ -290,9 +285,9 @@ impl Window {
 
 	/// This is mostly copy-pasted from `glutin::SimpleWindowBuilder::build`
 	/// but I use some custom configuration settings here
-	fn build_winit_window(
+	fn build_winit_window<UserEvent>(
 		builder: WindowBuilder,
-		event_loop: &EventLoop<()>,
+		event_loop: &EventLoop<UserEvent>,
 	) -> (winit::window::Window, Display<WindowSurface>) {
 		// First we start by opening a new Window
 		let display_builder =
@@ -349,66 +344,6 @@ impl Window {
 		(window, display)
 	}
 
-	// fn winit_window_handle_to_glutin(handle: winit::raw_window_handle::RawWindowHandle) -> raw_window_handle::RawWindowHandle {
-	// 	match handle {
-	// 		winit::raw_window_handle::RawWindowHandle::UiKit(handle) => {
-	// 			let mut new_handle = UiKitWindowHandle::empty();
-	// 			new_handle.ui_window = null_mut();
-	// 			new_handle.ui_view = handle.ui_view.as_ptr();
-	// 			new_handle.ui_view_controller = handle.ui_view_controller.map_or(null_mut(), |p| p.as_ptr());
-	// 			raw_window_handle::RawWindowHandle::UiKit(new_handle)
-	// 		}
-	// 		winit::raw_window_handle::RawWindowHandle::AppKit(handle) => {
-	// 			let mut new_handle = AppKitWindowHandle::empty();
-	// 			new_handle.ns_view = handle.ns_view.as_ptr();
-	// 			new_handle.ns_window = null_mut();
-	// 			raw_window_handle::RawWindowHandle::AppKit(new_handle)
-	// 		}
-	// 		winit::raw_window_handle::RawWindowHandle::Orbital(handle) => {
-	// 			todo!()
-	// 		}
-	// 		winit::raw_window_handle::RawWindowHandle::Xlib(handle) => {
-	// 			let mut new_handle = XlibWindowHandle::empty();
-	// 			new_handle.visual_id =
-	// 			raw_window_handle::RawWindowHandle::Xlib()
-	// 		}
-	// 		winit::raw_window_handle::RawWindowHandle::Xcb(handle) => {
-	// 			raw_window_handle::RawWindowHandle::Xcb(handle)
-	// 		}
-	// 		winit::raw_window_handle::RawWindowHandle::Wayland(handle) => {
-	// 			raw_window_handle::RawWindowHandle::Wayland(handle)
-	// 		}
-	// 		winit::raw_window_handle::RawWindowHandle::Drm(handle) => {
-	// 			raw_window_handle::RawWindowHandle::Drm(handle)
-	// 		}
-	// 		winit::raw_window_handle::RawWindowHandle::Gbm(handle) => {
-	// 			raw_window_handle::RawWindowHandle::Gbm(handle)
-	// 		}
-	// 		winit::raw_window_handle::RawWindowHandle::Win32(handle) => {
-	// 			raw_window_handle::RawWindowHandle::Win32(handle)
-	// 		}
-	// 		winit::raw_window_handle::RawWindowHandle::WinRt(handle) => {
-	// 			raw_window_handle::RawWindowHandle::WinRt(handle)
-	// 		}
-	// 		winit::raw_window_handle::RawWindowHandle::Web(handle) => {
-	// 			todo!()
-	// 		}
-	// 		winit::raw_window_handle::RawWindowHandle::WebCanvas(handle) => {
-	// 			todo!()
-	// 		}
-	// 		winit::raw_window_handle::RawWindowHandle::WebOffscreenCanvas(handle) => {
-	// 			todo!()
-	// 		}
-	// 		winit::raw_window_handle::RawWindowHandle::AndroidNdk(handle) => {
-	// 			todo!()
-	// 		}
-	// 		winit::raw_window_handle::RawWindowHandle::Haiku(handle) => {
-	// 			todo!()
-	// 		}
-	// 		_ => todo!(),
-	// 	}
-	// }
-
 	pub fn add_global_event_handler<F: FnMut(&WindowEvent) + 'static>(&self, fun: F) {
 		let mut borrowed = self.data.borrow_mut();
 		borrowed.global_event_handlers.push(Box::new(fun));
@@ -426,11 +361,17 @@ impl Window {
 		borrowed.bg_color = color;
 	}
 
-	// allowing event_loop to be unused because it's only used on some platforms
-	pub fn process_event(
+	/// This is called when a NewEvents event is received in the application
+	pub fn handle_loop_wake_up(&self) -> NextUpdate {
+		let root_widget = self.data.borrow().root_widget.clone();
+		root_widget.before_draw(self)
+	}
+
+	pub fn process_event<UserEvent>(
 		&self,
 		native_event: WindowEvent,
-		#[allow(unused_variables)] event_loop: &EventLoopWindowTarget<()>,
+		// allowing event_loop to be unused because it's only used on some platforms
+		#[allow(unused_variables)] event_loop: &EventLoopWindowTarget<UserEvent>,
 	) {
 		use winit::event::MouseScrollDelta;
 
