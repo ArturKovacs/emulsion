@@ -315,7 +315,7 @@ impl Window {
 					}
 					target = cfg;
 				}
-				return target;
+				target
 			})
 			.unwrap();
 		let window = window.unwrap();
@@ -340,13 +340,12 @@ impl Window {
 			.with_context_api(ContextApi::OpenGl(Some(Version::new(3, 3))))
 			.with_release_behavior(glutin::context::ReleaseBehavior::None)
 			.build(Some(window.raw_window_handle()));
-		let current_context = Some(unsafe {
+		let current_context = unsafe {
 			gl_config
 				.display()
 				.create_context(&gl_config, &context_attributes)
 				.expect("failed to create context")
-		})
-		.unwrap()
+		}
 		.make_current(&surface)
 		.unwrap();
 

@@ -2,7 +2,7 @@ use gelatin::winit::keyboard::{Key, NamedKey};
 use log::warn;
 
 /// Returns the textual name of the key as written in the config file.
-/// 
+///
 /// (Right side, eg "Return" is the string that should be used in the config file)
 pub fn virtual_keycode_to_string(key: &Key) -> String {
 	match key {
@@ -10,7 +10,6 @@ pub fn virtual_keycode_to_string(key: &Key) -> String {
 		Key::Character(ch) => ch.to_string(),
 		Key::Dead(ch) => ch.map_or(Default::default(), |ch| ch.into()),
 		Key::Named(named_key) => match named_key {
-
 			// ------------------------------------------------------
 			// Cases where the variant name doesn't match the config string
 			NamedKey::Enter => "Return".into(),
@@ -19,7 +18,6 @@ pub fn virtual_keycode_to_string(key: &Key) -> String {
 			NamedKey::ArrowRight => "Right".into(),
 			NamedKey::ArrowUp => "Up".into(),
 			// ------------------------------------------------------
-
 			NamedKey::Alt => "Alt".into(),
 			NamedKey::AltGraph => "AltGraph".into(),
 			NamedKey::CapsLock => "CapsLock".into(),

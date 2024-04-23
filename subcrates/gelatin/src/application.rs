@@ -188,15 +188,14 @@ where
 						if EXIT_REQUESTED.load(Ordering::Relaxed) {
 							event_loop.exit();
 							return;
-						} else {
-							for window in windows.values() {
-								window.main_events_cleared();
-								if window.redraw_needed() {
-									window.request_redraw();
-								}
-							}
-							// event_loop.set_control_flow(ControlFlow::Wait);
 						}
+						for window in windows.values() {
+							window.main_events_cleared();
+							if window.redraw_needed() {
+								window.request_redraw();
+							}
+						}
+						// event_loop.set_control_flow(ControlFlow::Wait);
 					}
 					Event::LoopExiting => {
 						if let Some(at_exit) = at_exit.take() {
