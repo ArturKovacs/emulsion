@@ -11,7 +11,7 @@ use gelatin::image::{
 	codecs::{gif::GifDecoder, png::PngDecoder},
 	AnimationDecoder, ImageFormat,
 };
-use usvg::TreeParsing;
+use usvg::fontdb;
 
 pub mod errors {
 	use gelatin::glium::texture;
@@ -146,21 +146,26 @@ pub fn load_gif(path: &Path, req_id: u32) -> Result<impl Iterator<Item = Result<
 
 /// Parse, render and gather an SVG into a ImageBuffer<Rgba>
 pub fn load_svg(path: &std::path::Path) -> Result<image::RgbaImage> {
-	let opt = usvg::Options::default();
-
 	let svg_data = fs::read(path)?;
+	let rtree = {
+		let mut opt = usvg::Options::default();
+		opt.resources_dir =
+			std::fs::canonicalize(path).ok().and_then(|p| p.parent().map(|p| p.to_path_buf()));
 
-	let rtree = usvg::Tree::from_data(&svg_data, &opt)?;
-	let width = rtree.size.width();
-	let height = rtree.size.height();
+		let mut fontdb = fontdb::Database::new();
+		fontdb.load_system_fonts();
+
+		usvg::Tree::from_data(&svg_data, &opt, &fontdb)?
+	};
+	let width = rtree.size().width();
+	let height = rtree.size().height();
 	// Scale to fit 4096
 	let zoom = 4096. / width.max(height);
 	let (width, height) = ((width * zoom) as u32, (height * zoom) as u32);
 	// These unwrapped Options are fine as long as the dimensions are correct
 	let mut pixmap = tiny_skia::Pixmap::new(width, height).unwrap();
 	let transform = tiny_skia::Transform::from_scale(zoom, zoom);
-	let rtree = resvg::Tree::from_usvg(&rtree);
-	rtree.render(transform, &mut pixmap.as_mut());
+	resvg::render(&rtree, transform, &mut pixmap.as_mut());
 	Ok(image::RgbaImage::from_raw(width, height, pixmap.take()).unwrap())
 }
 
