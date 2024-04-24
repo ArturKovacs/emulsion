@@ -148,9 +148,12 @@ pub fn load_gif(path: &Path, req_id: u32) -> Result<impl Iterator<Item = Result<
 pub fn load_svg(path: &std::path::Path) -> Result<image::RgbaImage> {
 	let svg_data = fs::read(path)?;
 	let rtree = {
-		let mut opt = usvg::Options::default();
-		opt.resources_dir =
-			std::fs::canonicalize(path).ok().and_then(|p| p.parent().map(|p| p.to_path_buf()));
+		let opt = usvg::Options {
+			resources_dir: std::fs::canonicalize(path)
+				.ok()
+				.and_then(|p| p.parent().map(|p| p.to_path_buf())),
+			..Default::default()
+		};
 
 		let mut fontdb = fontdb::Database::new();
 		fontdb.load_system_fonts();
