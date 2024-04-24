@@ -1,29 +1,49 @@
 use cgmath::{Matrix4, Vector3};
-use glium::glutin::window::Icon;
-use glium::glutin::{
-	self,
+use glium::{
+	glutin::{
+		self,
+		config::{Api, ConfigSurfaceTypes, GlConfig},
+		context::{ContextApi, GlProfile, NotCurrentGlContext, Version},
+		display::{GetGlDisplay, GlDisplay},
+		surface::{GlSurface, WindowSurface},
+	},
+	uniform, Blend, BlendingFunction, Display, Frame, IndexBuffer, Program, Rect, Surface,
+	VertexBuffer,
+};
+use log::error;
+use raw_window_handle::HasRawWindowHandle;
+use winit::{
 	dpi::{PhysicalPosition, PhysicalSize},
 	event::WindowEvent,
-	window::{CursorIcon, WindowId},
+	event_loop::{EventLoop, EventLoopWindowTarget},
+	keyboard::ModifiersState,
+	window::{CursorIcon, Fullscreen, Icon, WindowBuilder, WindowId},
 };
-use glium::{program, uniform, Display, Frame, IndexBuffer, Program, Rect, Surface, VertexBuffer};
-use glium::{Blend, BlendingFunction};
 
 #[cfg(not(any(target_os = "macos", windows)))]
-use winit::platform::unix::WindowBuilderExtUnix;
+use winit::platform::{
+	wayland::{EventLoopWindowTargetExtWayland, WindowBuilderExtWayland},
+	x11::WindowBuilderExtX11,
+};
 
-use std::cell::Cell;
-use std::cell::{RefCell, RefMut};
-use std::cmp::Eq;
-use std::hash::{Hash, Hasher};
-use std::ops::{Deref, DerefMut};
-use std::rc::Rc;
+use std::{
+	cell::{Cell, RefCell, RefMut},
+	cmp::Eq,
+	fmt::Debug,
+	hash::{Hash, Hasher},
+	num::NonZeroU32,
+	ops::{Deref, DerefMut},
+	rc::Rc,
+};
 
 use cgmath::ortho;
 use derive_builder::Builder;
 
-use crate::application::Application;
 use crate::shaders;
+use crate::{
+	application::Application,
+	shaders::{shader_from_source, ShaderDescriptor},
+};
 use crate::{
 	misc::{FromPhysical, LogicalRect, LogicalVector},
 	DrawContext, Event, EventKind, NextUpdate, Vertex, Widget,
@@ -60,7 +80,7 @@ pub struct WindowDisplayRefMut<'a> {
 	window_ref: RefMut<'a, WindowData>,
 }
 impl<'a> Deref for WindowDisplayRefMut<'a> {
-	type Target = Display;
+	type Target = Display<WindowSurface>;
 	fn deref(&self) -> &Self::Target {
 		&self.window_ref.display
 	}
@@ -68,6 +88,21 @@ impl<'a> Deref for WindowDisplayRefMut<'a> {
 impl<'a> DerefMut for WindowDisplayRefMut<'a> {
 	fn deref_mut(&mut self) -> &mut Self::Target {
 		&mut self.window_ref.display
+	}
+}
+
+pub struct WinitWindowRefMut<'a> {
+	window_ref: RefMut<'a, WindowData>,
+}
+impl<'a> Deref for WinitWindowRefMut<'a> {
+	type Target = winit::window::Window;
+	fn deref(&self) -> &Self::Target {
+		&self.window_ref.window
+	}
+}
+impl<'a> DerefMut for WinitWindowRefMut<'a> {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.window_ref.window
 	}
 }
 
@@ -93,19 +128,20 @@ pub struct WindowDescriptor {
 pub type EventHandler = dyn FnMut(&WindowEvent);
 
 struct WindowData {
-	display: glium::Display,
+	display: glium::Display<WindowSurface>,
+	window: winit::window::Window,
+
 	size_before_fullscreen: PhysicalSize<u32>,
 	fullscreen: bool,
 	last_mouse_move_update_time: std::time::Instant,
 	unprocessed_move_event: Option<Event>,
 	last_event_invalidated: bool,
-	should_sleep: bool,
 
 	new_title: Option<String>,
 
 	render_validity: RenderValidity,
 	cursor_pos: LogicalVector,
-	modifiers: glutin::event::ModifiersState,
+	modifiers: ModifiersState,
 	root_widget: Rc<dyn Widget>,
 	bg_color: [f32; 4],
 
@@ -135,11 +171,14 @@ impl PartialEq for Window {
 impl Eq for Window {}
 
 impl Window {
-	pub fn new(application: &mut Application, desc: WindowDescriptor) -> Rc<Self> {
+	pub fn new<UserEvent: Debug>(
+		application: &mut Application<UserEvent>,
+		desc: WindowDescriptor,
+	) -> Rc<Self> {
 		//use glium::glutin::window::Icon;
 		//let exe_parent = std::env::current_exe().unwrap().parent().unwrap().to_owned();
 
-		let window = glutin::window::WindowBuilder::new()
+		let window_builder = WindowBuilder::new()
 			.with_title("Loading")
 			.with_fullscreen(None)
 			.with_inner_size(desc.size)
@@ -147,18 +186,27 @@ impl Window {
 			.with_visible(desc.position.is_none());
 
 		#[cfg(not(any(target_os = "macos", windows)))]
-		let window = if let Some(app_id) = desc.app_id { window.with_app_id(app_id) } else { window };
+		let window_builder = if let Some(app_id) = desc.app_id {
+			let is_wayland = std::env::var("XDG_SESSION_TYPE")
+				.map_or(false, |var| var.to_lowercase().contains("wayland"));
+			if is_wayland {
+				WindowBuilderExtWayland::with_name(window_builder, &app_id, app_id.to_lowercase())
+			} else {
+				WindowBuilderExtX11::with_name(window_builder, &app_id, app_id.to_lowercase())
+			}
+		} else {
+			window_builder
+		};
 
-		let context =
-			glutin::ContextBuilder::new().with_gl_profile(glutin::GlProfile::Core).with_vsync(true);
-		let display = glium::Display::new(window, context, &application.event_loop).unwrap();
+		// let window = window.build(&application.event_loop).unwrap();
+		let (window, display) = Self::build_winit_window(window_builder, &application.event_loop);
 
 		if let Some(pos) = desc.position {
-			display.gl_window().window().set_outer_position(pos);
-			display.gl_window().window().set_visible(true);
+			window.set_outer_position(pos);
+			window.set_visible(true);
 		}
 
-		display.gl_window().window().set_cursor_icon(CursorIcon::Default);
+		window.set_cursor_icon(CursorIcon::Default);
 
 		// All the draw stuff
 		use glium::index::PrimitiveType;
@@ -180,36 +228,35 @@ impl Window {
 			IndexBuffer::new(&display, PrimitiveType::TriangleStrip, &[1_u16, 2, 0, 3]).unwrap();
 
 		// compiling shaders and linking them together
-		let textured_program = program!(&display,
-			140 => {
-				vertex: shaders::VERTEX_140,
-				fragment: shaders::TEXTURE_SHADOW_F_140
-			},
-			110 => {
-				vertex: shaders::VERTEX_110,
-				fragment: shaders::TEXTURE_SHADOW_F_110
-			},
-		)
-		.unwrap();
-		let colored_shadowed_program = program!(&display,
-			140 => {
-				vertex: shaders::VERTEX_140,
-				fragment: shaders::COLOR_SHADOW_F_140
-			},
-			110 => {
-				vertex: shaders::VERTEX_110,
-				fragment: shaders::COLOR_SHADOW_F_110
+		let textured_program = shader_from_source(
+			&display,
+			ShaderDescriptor {
+				vertex_shader: shaders::VERTEX_140,
+				fragment_shader: shaders::TEXTURE_SHADOW_F_140,
+				outputs_srgb: false,
+				..Default::default()
 			},
 		)
 		.unwrap();
-		let colored_program = program!(&display,
-			140 => {
-				vertex: shaders::VERTEX_140,
-				fragment: shaders::COLOR_F_140
+
+		let colored_shadowed_program = shader_from_source(
+			&display,
+			ShaderDescriptor {
+				vertex_shader: shaders::VERTEX_140,
+				fragment_shader: shaders::COLOR_SHADOW_F_140,
+				outputs_srgb: false,
+				..Default::default()
 			},
-			110 => {
-				vertex: shaders::VERTEX_110,
-				fragment: shaders::COLOR_F_110
+		)
+		.unwrap();
+
+		let colored_program = shader_from_source(
+			&display,
+			ShaderDescriptor {
+				vertex_shader: shaders::VERTEX_140,
+				fragment_shader: shaders::COLOR_F_140,
+				outputs_srgb: false,
+				..Default::default()
 			},
 		)
 		.unwrap();
@@ -217,15 +264,15 @@ impl Window {
 		let resulting_window = Rc::new(Window {
 			data: RefCell::new(WindowData {
 				display,
+				window,
 				size_before_fullscreen: desc.size,
 				fullscreen: false,
 				last_mouse_move_update_time: std::time::Instant::now(),
 				unprocessed_move_event: None,
 				last_event_invalidated: true,
-				should_sleep: false,
 				new_title: None,
 				cursor_pos: Default::default(),
-				modifiers: glutin::event::ModifiersState::empty(),
+				modifiers: ModifiersState::empty(),
 				render_validity: RenderValidity { validity: Rc::new(Cell::new(false)) },
 				root_widget: Rc::new(crate::line_layout_container::VerticalLayoutContainer::new()),
 				bg_color: [0.85, 0.85, 0.85, 1.0],
@@ -242,6 +289,75 @@ impl Window {
 
 		application.register_window(resulting_window.clone());
 		resulting_window
+	}
+
+	/// This is mostly copy-pasted from `glutin::SimpleWindowBuilder::build`
+	/// but I use some custom configuration settings here
+	fn build_winit_window<UserEvent>(
+		builder: WindowBuilder,
+		event_loop: &EventLoop<UserEvent>,
+	) -> (winit::window::Window, Display<WindowSurface>) {
+		// First we start by opening a new Window
+		let display_builder =
+			glutin_winit::DisplayBuilder::new().with_window_builder(Some(builder));
+
+		let config_template_builder = glutin::config::ConfigTemplateBuilder::new()
+			.prefer_hardware_accelerated(Some(true))
+			.with_surface_type(ConfigSurfaceTypes::WINDOW)
+			.with_api(Api::OPENGL);
+		let (window, gl_config) = display_builder
+			.build(event_loop, config_template_builder, |mut configs| {
+				// Pick the first srgb capable config
+				let mut target = configs.next().unwrap();
+				for cfg in configs {
+					if target.srgb_capable() {
+						break;
+					}
+					target = cfg;
+				}
+				target
+			})
+			.unwrap();
+		let window = window.unwrap();
+
+		// Now we get the window size to use as the initial size of the Surface
+		let (width, height): (u32, u32) = window.inner_size().into();
+		let attrs =
+			glutin::surface::SurfaceAttributesBuilder::<glutin::surface::WindowSurface>::new()
+				.with_srgb(Some(true))
+				.build(
+					window.raw_window_handle(),
+					NonZeroU32::new(width).unwrap(),
+					NonZeroU32::new(height).unwrap(),
+				);
+
+		// Finally we can create a Surface, use it to make a PossiblyCurrentContext and create the glium Display
+		let surface =
+			unsafe { gl_config.display().create_window_surface(&gl_config, &attrs).unwrap() };
+
+		let context_attributes = glutin::context::ContextAttributesBuilder::new()
+			.with_profile(GlProfile::Core) // requires OpenGL 3.3
+			.with_context_api(ContextApi::OpenGl(Some(Version::new(3, 3))))
+			.with_release_behavior(glutin::context::ReleaseBehavior::None)
+			.build(Some(window.raw_window_handle()));
+		let current_context = unsafe {
+			gl_config
+				.display()
+				.create_context(&gl_config, &context_attributes)
+				.expect("failed to create context")
+		}
+		.make_current(&surface)
+		.unwrap();
+
+		// Set up vsync
+		let swap_interval = glutin::surface::SwapInterval::Wait(NonZeroU32::new(1).unwrap());
+		if let Err(error) = surface.set_swap_interval(&current_context, swap_interval) {
+			error!("Failed to set vsync, error returned by set_swap_interval: {}", error);
+		}
+
+		let display = Display::from_context_surface(current_context, surface).unwrap();
+
+		(window, display)
 	}
 
 	pub fn add_global_event_handler<F: FnMut(&WindowEvent) + 'static>(&self, fun: F) {
@@ -261,8 +377,19 @@ impl Window {
 		borrowed.bg_color = color;
 	}
 
-	pub fn process_event(&self, native_event: WindowEvent) {
-		use glutin::event::MouseScrollDelta;
+	/// This is called when a NewEvents event is received in the application
+	pub fn handle_loop_wake_up(&self) -> NextUpdate {
+		let root_widget = self.data.borrow().root_widget.clone();
+		root_widget.before_draw(self)
+	}
+
+	pub fn process_event<UserEvent>(
+		&self,
+		native_event: WindowEvent,
+		// allowing event_loop to be unused because it's only used on some platforms
+		#[allow(unused_variables)] event_loop: &EventLoopWindowTarget<UserEvent>,
+	) {
+		use winit::event::MouseScrollDelta;
 
 		let event;
 		{
@@ -271,6 +398,19 @@ impl Window {
 				handler(&native_event);
 			}
 			match native_event {
+				WindowEvent::Resized(size) => {
+					event = None;
+					if size.width < 1 || size.height < 1 {
+						return;
+					}
+
+					#[cfg(all(unix, not(target_os = "macos")))]
+					if event_loop.is_wayland() {
+						// We need to set the framebuffer size explicitly on Wayland (god knows why)
+						borrowed.display.resize((size.width, size.height));
+					}
+					borrowed.window.request_redraw();
+				}
 				WindowEvent::CloseRequested => {
 					event = Some(Event {
 						cursor_pos: borrowed.cursor_pos,
@@ -278,27 +418,17 @@ impl Window {
 						kind: EventKind::CloseRequested,
 					});
 				}
-				WindowEvent::KeyboardInput { input, .. } => {
+				WindowEvent::KeyboardInput { event: key_event, .. } => {
 					event = Some(Event {
 						cursor_pos: borrowed.cursor_pos,
 						modifiers: borrowed.modifiers,
-						kind: EventKind::KeyInput { input },
-					});
-				}
-				WindowEvent::ReceivedCharacter(ch) => {
-					event = Some(Event {
-						cursor_pos: borrowed.cursor_pos,
-						modifiers: borrowed.modifiers,
-						kind: EventKind::ReceivedCharacter(ch),
+						kind: EventKind::KeyInput { input: key_event },
 					});
 				}
 				WindowEvent::CursorMoved { position, .. } => {
 					let logical_pos;
 					{
-						let gl_window = borrowed.display.gl_window();
-						let window = gl_window.window();
-
-						let scaling = window.scale_factor() as f32;
+						let scaling = borrowed.window.scale_factor() as f32;
 
 						logical_pos = LogicalVector::from_physical(position, scaling);
 						//logical_pos.vec.y = logical_dimensions.vec.y - logical_pos.vec.y;
@@ -368,7 +498,7 @@ impl Window {
 					});
 				}
 				WindowEvent::ModifiersChanged(modifiers) => {
-					borrowed.modifiers = modifiers;
+					borrowed.modifiers = modifiers.state();
 					event = None;
 				}
 				_ => event = None,
@@ -379,19 +509,10 @@ impl Window {
 			let cloned = self.data.borrow().root_widget.clone();
 			cloned.handle_event(&event);
 			let mut borrowed = self.data.borrow_mut();
-			borrowed.should_sleep = false;
-			if borrowed.render_validity.get() {
-				if let EventKind::MouseMove = event.kind {
-					borrowed.should_sleep = true;
-				}
-			} else {
+			if !borrowed.render_validity.get() {
 				borrowed.last_event_invalidated = true;
 			}
 		}
-	}
-
-	pub fn should_sleep(&self) -> bool {
-		self.data.borrow().should_sleep
 	}
 
 	pub fn set_title(&self, title: String) {
@@ -407,21 +528,24 @@ impl Window {
 		WindowDisplayRefMut { window_ref: self.data.borrow_mut() }
 	}
 
+	pub fn window_mut(&self) -> WinitWindowRefMut<'_> {
+		WinitWindowRefMut { window_ref: self.data.borrow_mut() }
+	}
+
 	pub fn get_id(&self) -> WindowId {
-		self.data.borrow().display.gl_window().window().id()
+		self.data.borrow().window.id()
 	}
 
 	pub fn request_redraw(&self) {
-		self.data.borrow_mut().display.gl_window().window().request_redraw();
+		self.data.borrow_mut().window.request_redraw();
 	}
 
-	pub fn main_events_cleared(&self) -> NextUpdate {
+	pub fn main_events_cleared(&self) {
 		// this way self.data is not borrowed while `before_draw` is running.
 		let root_widget = self.data.borrow().root_widget.clone();
 		if let Some(event) = self.data.borrow_mut().unprocessed_move_event.take() {
 			root_widget.handle_event(&event);
 		}
-		root_widget.before_draw(self)
 	}
 
 	pub fn redraw_needed(&self) -> bool {
@@ -432,23 +556,22 @@ impl Window {
 	/// This means that trying to borrow the window *mutably* in a widget's
 	/// draw function will fail.
 	pub fn redraw(&self) -> crate::NextUpdate {
-		// Using a scope to only borrow the data mutable for the very beggining.
+		// Using a scope to only borrow the data mutably for the very beggining.
 		{
 			let mut borrowed = self.data.borrow_mut();
 			if let Some(new_title) = borrowed.new_title.take() {
-				borrowed.display.gl_window().window().set_title(&new_title);
+				borrowed.window.set_title(&new_title);
 			}
 			borrowed.last_event_invalidated = false;
 		}
 		// this way self.data is not borrowed while before draw is running.
-		let dpi_scaling = self.data.borrow().display.gl_window().window().scale_factor();
+		let dpi_scaling = self.data.borrow().window.scale_factor();
 		let mut target = self.data.borrow().display.draw();
 
 		// Can't change the window during drawing phase. Deal with it.
 		let borrowed = self.data.borrow();
 		let dimensions = target.get_dimensions();
-		let phys_dimensions =
-			glutin::dpi::PhysicalSize::new(dimensions.0 as f32, dimensions.1 as f32);
+		let phys_dimensions = PhysicalSize::new(dimensions.0 as f32, dimensions.1 as f32);
 		let phys_width = phys_dimensions.width;
 		let phys_height = phys_dimensions.height;
 		let logical_dimensions = LogicalVector::from_physical(phys_dimensions, dpi_scaling as f32);
@@ -491,7 +614,7 @@ impl Window {
 
 		// Using the cloned root instead of self.root_widget doesn't make much difference
 		// because self is being borrowed by through the draw_context anyways but it's fine.
-		let retval = borrowed.root_widget.draw(&mut target, &draw_context).unwrap();
+		let next_update = borrowed.root_widget.draw(&mut target, &draw_context).unwrap();
 
 		// After all widgets are drawn, let's set the alpha values of all the pixels to 1.
 		// This is required on Wayland because the Wayland compositor very kindly takes
@@ -501,7 +624,7 @@ impl Window {
 
 		target.finish().unwrap();
 		borrowed.render_validity.make_valid();
-		retval
+		next_update
 	}
 
 	pub fn fullscreen(&self) -> bool {
@@ -514,20 +637,18 @@ impl Window {
 		let monitor = if fullscreen {
 			let curr_mon;
 			borrowed.size_before_fullscreen = {
-				let gl_win = borrowed.display.gl_window();
-				curr_mon = gl_win.window().current_monitor();
-				gl_win.window().inner_size()
+				curr_mon = borrowed.window.current_monitor();
+				borrowed.window.inner_size()
 			};
-			Some(glutin::window::Fullscreen::Borderless(curr_mon))
+			Some(Fullscreen::Borderless(curr_mon))
 		} else {
 			None
 		};
-		let gl_win = borrowed.display.gl_window();
-		gl_win.window().set_fullscreen(monitor);
+		borrowed.window.set_fullscreen(monitor);
 	}
 
 	pub fn set_maximized(&self, maximized: bool) {
-		self.display_mut().gl_window().window().set_maximized(maximized);
+		self.data.borrow_mut().window.set_maximized(maximized);
 	}
 
 	/// Sets the alpha values by drawing a quad covering the entire framebuffer

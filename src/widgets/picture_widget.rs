@@ -1,31 +1,38 @@
-use std::cell::{Ref, RefCell};
-use std::path::PathBuf;
-use std::rc::{Rc, Weak};
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
-
-use gelatin::cgmath::{Matrix4, Vector2, Vector3};
-use gelatin::glium::glutin::event::{ElementState, ModifiersState, MouseButton};
-use gelatin::glium::{
-	program, uniform, uniforms::MagnifySamplerFilter, Display, Frame, Program, Surface,
+use std::{
+	cell::{Ref, RefCell},
+	path::PathBuf,
+	rc::{Rc, Weak},
+	sync::{Arc, Mutex},
+	time::{Duration, Instant},
 };
 
-use gelatin::add_common_widget_functions;
-use gelatin::misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement};
-use gelatin::window::{RenderValidity, Window};
-use gelatin::NextUpdate;
 use gelatin::{
-	application::request_exit, DrawContext, Event, EventKind, Widget, WidgetData, WidgetError,
+	cgmath::{Matrix4, Vector2, Vector3},
+	glium::{uniform, uniforms::MagnifySamplerFilter, Frame, Program, Surface},
+	shaders::ShaderDescriptor,
+	winit::{
+		event::{ElementState, MouseButton},
+		platform::modifier_supplement::KeyEventExtModifierSupplement,
+	},
 };
 
-use crate::input_handling::*;
-use crate::shaders;
-use crate::utils::{virtual_keycode_is_char, virtual_keycode_to_string};
+use gelatin::{
+	add_common_widget_functions,
+	application::request_exit,
+	misc::{Alignment, Length, LogicalRect, LogicalVector, WidgetPlacement},
+	window::{RenderValidity, Window},
+	winit::keyboard::ModifiersState,
+	Display, DrawContext, Event, EventKind, NextUpdate, Widget, WidgetData, WidgetError,
+};
+
 use crate::{
 	clipboard_handler::ClipboardHandler,
 	configuration::{Antialias, Cache, Configuration},
 	image_cache::{image_loader::Orientation, AnimationFrameTexture},
+	input_handling::*,
 	playback_manager::*,
+	shaders,
+	utils::virtual_keycode_to_string,
 };
 
 use super::{bottom_bar::BottomBar, copy_notification::CopyNotifications, help_screen::HelpScreen};
@@ -412,14 +419,25 @@ impl PictureWidget {
 		configuration: Rc<RefCell<Configuration>>,
 		cache: Arc<Mutex<Cache>>,
 	) -> PictureWidget {
-		let program = program!(display,
-			140 => {
-				vertex: shaders::VERTEX_140,
-				fragment: shaders::FRAGMENT_140
-			},
-			110 => {
-				vertex: shaders::VERTEX_110,
-				fragment: shaders::FRAGMENT_110
+		// let program = program!(display,
+		// 	140 => {
+		// 		vertex: shaders::VERTEX_140,
+		// 		fragment: shaders::FRAGMENT_140
+		// 	},
+		// 	110 => {
+		// 		vertex: shaders::VERTEX_110,
+		// 		fragment: shaders::FRAGMENT_110
+		// 	},
+		// )
+		// .unwrap();
+
+		let program = gelatin::shaders::shader_from_source(
+			display,
+			ShaderDescriptor {
+				vertex_shader: shaders::VERTEX_140,
+				fragment_shader: shaders::FRAGMENT_140,
+				outputs_srgb: false,
+				..Default::default()
 			},
 		)
 		.unwrap();
@@ -662,6 +680,8 @@ impl Widget for PictureWidget {
 		let curr_file_index = data.playback_manager.current_file_index();
 		let curr_dir_len = data.playback_manager.current_dir_len();
 		if let (Some(curr_file_index), Some(curr_dir_len)) = (curr_file_index, curr_dir_len) {
+			// dbg!(curr_file_index);
+			// dbg!(curr_dir_len);
 			data.bottom_bar.slider.set_steps(curr_dir_len as u32, curr_file_index as u32);
 		}
 		//data.slider.set_step_bg(data.playback_manager.cached_from_dir());
@@ -795,114 +815,100 @@ impl Widget for PictureWidget {
 				let delta = delta.vec.y * 0.375;
 				borrowed.zoom_image(event.cursor_pos, delta);
 			}
-			EventKind::ReceivedCharacter(ch) => {
-				//println!("Got char {}", ch);
-				// When the control key is held down, this character is going to be the keycode
-				// of an ascii control character
-				// See https://en.wikipedia.org/wiki/Caret_notation
-				if !event.modifiers.ctrl() {
-					let input_key = char_to_input_key(ch);
-					//println!("triggering for char {}, input str: {}", ch, input_key);
-					self.handle_key_input(input_key.as_str(), event.modifiers);
+			EventKind::KeyInput { ref input } => {
+				let key = input.key_without_modifiers();
+				let is_pressed = input.state == ElementState::Pressed;
+				//println!("Got input for {:?}", key);
+				let input_key_str = virtual_keycode_to_string(&key).to_lowercase();
+				let input_key_str = char_to_input_key(&input_key_str);
+				if is_pressed {
+					self.handle_key_input(input_key_str.as_str(), event.modifiers);
 				}
-			}
-			EventKind::KeyInput { input } => {
-				if let Some(key) = input.virtual_keycode {
-					//println!("Got input for {:?}", key);
-					let input_key_str = virtual_keycode_to_string(key).to_lowercase();
-					let printable = !event.modifiers.ctrl() && virtual_keycode_is_char(key);
-					if !printable && input.state == ElementState::Pressed {
-						//println!("Triggering for input {:?}", key);
-						self.handle_key_input(input_key_str.as_str(), event.modifiers);
-					}
-					// Panning is a special snowflake
-					let mut borrowed = self.data.borrow_mut();
-					if action_triggered(
-						&borrowed.configuration,
-						PAN_NAME,
-						input_key_str.as_str(),
-						event.modifiers,
-					) {
-						borrowed.panning_2d = input.state == ElementState::Pressed;
-					}
-					if action_triggered(
-						&borrowed.configuration,
-						PAN_VERT_NAME,
-						input_key_str.as_str(),
-						event.modifiers,
-					) {
-						borrowed.panning_vert = input.state == ElementState::Pressed;
-					}
-					if action_triggered(
-						&borrowed.configuration,
-						PAN_HOR_NAME,
-						input_key_str.as_str(),
-						event.modifiers,
-					) {
-						borrowed.panning_hor = input.state == ElementState::Pressed;
-					}
+				// Panning is a special snowflake
+				let mut borrowed = self.data.borrow_mut();
+				if action_triggered(
+					&borrowed.configuration,
+					PAN_NAME,
+					input_key_str.as_str(),
+					event.modifiers,
+				) {
+					borrowed.panning_2d = is_pressed;
+				}
+				if action_triggered(
+					&borrowed.configuration,
+					PAN_VERT_NAME,
+					input_key_str.as_str(),
+					event.modifiers,
+				) {
+					borrowed.panning_vert = is_pressed;
+				}
+				if action_triggered(
+					&borrowed.configuration,
+					PAN_HOR_NAME,
+					input_key_str.as_str(),
+					event.modifiers,
+				) {
+					borrowed.panning_hor = is_pressed;
+				}
 
-					let pressed = input.state == ElementState::Pressed;
-
-					macro_rules! movement_trigger {
-						($input:expr, $vel:expr, $name:expr, $dir:expr) => {
-							if action_triggered(
-								&borrowed.configuration,
-								$name,
-								input_key_str.as_str(),
-								event.modifiers,
-							) {
-								if $input == $dir && !pressed {
-									$input = MovementDir::None;
-									$vel = 0.0;
-								}
-								if $input != $dir && pressed {
-									borrowed.camera_movement_will_start();
-									$input = $dir;
-								}
+				macro_rules! movement_trigger {
+					($input:expr, $vel:expr, $name:expr, $dir:expr) => {
+						if action_triggered(
+							&borrowed.configuration,
+							$name,
+							input_key_str.as_str(),
+							event.modifiers,
+						) {
+							if $input == $dir && !is_pressed {
+								$input = MovementDir::None;
+								$vel = 0.0;
 							}
-						};
-					}
-
-					movement_trigger!(
-						borrowed.zoom_input,
-						borrowed.zoom_vel,
-						ZOOM_IN_NAME,
-						MovementDir::Positive
-					);
-					movement_trigger!(
-						borrowed.zoom_input,
-						borrowed.zoom_vel,
-						ZOOM_OUT_NAME,
-						MovementDir::Negative
-					);
-
-					movement_trigger!(
-						borrowed.hor_pan_input,
-						borrowed.hor_pan_vel,
-						PAN_LEFT_NAME,
-						MovementDir::Positive
-					);
-					movement_trigger!(
-						borrowed.hor_pan_input,
-						borrowed.hor_pan_vel,
-						PAN_RIGHT_NAME,
-						MovementDir::Negative
-					);
-
-					movement_trigger!(
-						borrowed.ver_pan_input,
-						borrowed.ver_pan_vel,
-						PAN_UP_NAME,
-						MovementDir::Positive
-					);
-					movement_trigger!(
-						borrowed.ver_pan_input,
-						borrowed.ver_pan_vel,
-						PAN_DOWN_NAME,
-						MovementDir::Negative
-					);
+							if $input != $dir && is_pressed {
+								borrowed.camera_movement_will_start();
+								$input = $dir;
+							}
+						}
+					};
 				}
+
+				movement_trigger!(
+					borrowed.zoom_input,
+					borrowed.zoom_vel,
+					ZOOM_IN_NAME,
+					MovementDir::Positive
+				);
+				movement_trigger!(
+					borrowed.zoom_input,
+					borrowed.zoom_vel,
+					ZOOM_OUT_NAME,
+					MovementDir::Negative
+				);
+
+				movement_trigger!(
+					borrowed.hor_pan_input,
+					borrowed.hor_pan_vel,
+					PAN_LEFT_NAME,
+					MovementDir::Positive
+				);
+				movement_trigger!(
+					borrowed.hor_pan_input,
+					borrowed.hor_pan_vel,
+					PAN_RIGHT_NAME,
+					MovementDir::Negative
+				);
+
+				movement_trigger!(
+					borrowed.ver_pan_input,
+					borrowed.ver_pan_vel,
+					PAN_UP_NAME,
+					MovementDir::Positive
+				);
+				movement_trigger!(
+					borrowed.ver_pan_input,
+					borrowed.ver_pan_vel,
+					PAN_DOWN_NAME,
+					MovementDir::Negative
+				);
 			}
 			EventKind::DroppedFile(ref path) => {
 				let mut borrowed = self.data.borrow_mut();

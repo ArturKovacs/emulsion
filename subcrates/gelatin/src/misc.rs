@@ -1,5 +1,5 @@
 use cgmath::Vector2;
-use glium::glutin::dpi;
+use winit::dpi;
 
 use std::ops::{Add, AddAssign, Div, Mul, Sub};
 

@@ -1,5 +1,10 @@
 ## Unreleased
 
+### Changed
+
+- **Breaking**: The name of some keys (used for key bindings) have changed. As of writing this, a list of all supported key names can be found in the `virtual_keycode_to_string` function in the source code.
+- **Breaking**: Dropped support for systems that don't have at least OpenGL 3.3 (In other words: from now on Emulsion requires OpenGL 3.3 to run. Which is more than 10 years old by now)
+
 ## 10.3 on 2022-10-23
 
 No change is made to emulsion, this release is only made to fix errors

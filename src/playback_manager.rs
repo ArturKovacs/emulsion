@@ -10,8 +10,8 @@ use rand::thread_rng;
 
 use log::{debug, trace};
 
-use gelatin::glium::Display;
 use gelatin::window::Window;
+use gelatin::Display;
 
 use crate::image_cache::{self, AnimationFrameTexture, ImageCache};
 
@@ -287,7 +287,6 @@ impl<P: Playback> ImgSequencePlayer<P> {
 			frametime_drift_offset: 0,
 			//frame_count_since_playback_start: 0,
 			load_request: LoadRequest::None,
-			//should_sleep: true,
 			image_texture: None,
 			file_path: None,
 

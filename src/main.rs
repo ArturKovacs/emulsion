@@ -16,7 +16,7 @@ use lazy_static::lazy_static;
 
 use log::trace;
 
-use gelatin::glium::glutin::{
+use gelatin::winit::{
 	dpi::{PhysicalPosition, PhysicalSize},
 	event::WindowEvent,
 	window::Icon,
@@ -65,6 +65,13 @@ static VISIT_SITE: &[u8] = include_bytes!("../resource/visit-site.png");
 static USAGE: &[u8] = include_bytes!("../resource/usage.png");
 static LEFT_TO_PAN: &[u8] = include_bytes!("../resource/use-left-to-pan.png");
 
+#[derive(Debug)]
+pub enum EmulsionEvent {
+	/// Used to signal the event loop to wake up, because an image was loaded
+	/// and the UI may need to update to display the image
+	ImageLoaded,
+}
+
 // ========================================================
 // Not-so glorious main function
 // ========================================================
@@ -90,7 +97,7 @@ fn main() {
 			args.displayed_folders;
 	}
 
-	let mut application = Application::new();
+	let mut application = Application::<()>::new();
 	let window: Rc<Window> = {
 		let window_cache = &mut cache.lock().unwrap().window;
 		let window_cfg = &config.borrow().window;
@@ -131,7 +138,7 @@ fn main() {
 		let window = Window::new(&mut application, window_desc);
 		// This is just to fix the bug on Linux that the window doesn't start up at
 		// the specified position when the position is specified during initialization
-		window.display_mut().gl_window().window().set_outer_position(pos);
+		window.window_mut().set_outer_position(pos);
 
 		if let Some(ConfigWindowSection { start_maximized: Some(true), .. }) = window_cfg {
 			window.set_maximized(true);
