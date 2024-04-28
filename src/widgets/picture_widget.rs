@@ -328,7 +328,9 @@ impl PictureWidgetData {
 
 		let name = match file_path {
 			LoadedImgPath::NotYetLoaded => "[ none ]".into(),
-			LoadedImgPath::ErrLoading(path) => format!("[ FAILED TO OPEN ] {}", title_config.format_file_path(path)).into(),
+			LoadedImgPath::ErrLoading(path) => {
+				format!("[ FAILED TO OPEN ] {}", title_config.format_file_path(path)).into()
+			}
 			LoadedImgPath::Loaded(path) => title_config.format_file_path(path),
 		};
 		let title = format!("{}{}{}", name, playback, title_config.format_program_name());
@@ -625,7 +627,8 @@ impl PictureWidget {
 			}
 		}
 		if triggered!(IMG_COPY_NAME) {
-			if let LoadedImgPath::Loaded(path) = borrowed.playback_manager.shown_file_path().clone() {
+			if let LoadedImgPath::Loaded(path) = borrowed.playback_manager.shown_file_path().clone()
+			{
 				let request_started;
 				if let Some(clipboard_handler) = &mut borrowed.clipboard_handler {
 					request_started = true;
@@ -937,7 +940,9 @@ impl Widget for PictureWidget {
 					}
 					HoverState::ItemHovered { prev_path } => {
 						if let LoadedImgPath::Loaded(prev_path) = prev_path {
-							borrowed.playback_manager.request_load(LoadRequest::FilePath(prev_path));
+							borrowed
+								.playback_manager
+								.request_load(LoadRequest::FilePath(prev_path));
 						}
 						borrowed.hover_state = HoverState::None;
 					}

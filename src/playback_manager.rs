@@ -13,7 +13,9 @@ use log::{debug, trace};
 use gelatin::window::Window;
 use gelatin::Display;
 
-use crate::image_cache::{self, AnimationFrameTexture, ImageCache, LoadResult2, PathResolutionError, TextureResult};
+use crate::image_cache::{
+	self, AnimationFrameTexture, ImageCache, LoadResult2, PathResolutionError, TextureResult,
+};
 
 use image_cache::directory;
 
@@ -53,11 +55,7 @@ trait Playback: Sized {
 		image_cache.load_specific(display, path, None)
 	}
 
-	fn load_at_index(
-		image_cache: &mut ImageCache,
-		display: &Display,
-		index: usize,
-	) -> LoadResult2;
+	fn load_at_index(image_cache: &mut ImageCache, display: &Display, index: usize) -> LoadResult2;
 
 	fn delay_nanos(player: &ImgSequencePlayer<Self>) -> u64;
 }
@@ -77,11 +75,7 @@ impl Playback for FolderPlayback {
 		image_cache.load_jump(display, amount, 0)
 	}
 
-	fn load_at_index(
-		image_cache: &mut ImageCache,
-		display: &Display,
-		index: usize,
-	) -> LoadResult2 {
+	fn load_at_index(image_cache: &mut ImageCache, display: &Display, index: usize) -> LoadResult2 {
 		image_cache.load_at_index(display, index, None)
 	}
 
@@ -106,11 +100,7 @@ impl Playback for AnimPlayback {
 		image_cache.load_jump(display, 0, amount as isize)
 	}
 
-	fn load_at_index(
-		image_cache: &mut ImageCache,
-		display: &Display,
-		index: usize,
-	) -> LoadResult2 {
+	fn load_at_index(image_cache: &mut ImageCache, display: &Display, index: usize) -> LoadResult2 {
 		if let Some(curr_index) = image_cache.current_file_index() {
 			image_cache.load_at_index(display, curr_index, Some(index as isize))
 		} else {
@@ -265,7 +255,7 @@ impl PlaybackManager {
 pub enum LoadedImgPath {
 	NotYetLoaded,
 	ErrLoading(PathBuf),
-	Loaded(PathBuf)
+	Loaded(PathBuf),
 }
 
 impl LoadedImgPath {
@@ -509,7 +499,7 @@ impl<P: Playback> ImgSequencePlayer<P> {
 						}
 						writeln!(stderr).expect(stderr_errmsg);
 					}
-				}
+				},
 				Err(PathResolutionError::WaitingOnDirFilter) => {
 					// Set the load request to jump in place so that
 					// next time we attempt to load this again.
@@ -521,7 +511,6 @@ impl<P: Playback> ImgSequencePlayer<P> {
 					self.file_path = LoadedImgPath::NotYetLoaded;
 				}
 			}
-			
 		}
 		next_update
 	}
