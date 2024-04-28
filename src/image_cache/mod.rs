@@ -65,8 +65,6 @@ pub type TextureResult<T> = self::texture_load_errors::Result<T>;
 
 // use self::texture_load_errors::*;
 
-use thiserror;
-
 #[derive(Debug, thiserror::Error)]
 pub enum PathResolutionError {
 	#[error("No image path has been specified. (Eg emulsion was started without it being requested to open an image or folder)")]
@@ -392,7 +390,7 @@ impl ImageCache {
 		let path = self
 			.dir
 			.image_by_index(index)
-			.ok_or_else(|| PathResolutionError::WaitingOnDirFilter)?
+			.ok_or(PathResolutionError::WaitingOnDirFilter)?
 			.path
 			.clone();
 
