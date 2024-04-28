@@ -29,6 +29,12 @@ impl From<std::io::Error> for Error {
 		Error::Other(format!("{}", e))
 	}
 }
+impl From<Error> for std::io::Error {
+	fn from(value: Error) -> Self {
+		use std::io::ErrorKind;
+		std::io::Error::new(ErrorKind::Other, format!("directory::Error: {}", value))
+	}
+}
 
 pub type Result<T> = std::result::Result<T, Error>;
 

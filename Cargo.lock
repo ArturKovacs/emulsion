@@ -829,6 +829,7 @@ dependencies = [
  "resvg",
  "serde",
  "sys-info",
+ "thiserror",
  "tiny-skia",
  "toml 0.8.12",
  "trash",

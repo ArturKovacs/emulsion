@@ -13,7 +13,9 @@ use log::{debug, trace};
 use gelatin::window::Window;
 use gelatin::Display;
 
-use crate::image_cache::{self, AnimationFrameTexture, ImageCache};
+use crate::image_cache::{self, AnimationFrameTexture, ImageCache, LoadResult2, PathResolutionError, TextureResult};
+
+use image_cache::directory;
 
 const NANOS_PER_SEC: u64 = 1_000_000_000;
 
@@ -37,17 +39,17 @@ pub enum PlaybackState {
 }
 
 trait Playback: Sized {
-	fn load_next(image_cache: &mut ImageCache, display: &Display) -> FrameLoadResult;
+	fn load_next(image_cache: &mut ImageCache, display: &Display) -> LoadResult2;
 
-	fn load_prev(image_cache: &mut ImageCache, display: &Display) -> FrameLoadResult;
+	fn load_prev(image_cache: &mut ImageCache, display: &Display) -> LoadResult2;
 
-	fn load_jump(image_cache: &mut ImageCache, display: &Display, amount: i32) -> FrameLoadResult;
+	fn load_jump(image_cache: &mut ImageCache, display: &Display, amount: i32) -> LoadResult2;
 
 	fn load_path(
 		image_cache: &mut ImageCache,
 		display: &Display,
 		path: &Path,
-	) -> image_cache::Result<AnimationFrameTexture> {
+	) -> TextureResult<AnimationFrameTexture> {
 		image_cache.load_specific(display, path, None)
 	}
 
@@ -55,7 +57,7 @@ trait Playback: Sized {
 		image_cache: &mut ImageCache,
 		display: &Display,
 		index: usize,
-	) -> FrameLoadResult;
+	) -> LoadResult2;
 
 	fn delay_nanos(player: &ImgSequencePlayer<Self>) -> u64;
 }
@@ -63,15 +65,15 @@ trait Playback: Sized {
 struct FolderPlayback;
 
 impl Playback for FolderPlayback {
-	fn load_next(image_cache: &mut ImageCache, display: &Display) -> FrameLoadResult {
+	fn load_next(image_cache: &mut ImageCache, display: &Display) -> LoadResult2 {
 		image_cache.load_next(display)
 	}
 
-	fn load_prev(image_cache: &mut ImageCache, display: &Display) -> FrameLoadResult {
+	fn load_prev(image_cache: &mut ImageCache, display: &Display) -> LoadResult2 {
 		image_cache.load_prev(display)
 	}
 
-	fn load_jump(image_cache: &mut ImageCache, display: &Display, amount: i32) -> FrameLoadResult {
+	fn load_jump(image_cache: &mut ImageCache, display: &Display, amount: i32) -> LoadResult2 {
 		image_cache.load_jump(display, amount, 0)
 	}
 
@@ -79,7 +81,7 @@ impl Playback for FolderPlayback {
 		image_cache: &mut ImageCache,
 		display: &Display,
 		index: usize,
-	) -> FrameLoadResult {
+	) -> LoadResult2 {
 		image_cache.load_at_index(display, index, None)
 	}
 
@@ -92,15 +94,15 @@ impl Playback for FolderPlayback {
 struct AnimPlayback;
 
 impl Playback for AnimPlayback {
-	fn load_next(image_cache: &mut ImageCache, display: &Display) -> FrameLoadResult {
+	fn load_next(image_cache: &mut ImageCache, display: &Display) -> LoadResult2 {
 		image_cache.load_jump(display, 0, 1)
 	}
 
-	fn load_prev(image_cache: &mut ImageCache, display: &Display) -> FrameLoadResult {
+	fn load_prev(image_cache: &mut ImageCache, display: &Display) -> LoadResult2 {
 		image_cache.load_jump(display, 0, -1)
 	}
 
-	fn load_jump(image_cache: &mut ImageCache, display: &Display, amount: i32) -> FrameLoadResult {
+	fn load_jump(image_cache: &mut ImageCache, display: &Display, amount: i32) -> LoadResult2 {
 		image_cache.load_jump(display, 0, amount as isize)
 	}
 
@@ -108,13 +110,11 @@ impl Playback for AnimPlayback {
 		image_cache: &mut ImageCache,
 		display: &Display,
 		index: usize,
-	) -> FrameLoadResult {
+	) -> LoadResult2 {
 		if let Some(curr_index) = image_cache.current_file_index() {
 			image_cache.load_at_index(display, curr_index, Some(index as isize))
 		} else {
-			Err(image_cache::errors::Error::from_kind(
-				image_cache::errors::ErrorKind::WaitingOnDirFilter,
-			))
+			Err(PathResolutionError::WaitingOnDirFilter)
 		}
 	}
 
@@ -205,7 +205,7 @@ impl PlaybackManager {
 		self.image_cache.current_dir_len()
 	}
 
-	pub fn update_directory(&mut self) -> image_cache::Result<()> {
+	pub fn update_directory(&mut self) -> directory::Result<()> {
 		debug!("In `update_directory`");
 		if let LoadRequest::None = self.folder_player.load_request {
 			let curr_path = self.image_cache.current_file_path();
@@ -233,7 +233,7 @@ impl PlaybackManager {
 	}
 
 	/// The path to the image file which is currently rendered onto the screen.
-	pub fn shown_file_path(&self) -> &Option<PathBuf> {
+	pub fn shown_file_path(&self) -> &LoadedImgPath {
 		&self.folder_player.file_path
 	}
 
@@ -261,7 +261,18 @@ impl PlaybackManager {
 	}
 }
 
-type FrameLoadResult = image_cache::Result<(AnimationFrameTexture, PathBuf)>;
+#[derive(Debug, Clone)]
+pub enum LoadedImgPath {
+	NotYetLoaded,
+	ErrLoading(PathBuf),
+	Loaded(PathBuf)
+}
+
+impl LoadedImgPath {
+	fn is_loaded(&self) -> bool {
+		matches!(self, LoadedImgPath::Loaded(_))
+	}
+}
 
 struct ImgSequencePlayer<P: Playback> {
 	playback_state: PlaybackState,
@@ -273,7 +284,7 @@ struct ImgSequencePlayer<P: Playback> {
 	load_request: LoadRequest,
 
 	image_texture: Option<AnimationFrameTexture>,
-	file_path: Option<PathBuf>,
+	file_path: LoadedImgPath,
 
 	_playback: PhantomData<P>,
 }
@@ -288,7 +299,7 @@ impl<P: Playback> ImgSequencePlayer<P> {
 			//frame_count_since_playback_start: 0,
 			load_request: LoadRequest::None,
 			image_texture: None,
-			file_path: None,
+			file_path: LoadedImgPath::NotYetLoaded,
 
 			_playback: PhantomData,
 		}
@@ -345,7 +356,7 @@ impl<P: Playback> ImgSequencePlayer<P> {
 		);
 		let is_paused = matches!(self.playback_state, PlaybackState::Paused);
 		let no_request = matches!(self.load_request, LoadRequest::None);
-		if self.file_path.is_none() && no_request && is_paused {
+		if !self.file_path.is_loaded() && no_request && is_paused {
 			return gelatin::NextUpdate::Latest;
 		}
 		let now = Instant::now();
@@ -460,43 +471,57 @@ impl<P: Playback> ImgSequencePlayer<P> {
 			LoadRequest::LoadNext => Some(P::load_next(image_cache, display)),
 			LoadRequest::LoadPrevious => Some(P::load_prev(image_cache, display)),
 			LoadRequest::FilePath(file_path) => {
-				Some(P::load_path(image_cache, display, &file_path).map(|x| (x, file_path)))
+				let load_result = P::load_path(image_cache, display, &file_path);
+				Some(Ok((file_path, load_result)))
 			}
 			LoadRequest::LoadAtIndex(index) => Some(P::load_at_index(image_cache, display, index)),
 			LoadRequest::Jump(jump_count) => Some(P::load_jump(image_cache, display, jump_count)),
 			LoadRequest::None => None,
 		};
-		if let Some(result) = load_result {
-			match result {
-				Ok((frame, file_path)) => {
-					self.image_texture = Some(frame);
-					self.file_path = Some(file_path);
+		if let Some(loaded_image) = load_result {
+			match loaded_image {
+				Ok((path, result)) => match result {
+					Ok(frame) => {
+						self.image_texture = Some(frame);
+						self.file_path = LoadedImgPath::Loaded(path);
+					}
+					Err(image_cache::texture_load_errors::Error(
+						image_cache::texture_load_errors::ErrorKind::WaitingOnLoader,
+						_,
+					)) => {
+						// Set the load request to jump in place so that
+						// next time we attempt to load this again.
+						self.load_request = LoadRequest::Jump(0);
+						next_update = gelatin::NextUpdate::WaitUntil(few_millisecs_from_now);
+					}
+					Err(err) => {
+						self.image_texture = None;
+						self.file_path = LoadedImgPath::ErrLoading(path);
+						let stderr = &mut ::std::io::stderr();
+						let stderr_errmsg = "Error writing to stderr";
+						writeln!(stderr, "Error occurred while loading image: {}", err)
+							.expect(stderr_errmsg);
+						for e in err.iter().skip(1) {
+							writeln!(stderr, "... caused by: {}", e).expect(stderr_errmsg);
+						}
+						if let Some(backtrace) = err.backtrace() {
+							writeln!(stderr, "backtrace: {:?}", backtrace).expect(stderr_errmsg);
+						}
+						writeln!(stderr).expect(stderr_errmsg);
+					}
 				}
-				Err(image_cache::errors::Error(
-					image_cache::errors::ErrorKind::WaitingOnLoader,
-					_,
-				)) => {
+				Err(PathResolutionError::WaitingOnDirFilter) => {
 					// Set the load request to jump in place so that
 					// next time we attempt to load this again.
 					self.load_request = LoadRequest::Jump(0);
 					next_update = gelatin::NextUpdate::WaitUntil(few_millisecs_from_now);
 				}
-				Err(err) => {
+				Err(PathResolutionError::NotYetSpecified) => {
 					self.image_texture = None;
-					self.file_path = None;
-					let stderr = &mut ::std::io::stderr();
-					let stderr_errmsg = "Error writing to stderr";
-					writeln!(stderr, "Error occurred while loading image: {}", err)
-						.expect(stderr_errmsg);
-					for e in err.iter().skip(1) {
-						writeln!(stderr, "... caused by: {}", e).expect(stderr_errmsg);
-					}
-					if let Some(backtrace) = err.backtrace() {
-						writeln!(stderr, "backtrace: {:?}", backtrace).expect(stderr_errmsg);
-					}
-					writeln!(stderr).expect(stderr_errmsg);
+					self.file_path = LoadedImgPath::NotYetLoaded;
 				}
 			}
+			
 		}
 		next_update
 	}

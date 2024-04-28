@@ -21,15 +21,17 @@ use gelatin::{
 };
 
 pub mod image_loader;
+
 use self::{directory::DirItem, image_loader::*};
 
 mod pending_requests;
 use pending_requests::PendingRequests;
 
-mod directory;
+pub mod directory;
 use directory::Directory;
 
-pub mod errors {
+// TODO: Remove `texture_load_errors` and stop using error_chain, use `thiserror` or `anyhow` instead
+pub mod texture_load_errors {
 	use crate::image_cache::image_loader;
 	use gelatin::glium::texture;
 	use gelatin::image;
@@ -58,8 +60,25 @@ pub mod errors {
 	}
 }
 
-pub use self::errors::Result;
-use self::errors::*;
+// pub use self::texture_load_errors::Result as TextureResult;
+pub type TextureResult<T> = self::texture_load_errors::Result<T>;
+
+// use self::texture_load_errors::*;
+
+use thiserror;
+
+#[derive(Debug, thiserror::Error)]
+pub enum PathResolutionError {
+	#[error("No image path has been specified. (Eg emulsion was started without it being requested to open an image or folder)")]
+	NotYetSpecified,
+
+	#[error("Could not find file path matching the request, because the Directory Filter hasn't finished yet")]
+	WaitingOnDirFilter,
+}
+
+// TODO: Rename this to `LoadResult` (remove 2)
+pub type LoadResult2 = std::result::Result<(PathBuf, TextureResult<AnimationFrameTexture>), PathResolutionError>;
+
 
 pub fn get_image_size_estimate(width: u32, height: u32) -> isize {
 	// In an RGBA image, each pixel is 4 bytes.
@@ -128,7 +147,7 @@ impl AnimationFrameTexture {
 		image: image::RgbaImage,
 		delay_nano: u64,
 		orientation: Orientation,
-	) -> Result<Self> {
+	) -> TextureResult<Self> {
 		let (w, h) = image.dimensions();
 		let img_bytes = image.into_raw();
 		let mut tex_grid = Vec::new();
@@ -192,7 +211,7 @@ fn texture_from_img_rect(
 	offset_y: u32,
 	cell_w: u32,
 	cell_h: u32,
-) -> Result<SrgbTexture2d> {
+) -> TextureResult<SrgbTexture2d> {
 	let raw_image;
 	if img_w == cell_w {
 		assert!(offset_x == 0);
@@ -325,12 +344,8 @@ impl ImageCache {
 		self.dir.image_count()
 	}
 
-	fn curr_dir_item(&self) -> Result<DirItem> {
-		if let Some(desc) = self.dir.curr_descriptor() {
-			Ok(desc.clone())
-		} else {
-			bail!("Could not get the current file descriptor");
-		}
+	fn curr_dir_item(&self) -> Option<DirItem> {
+		self.dir.curr_descriptor().cloned()
 	}
 
 	/// Returns tru if and only if the current image has been fully loaded and it has a single frame.
@@ -355,7 +370,7 @@ impl ImageCache {
 	///
 	/// Returns the error that might occure while fetching the files from the directory. Otherwise
 	/// returns `Ok(())`
-	pub fn update_directory(&mut self) -> Result<()> {
+	pub fn update_directory(&mut self) -> directory::Result<()> {
 		self.dir.update_directory()?;
 
 		// indicate that the an update directory
@@ -373,16 +388,16 @@ impl ImageCache {
 		display: &gelatin::Display,
 		index: usize,
 		frame_id: Option<isize>,
-	) -> Result<(AnimationFrameTexture, PathBuf)> {
+	) -> LoadResult2 {
 		let path = self
 			.dir
 			.image_by_index(index)
-			.ok_or_else(|| Error::from_kind(ErrorKind::WaitingOnDirFilter))?
+			.ok_or_else(|| PathResolutionError::WaitingOnDirFilter)?
 			.path
 			.clone();
 
-		let result = self.load_specific(display, &path, frame_id)?;
-		Ok((result, path))
+		let result = self.load_specific(display, &path, frame_id);
+		Ok((path, result))
 	}
 
 	/// Returns `Err(errors::Error::from_kind(errors::ErrorKind::WaitingOnLoader))`
@@ -392,7 +407,7 @@ impl ImageCache {
 		display: &gelatin::Display,
 		path: &Path,
 		frame_id: Option<isize>,
-	) -> Result<AnimationFrameTexture> {
+	) -> TextureResult<AnimationFrameTexture> {
 		trace!("Begin `load_specific`");
 		self.receive_prefetched();
 		trace!("Receive prefetched done");
@@ -415,9 +430,9 @@ impl ImageCache {
 			self.current_frame_idx = 0;
 		}
 		if self.dir.path() != parent {
-			let DirItem { path, request_id } = self.curr_dir_item()?;
+			let DirItem { path, request_id } = self.curr_dir_item().ok_or_else(|| texture_load_errors::Error::from("Could not get path for current image"))?;
 			self.send_request_for_file(path, request_id, RequestKind::Priority { display });
-			return Err(errors::Error::from_kind(errors::ErrorKind::WaitingOnLoader));
+			return Err(texture_load_errors::Error::from_kind(texture_load_errors::ErrorKind::WaitingOnLoader));
 		}
 		if let Some(img_index) = self.dir.curr_img_index() {
 			self.dir.set_curr_img_index(img_index)?;
@@ -473,13 +488,13 @@ impl ImageCache {
 	pub fn load_next(
 		&mut self,
 		display: &gelatin::Display,
-	) -> Result<(AnimationFrameTexture, PathBuf)> {
+	) -> LoadResult2 {
 		self.load_jump(display, 1, 0)
 	}
 	pub fn load_prev(
 		&mut self,
 		display: &gelatin::Display,
-	) -> Result<(AnimationFrameTexture, PathBuf)> {
+	) -> LoadResult2 {
 		self.load_jump(display, -1, 0)
 	}
 
@@ -488,16 +503,16 @@ impl ImageCache {
 		display: &gelatin::Display,
 		file_jump_count: i32,
 		frame_jump_count: isize,
-	) -> Result<(AnimationFrameTexture, PathBuf)> {
+	) -> LoadResult2 {
 		if file_jump_count == 0 {
 			// Here, it is possible that the current image was already
 			// requested but not yet loaded.
 			let target_frame = self.current_frame_idx as isize + frame_jump_count;
 			let requested = self.try_getting_requested_image(display, target_frame);
 			if let Some(path) = self.current_file_path() {
-				return requested.map(|t| (t, path));
+				return Ok((path, requested));
 			} else {
-				bail!("No file is open");
+				return Err(PathResolutionError::NotYetSpecified);
 			}
 		} else {
 			self.current_frame_idx = 0;
@@ -520,10 +535,11 @@ impl ImageCache {
 
 			target_path = self.dir.image_by_index(target_index).unwrap().path.clone();
 		} else {
-			bail!("Folder is empty, no folder was open, or folder hasn't finished filtering when trying to jump to an image by index.");
+			log::info!("Folder is empty, no folder was open, or folder hasn't finished filtering when trying to jump to an image by index.");
+			return Err(PathResolutionError::NotYetSpecified);
 		}
-		let result = self.load_specific(display, &target_path, None)?;
-		Ok((result, target_path))
+		let result = self.load_specific(display, &target_path, None);
+		Ok((target_path, result))
 	}
 
 	fn receive_prefetched(&mut self) {
@@ -539,7 +555,7 @@ impl ImageCache {
 		}
 	}
 
-	pub fn process_prefetched(&mut self, display: &gelatin::Display) -> Result<()> {
+	pub fn process_prefetched(&mut self, display: &gelatin::Display) -> texture_load_errors::Result<()> {
 		self.receive_prefetched();
 		let mut uploaded_one = false;
 		let req_ids = self.pending_requests.get_all_ids();
@@ -550,7 +566,7 @@ impl ImageCache {
 					match self.upload_to_texture(display, result) {
 						Ok(_) => uploaded_one = true,
 						// it's okay to ignore if the image falied to load here, this is just pre-fetch.
-						Err(Error(ErrorKind::FailedToLoadImage(..), ..)) => {}
+						Err(texture_load_errors::Error(texture_load_errors::ErrorKind::FailedToLoadImage(..), ..)) => {}
 						Err(e) => {
 							retval = Err(e);
 							break;
@@ -582,9 +598,9 @@ impl ImageCache {
 		&mut self,
 		display: &gelatin::Display,
 		frame_id: isize,
-	) -> Result<AnimationFrameTexture> {
+	) -> TextureResult<AnimationFrameTexture> {
 		trace!("Begin `try_getting_requested_image` in `image_cache`");
-		let DirItem { path, request_id: req_id } = self.curr_dir_item()?;
+		let DirItem { path, request_id: req_id } = self.curr_dir_item().ok_or_else(|| texture_load_errors::Error::from("Could not get path for current image"))?;
 
 		// Check if it's among the prefetched, and upload it, if it is
 		if let Some(results) = self.pending_requests.take_results(req_id) {
@@ -597,7 +613,7 @@ impl ImageCache {
 		// Check if it is inside the texture cache first
 		if let Some(tex) = self.texture_cache.get(&req_id) {
 			if tex.failed {
-				return Err(Error::from_kind(ErrorKind::FailedToLoadImage(req_id)));
+				return Err(texture_load_errors::Error::from_kind(texture_load_errors::ErrorKind::FailedToLoadImage(req_id)));
 			}
 			let modified = fs::metadata(&path).ok().and_then(|m| m.modified().ok());
 			let mut get_from_cache = false;
@@ -625,23 +641,23 @@ impl ImageCache {
 					}
 				}
 			}
-			return Err(Error::from_kind(ErrorKind::WaitingOnLoader));
+			return Err(texture_load_errors::Error::from_kind(texture_load_errors::ErrorKind::WaitingOnLoader));
 		}
 		if self.pending_requests.contains(&req_id) {
 			PRIORITY_REQUEST_ID.store(req_id, Ordering::SeqCst);
-			return Err(Error::from_kind(ErrorKind::WaitingOnLoader));
+			return Err(texture_load_errors::Error::from_kind(texture_load_errors::ErrorKind::WaitingOnLoader));
 		}
 		self.send_request_for_file(path, req_id, RequestKind::Priority { display });
 		// If the texture is not in the cache just throw our hands in the air
 		// and tell the caller that we gotta wait for the loader to load this texture.
-		Err(Error::from_kind(ErrorKind::WaitingOnLoader))
+		Err(texture_load_errors::Error::from_kind(texture_load_errors::ErrorKind::WaitingOnLoader))
 	}
 
 	fn upload_to_texture(
 		&mut self,
 		display: &gelatin::Display,
 		load_result: LoadResult,
-	) -> Result<Option<AnimationFrameTexture>> {
+	) -> TextureResult<Option<AnimationFrameTexture>> {
 		use std::collections::btree_map::Entry;
 		match load_result {
 			LoadResult::Start { req_id, metadata } => {
@@ -728,7 +744,7 @@ impl ImageCache {
 					Ordering::SeqCst,
 				);
 				self.pending_requests.set_finished(&req_id);
-				Err(errors::Error::from_kind(errors::ErrorKind::FailedToLoadImage(req_id)))
+				Err(texture_load_errors::Error::from_kind(texture_load_errors::ErrorKind::FailedToLoadImage(req_id)))
 			}
 		}
 	}
@@ -815,7 +831,7 @@ impl ImageCache {
 		true
 	}
 
-	fn change_directory(&mut self, dir_path: &Path) -> Result<()> {
+	fn change_directory(&mut self, dir_path: &Path) -> directory::Result<()> {
 		if self.dir.path() == dir_path {
 			return Ok(());
 		}
@@ -831,10 +847,8 @@ impl ImageCache {
 		Ok(())
 	}
 
-	fn change_directory_with_filename(&mut self, dir_path: &Path, filename: &OsStr) -> Result<()> {
-		self.dir
-			.change_directory_with_filename(dir_path, filename)
-			.map_err(|e| Error::from_kind(ErrorKind::Msg(format!("{}", e))))
+	fn change_directory_with_filename(&mut self, dir_path: &Path, filename: &OsStr) -> directory::Result<()> {
+		self.dir.change_directory_with_filename(dir_path, filename)
 	}
 
 	// fn collect_directory(&mut self) -> Result<Vec<DirItem>> {
@@ -873,10 +887,17 @@ impl ImageCache {
 	// }
 }
 
-fn get_file_name_and_parent(path: &Path) -> Result<(OsString, PathBuf)> {
+fn get_file_name_and_parent(path: &Path) -> std::io::Result<(OsString, PathBuf)> {
+	use std::io;
+
 	let file_name = match path.file_name() {
 		Some(f) => f.to_owned(),
-		None => bail!("Could not get file name from path {:?}", path),
+		None => {
+			return Err(io::Error::new(
+				io::ErrorKind::Other,
+				format!("Could not get file name from path {:?}", path)
+			))
+		},
 	};
 	let parent = match path.parent() {
 		Some(p) => {
@@ -889,7 +910,10 @@ fn get_file_name_and_parent(path: &Path) -> Result<(OsString, PathBuf)> {
 		None => {
 			let mut path = path.canonicalize()?;
 			if !path.pop() {
-				bail!("Could not get parent directory of {:?}", path);
+				return Err(io::Error::new(
+					io::ErrorKind::Other,
+					format!("Could not get parent directory of {:?}", path)
+				));
 			}
 			path
 		}

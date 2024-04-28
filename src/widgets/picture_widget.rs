@@ -64,7 +64,7 @@ impl MovementDir {
 #[derive(Debug, Clone)]
 enum HoverState {
 	None,
-	ItemHovered { prev_path: PathBuf },
+	ItemHovered { prev_path: LoadedImgPath },
 }
 
 fn orientation_to_matrix(orientation: Orientation) -> Matrix4<f32> {
@@ -314,7 +314,7 @@ impl PictureWidgetData {
 		&self,
 		window: &Window,
 		playback_state: PlaybackState,
-		file_path: &Option<PathBuf>,
+		file_path: &LoadedImgPath,
 	) {
 		let playback = match playback_state {
 			PlaybackState::Forward => " : Playing",
@@ -327,8 +327,9 @@ impl PictureWidgetData {
 		let title_config = config.title.clone().unwrap_or_default();
 
 		let name = match file_path {
-			Some(file_path) => title_config.format_file_path(file_path),
-			None => "[ none ]".into(),
+			LoadedImgPath::NotYetLoaded => "[ none ]".into(),
+			LoadedImgPath::ErrLoading(path) => format!("[ FAILED TO OPEN ] {}", title_config.format_file_path(path)).into(),
+			LoadedImgPath::Loaded(path) => title_config.format_file_path(path),
 		};
 		let title = format!("{}{}{}", name, playback, title_config.format_program_name());
 		window.set_title(title);
@@ -613,7 +614,7 @@ impl PictureWidget {
 			borrowed.render_validity.invalidate();
 		}
 		if triggered!(IMG_DEL_NAME) {
-			if let Some(path) = borrowed.playback_manager.shown_file_path() {
+			if let LoadedImgPath::Loaded(path) = borrowed.playback_manager.shown_file_path() {
 				if let Err(e) = trash::delete(path) {
 					eprintln!("Error while moving file '{:?}' to trash: {:?}", path, e);
 				}
@@ -624,7 +625,7 @@ impl PictureWidget {
 			}
 		}
 		if triggered!(IMG_COPY_NAME) {
-			if let Some(path) = borrowed.playback_manager.shown_file_path().clone() {
+			if let LoadedImgPath::Loaded(path) = borrowed.playback_manager.shown_file_path().clone() {
 				let request_started;
 				if let Some(clipboard_handler) = &mut borrowed.clipboard_handler {
 					request_started = true;
@@ -638,7 +639,7 @@ impl PictureWidget {
 				}
 			}
 		}
-		if let Some(img_path) = borrowed.playback_manager.shown_file_path() {
+		if let LoadedImgPath::Loaded(img_path) = borrowed.playback_manager.shown_file_path() {
 			if let Some(folder_path) = img_path.parent() {
 				let img_and_folder = (img_path.to_str(), folder_path.to_str());
 				if let (Some(img_path), Some(folder_path)) = img_and_folder {
@@ -650,10 +651,10 @@ impl PictureWidget {
 						folder_path,
 					);
 				} else {
-					eprintln!("Could not convert the image path to utf8. Path: '{:?}'", img_path);
+					log::error!("Could not convert the image path to utf8. Path: '{:?}'", img_path);
 				}
 			} else {
-				eprintln!("Could not get parent folder for the image path {:?}", img_path);
+				log::error!("Could not get parent folder for the image path {:?}", img_path);
 			}
 		}
 	}
@@ -920,8 +921,7 @@ impl Widget for PictureWidget {
 				let mut borrowed = self.data.borrow_mut();
 				match borrowed.hover_state {
 					HoverState::None => {
-						let curr_path =
-							borrowed.playback_manager.shown_file_path().clone().unwrap_or_default();
+						let curr_path = borrowed.playback_manager.shown_file_path().clone();
 						borrowed.hover_state = HoverState::ItemHovered { prev_path: curr_path };
 					}
 					HoverState::ItemHovered { .. } => {}
@@ -936,7 +936,9 @@ impl Widget for PictureWidget {
 						// Suprisingly this does happen sometimes, so let's just ignore this.
 					}
 					HoverState::ItemHovered { prev_path } => {
-						borrowed.playback_manager.request_load(LoadRequest::FilePath(prev_path));
+						if let LoadedImgPath::Loaded(prev_path) = prev_path {
+							borrowed.playback_manager.request_load(LoadRequest::FilePath(prev_path));
+						}
 						borrowed.hover_state = HoverState::None;
 					}
 				}
