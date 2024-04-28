@@ -455,35 +455,13 @@ mod update {
 #[cfg(feature = "networking")]
 mod update {
 	use serde::Deserialize;
-	use std::borrow::Cow;
 
 	#[derive(Deserialize)]
 	struct ReleaseInfoJson {
 		tag_name: String,
 	}
 
-	#[derive(Debug, thiserror::Error)]
-	#[error("network error: {msg}")]
-	struct NetworkError {
-		pub msg: Cow<'static, str>,
-	}
-	impl From<std::io::Error> for NetworkError {
-		fn from(value: std::io::Error) -> Self {
-			Self { msg: format!("{value}").into() }
-		}
-	}
-	impl From<std::num::ParseIntError> for NetworkError {
-		fn from(value: std::num::ParseIntError) -> Self {
-			Self { msg: format!("{value}").into() }
-		}
-	}
-	impl NetworkError {
-		fn from_error<E: std::error::Error>(error: E) -> Self {
-			Self { msg: format!("{error}").into() }
-		}
-	}
-
-	type Result<T> = std::result::Result<T, NetworkError>;
+	type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 	/// Tries to fetch latest release tag
 	fn latest_release() -> Result<ReleaseInfoJson> {
@@ -494,7 +472,7 @@ mod update {
 				let release_info = res.into_json()?;
 				Ok(release_info)
 			}
-			Err(err) => Err(NetworkError::from_error(err)),
+			Err(err) => Err(Box::from(err)),
 		}
 	}
 
