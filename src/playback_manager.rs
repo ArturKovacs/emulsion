@@ -14,7 +14,8 @@ use gelatin::window::Window;
 use gelatin::Display;
 
 use crate::image_cache::{
-	self, AnimationFrameTexture, ImageCache, LoadResult2, PathResolutionError, TextureResult,
+	self, AnimationFrameTexture, ImageCache, PathResolutionError, PathedTextureResult,
+	TextureResult,
 };
 
 use image_cache::directory;
@@ -41,11 +42,15 @@ pub enum PlaybackState {
 }
 
 trait Playback: Sized {
-	fn load_next(image_cache: &mut ImageCache, display: &Display) -> LoadResult2;
+	fn load_next(image_cache: &mut ImageCache, display: &Display) -> PathedTextureResult;
 
-	fn load_prev(image_cache: &mut ImageCache, display: &Display) -> LoadResult2;
+	fn load_prev(image_cache: &mut ImageCache, display: &Display) -> PathedTextureResult;
 
-	fn load_jump(image_cache: &mut ImageCache, display: &Display, amount: i32) -> LoadResult2;
+	fn load_jump(
+		image_cache: &mut ImageCache,
+		display: &Display,
+		amount: i32,
+	) -> PathedTextureResult;
 
 	fn load_path(
 		image_cache: &mut ImageCache,
@@ -55,7 +60,11 @@ trait Playback: Sized {
 		image_cache.load_specific(display, path, None)
 	}
 
-	fn load_at_index(image_cache: &mut ImageCache, display: &Display, index: usize) -> LoadResult2;
+	fn load_at_index(
+		image_cache: &mut ImageCache,
+		display: &Display,
+		index: usize,
+	) -> PathedTextureResult;
 
 	fn delay_nanos(player: &ImgSequencePlayer<Self>) -> u64;
 }
@@ -63,19 +72,27 @@ trait Playback: Sized {
 struct FolderPlayback;
 
 impl Playback for FolderPlayback {
-	fn load_next(image_cache: &mut ImageCache, display: &Display) -> LoadResult2 {
+	fn load_next(image_cache: &mut ImageCache, display: &Display) -> PathedTextureResult {
 		image_cache.load_next(display)
 	}
 
-	fn load_prev(image_cache: &mut ImageCache, display: &Display) -> LoadResult2 {
+	fn load_prev(image_cache: &mut ImageCache, display: &Display) -> PathedTextureResult {
 		image_cache.load_prev(display)
 	}
 
-	fn load_jump(image_cache: &mut ImageCache, display: &Display, amount: i32) -> LoadResult2 {
+	fn load_jump(
+		image_cache: &mut ImageCache,
+		display: &Display,
+		amount: i32,
+	) -> PathedTextureResult {
 		image_cache.load_jump(display, amount, 0)
 	}
 
-	fn load_at_index(image_cache: &mut ImageCache, display: &Display, index: usize) -> LoadResult2 {
+	fn load_at_index(
+		image_cache: &mut ImageCache,
+		display: &Display,
+		index: usize,
+	) -> PathedTextureResult {
 		image_cache.load_at_index(display, index, None)
 	}
 
@@ -88,19 +105,27 @@ impl Playback for FolderPlayback {
 struct AnimPlayback;
 
 impl Playback for AnimPlayback {
-	fn load_next(image_cache: &mut ImageCache, display: &Display) -> LoadResult2 {
+	fn load_next(image_cache: &mut ImageCache, display: &Display) -> PathedTextureResult {
 		image_cache.load_jump(display, 0, 1)
 	}
 
-	fn load_prev(image_cache: &mut ImageCache, display: &Display) -> LoadResult2 {
+	fn load_prev(image_cache: &mut ImageCache, display: &Display) -> PathedTextureResult {
 		image_cache.load_jump(display, 0, -1)
 	}
 
-	fn load_jump(image_cache: &mut ImageCache, display: &Display, amount: i32) -> LoadResult2 {
+	fn load_jump(
+		image_cache: &mut ImageCache,
+		display: &Display,
+		amount: i32,
+	) -> PathedTextureResult {
 		image_cache.load_jump(display, 0, amount as isize)
 	}
 
-	fn load_at_index(image_cache: &mut ImageCache, display: &Display, index: usize) -> LoadResult2 {
+	fn load_at_index(
+		image_cache: &mut ImageCache,
+		display: &Display,
+		index: usize,
+	) -> PathedTextureResult {
 		if let Some(curr_index) = image_cache.current_file_index() {
 			image_cache.load_at_index(display, curr_index, Some(index as isize))
 		} else {
@@ -475,10 +500,7 @@ impl<P: Playback> ImgSequencePlayer<P> {
 						self.image_texture = Some(frame);
 						self.file_path = LoadedImgPath::Loaded(path);
 					}
-					Err(image_cache::texture_load_errors::Error(
-						image_cache::texture_load_errors::ErrorKind::WaitingOnLoader,
-						_,
-					)) => {
+					Err(image_cache::TextureError::WaitingOnLoader) => {
 						// Set the load request to jump in place so that
 						// next time we attempt to load this again.
 						self.load_request = LoadRequest::Jump(0);
@@ -491,12 +513,9 @@ impl<P: Playback> ImgSequencePlayer<P> {
 						let stderr_errmsg = "Error writing to stderr";
 						writeln!(stderr, "Error occurred while loading image: {}", err)
 							.expect(stderr_errmsg);
-						for e in err.iter().skip(1) {
-							writeln!(stderr, "... caused by: {}", e).expect(stderr_errmsg);
-						}
-						if let Some(backtrace) = err.backtrace() {
-							writeln!(stderr, "backtrace: {:?}", backtrace).expect(stderr_errmsg);
-						}
+						// if let Some(backtrace) = err.backtrace() {
+						// 	writeln!(stderr, "backtrace: {:?}", backtrace).expect(stderr_errmsg);
+						// }
 						writeln!(stderr).expect(stderr_errmsg);
 					}
 				},

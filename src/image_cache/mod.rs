@@ -30,38 +30,36 @@ use pending_requests::PendingRequests;
 pub mod directory;
 use directory::Directory;
 
-// TODO: Remove `texture_load_errors` and stop using error_chain, use `thiserror` or `anyhow` instead
-pub mod texture_load_errors {
-	use crate::image_cache::image_loader;
-	use gelatin::glium::texture;
-	use gelatin::image;
-	use std::io;
+#[derive(Debug, thiserror::Error)]
+pub enum TextureError {
+	#[error("ImageCache is waiting for the image loader to send result")]
+	WaitingOnLoader,
 
-	error_chain! {
-		foreign_links {
-			Io(io::Error) #[doc = "Error during IO"];
-			TextureCreationError(texture::TextureCreationError);
-			ImageRsError(image::ImageError);
-			TextureLoaderError(image_loader::errors::Error);
-			DirError(super::directory::Error);
-		}
-		errors {
-			WaitingOnLoader {
-				description("ImageCache is waiting for loader to send result")
-				display("ImageCache is waiting for loader to send result")
-			}
-			WaitingOnDirFilter {
-				display("ImageCache is waiting for the directory items to be filtered for image files")
-			}
-			FailedToLoadImage(req_id: u32) {
-				display("Failed to load #{}", req_id)
-			}
-		}
+	#[error("Other texture error: {0}")]
+	Other(Cow<'static, str>),
+}
+impl From<directory::Error> for TextureError {
+	fn from(value: directory::Error) -> Self {
+		Self::Other(format!("Directory error: {}", value).into())
+	}
+}
+impl From<glium::texture::TextureCreationError> for TextureError {
+	fn from(value: glium::texture::TextureCreationError) -> Self {
+		Self::Other(format!("glium failed to create the texture: {value}").into())
+	}
+}
+impl From<std::io::Error> for TextureError {
+	fn from(value: std::io::Error) -> Self {
+		Self::Other(format!("IO error occured during texture creation: {value}").into())
+	}
+}
+impl TextureError {
+	pub fn from_failed_request(req_id: u32) -> Self {
+		Self::Other(format!("Failed to load #{req_id}").into())
 	}
 }
 
-// pub use self::texture_load_errors::Result as TextureResult;
-pub type TextureResult<T> = self::texture_load_errors::Result<T>;
+pub type TextureResult<T> = Result<T, TextureError>;
 
 // use self::texture_load_errors::*;
 
@@ -74,9 +72,11 @@ pub enum PathResolutionError {
 	WaitingOnDirFilter,
 }
 
-// TODO: Rename this to `LoadResult` (remove 2)
-pub type LoadResult2 =
-	std::result::Result<(PathBuf, TextureResult<AnimationFrameTexture>), PathResolutionError>;
+/// Some operations eg "load the next image" doesn't only have to load the image but
+/// also have to determine the path to the image. It's possible that we successfuly
+/// determined the path, but cannot load the image for some reason.
+pub type PathedTextureResult =
+	Result<(PathBuf, TextureResult<AnimationFrameTexture>), PathResolutionError>;
 
 pub fn get_image_size_estimate(width: u32, height: u32) -> isize {
 	// In an RGBA image, each pixel is 4 bytes.
@@ -386,7 +386,7 @@ impl ImageCache {
 		display: &gelatin::Display,
 		index: usize,
 		frame_id: Option<isize>,
-	) -> LoadResult2 {
+	) -> PathedTextureResult {
 		let path = self
 			.dir
 			.image_by_index(index)
@@ -429,12 +429,10 @@ impl ImageCache {
 		}
 		if self.dir.path() != parent {
 			let DirItem { path, request_id } = self.curr_dir_item().ok_or_else(|| {
-				texture_load_errors::Error::from("Could not get path for current image")
+				TextureError::Other("Could not get path for current image".into())
 			})?;
 			self.send_request_for_file(path, request_id, RequestKind::Priority { display });
-			return Err(texture_load_errors::Error::from_kind(
-				texture_load_errors::ErrorKind::WaitingOnLoader,
-			));
+			return Err(TextureError::WaitingOnLoader);
 		}
 		if let Some(img_index) = self.dir.curr_img_index() {
 			self.dir.set_curr_img_index(img_index)?;
@@ -487,10 +485,10 @@ impl ImageCache {
 		}
 	}
 
-	pub fn load_next(&mut self, display: &gelatin::Display) -> LoadResult2 {
+	pub fn load_next(&mut self, display: &gelatin::Display) -> PathedTextureResult {
 		self.load_jump(display, 1, 0)
 	}
-	pub fn load_prev(&mut self, display: &gelatin::Display) -> LoadResult2 {
+	pub fn load_prev(&mut self, display: &gelatin::Display) -> PathedTextureResult {
 		self.load_jump(display, -1, 0)
 	}
 
@@ -499,7 +497,7 @@ impl ImageCache {
 		display: &gelatin::Display,
 		file_jump_count: i32,
 		frame_jump_count: isize,
-	) -> LoadResult2 {
+	) -> PathedTextureResult {
 		if file_jump_count == 0 {
 			// Here, it is possible that the current image was already
 			// requested but not yet loaded.
@@ -551,10 +549,7 @@ impl ImageCache {
 		}
 	}
 
-	pub fn process_prefetched(
-		&mut self,
-		display: &gelatin::Display,
-	) -> texture_load_errors::Result<()> {
+	pub fn process_prefetched(&mut self, display: &gelatin::Display) -> TextureResult<()> {
 		self.receive_prefetched();
 		let mut uploaded_one = false;
 		let req_ids = self.pending_requests.get_all_ids();
@@ -565,13 +560,9 @@ impl ImageCache {
 					match self.upload_to_texture(display, result) {
 						Ok(_) => uploaded_one = true,
 						// it's okay to ignore if the image falied to load here, this is just pre-fetch.
-						Err(texture_load_errors::Error(
-							texture_load_errors::ErrorKind::FailedToLoadImage(..),
-							..,
-						)) => {}
+						// so we don't break the loop
 						Err(e) => {
 							retval = Err(e);
-							break;
 						}
 					}
 				}
@@ -602,9 +593,9 @@ impl ImageCache {
 		frame_id: isize,
 	) -> TextureResult<AnimationFrameTexture> {
 		trace!("Begin `try_getting_requested_image` in `image_cache`");
-		let DirItem { path, request_id: req_id } = self.curr_dir_item().ok_or_else(|| {
-			texture_load_errors::Error::from("Could not get path for current image")
-		})?;
+		let DirItem { path, request_id: req_id } = self
+			.curr_dir_item()
+			.ok_or_else(|| TextureError::Other("Could not get path for current image".into()))?;
 
 		// Check if it's among the prefetched, and upload it, if it is
 		if let Some(results) = self.pending_requests.take_results(req_id) {
@@ -617,9 +608,7 @@ impl ImageCache {
 		// Check if it is inside the texture cache first
 		if let Some(tex) = self.texture_cache.get(&req_id) {
 			if tex.failed {
-				return Err(texture_load_errors::Error::from_kind(
-					texture_load_errors::ErrorKind::FailedToLoadImage(req_id),
-				));
+				return Err(TextureError::from_failed_request(req_id));
 			}
 			let modified = fs::metadata(&path).ok().and_then(|m| m.modified().ok());
 			let mut get_from_cache = false;
@@ -647,20 +636,16 @@ impl ImageCache {
 					}
 				}
 			}
-			return Err(texture_load_errors::Error::from_kind(
-				texture_load_errors::ErrorKind::WaitingOnLoader,
-			));
+			return Err(TextureError::WaitingOnLoader);
 		}
 		if self.pending_requests.contains(&req_id) {
 			PRIORITY_REQUEST_ID.store(req_id, Ordering::SeqCst);
-			return Err(texture_load_errors::Error::from_kind(
-				texture_load_errors::ErrorKind::WaitingOnLoader,
-			));
+			return Err(TextureError::WaitingOnLoader);
 		}
 		self.send_request_for_file(path, req_id, RequestKind::Priority { display });
 		// If the texture is not in the cache just throw our hands in the air
 		// and tell the caller that we gotta wait for the loader to load this texture.
-		Err(texture_load_errors::Error::from_kind(texture_load_errors::ErrorKind::WaitingOnLoader))
+		Err(TextureError::WaitingOnLoader)
 	}
 
 	fn upload_to_texture(
@@ -754,9 +739,7 @@ impl ImageCache {
 					Ordering::SeqCst,
 				);
 				self.pending_requests.set_finished(&req_id);
-				Err(texture_load_errors::Error::from_kind(
-					texture_load_errors::ErrorKind::FailedToLoadImage(req_id),
-				))
+				Err(TextureError::from_failed_request(req_id))
 			}
 		}
 	}
