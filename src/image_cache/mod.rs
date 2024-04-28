@@ -59,7 +59,7 @@ impl TextureError {
 	}
 }
 
-pub type TextureResult<T> = Result<T, TextureError>;
+pub type TextureResult<T> = std::result::Result<T, TextureError>;
 
 // use self::texture_load_errors::*;
 
@@ -76,7 +76,7 @@ pub enum PathResolutionError {
 /// also have to determine the path to the image. It's possible that we successfuly
 /// determined the path, but cannot load the image for some reason.
 pub type PathedTextureResult =
-	Result<(PathBuf, TextureResult<AnimationFrameTexture>), PathResolutionError>;
+	std::result::Result<(PathBuf, TextureResult<AnimationFrameTexture>), PathResolutionError>;
 
 pub fn get_image_size_estimate(width: u32, height: u32) -> isize {
 	// In an RGBA image, each pixel is 4 bytes.

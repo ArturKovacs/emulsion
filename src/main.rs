@@ -1,8 +1,5 @@
 #![cfg_attr(all(not(feature = "benchmark"), not(debug_assertions)), windows_subsystem = "windows")]
 
-#[macro_use]
-extern crate error_chain;
-
 use std::cell::{Cell, RefCell};
 use std::f32;
 use std::path::PathBuf;
@@ -458,24 +455,38 @@ mod update {
 #[cfg(feature = "networking")]
 mod update {
 	use serde::Deserialize;
+	use std::borrow::Cow;
 
 	#[derive(Deserialize)]
 	struct ReleaseInfoJson {
 		tag_name: String,
 	}
 
-	mod errors {
-		error_chain! {
-			foreign_links {
-				Io(std::io::Error);
-				Ureq(Box<ureq::Error>);
-				ParseIntError(std::num::ParseIntError);
-			}
+	#[derive(Debug, thiserror::Error)]
+	#[error("network error: {msg}")]
+	struct NetworkError {
+		pub msg: Cow<'static, str>,
+	}
+	impl From<std::io::Error> for NetworkError {
+		fn from(value: std::io::Error) -> Self {
+			Self { msg: format!("{value}").into() }
+		}
+	}
+	impl From<std::num::ParseIntError> for NetworkError {
+		fn from(value: std::num::ParseIntError) -> Self {
+			Self { msg: format!("{value}").into() }
+		}
+	}
+	impl NetworkError {
+		fn from_error<E: std::error::Error>(error: E) -> Self {
+			Self { msg: format!("{error}").into() }
 		}
 	}
 
+	type Result<T> = std::result::Result<T, NetworkError>;
+
 	/// Tries to fetch latest release tag
-	fn latest_release() -> errors::Result<ReleaseInfoJson> {
+	fn latest_release() -> Result<ReleaseInfoJson> {
 		let url = "https://api.github.com/repos/ArturKovacs/emulsion/releases/latest";
 		let res = ureq::get(url).set("User-Agent", "emulsion").call();
 		match res {
@@ -483,12 +494,12 @@ mod update {
 				let release_info = res.into_json()?;
 				Ok(release_info)
 			}
-			Err(err) => Err(Box::new(err).into()),
+			Err(err) => Err(NetworkError::from_error(err)),
 		}
 	}
 
 	/// Tries to parse version tag and compare against current version
-	fn compare_release(info: &ReleaseInfoJson) -> errors::Result<bool> {
+	fn compare_release(info: &ReleaseInfoJson) -> Result<bool> {
 		use crate::version::Version;
 		use std::str::FromStr;
 

@@ -8,7 +8,9 @@ use gelatin::image::imageops::{
 	flip_horizontal_in_place, flip_vertical_in_place, rotate180_in_place, rotate270, rotate90,
 };
 
-use crate::image_cache::image_loader::{complex_load_image, LoadResult, Orientation};
+use crate::image_cache::image_loader::{
+	complex_load_image, ImageLoaderError, LoadResult, Orientation,
+};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum ClipboardState {
@@ -150,7 +152,7 @@ impl ClipboardHandler {
 						}
 					}
 				}
-				Err("Could not set the clipboard image.".into())
+				Err(ImageLoaderError { description: "Could not set the clipboard image.".into() })
 			});
 			let mut state = request_handle.state.lock().unwrap();
 			*state =

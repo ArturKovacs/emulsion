@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fs;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
@@ -13,23 +14,28 @@ use gelatin::image::{
 };
 use usvg::fontdb;
 
-pub mod errors {
-	use gelatin::glium::texture;
-	use gelatin::image;
-	use std::io;
-
-	error_chain! {
-		foreign_links {
-			Io(io::Error) #[doc = "Error during IO"];
-			TextureCreationError(texture::TextureCreationError);
-			ImageLoadError(image::ImageError);
-			ExifError(exif::Error);
-			SvgError(usvg::Error);
-		}
+#[derive(Debug, thiserror::Error)]
+#[error("error happened in the image_loader: {description}")]
+pub struct ImageLoaderError {
+	pub description: Cow<'static, str>,
+}
+impl From<std::io::Error> for ImageLoaderError {
+	fn from(value: std::io::Error) -> Self {
+		ImageLoaderError { description: format!("IO error: {value}").into() }
+	}
+}
+impl From<image::ImageError> for ImageLoaderError {
+	fn from(value: image::ImageError) -> Self {
+		ImageLoaderError { description: format!("image-crate error: {value}").into() }
+	}
+}
+impl From<usvg::Error> for ImageLoaderError {
+	fn from(value: usvg::Error) -> Self {
+		ImageLoaderError { description: format!("usvg error: {value}").into() }
 	}
 }
 
-use self::errors::*;
+pub type Result<T> = std::result::Result<T, ImageLoaderError>;
 
 /// We want to prevent prefetch operations taking place when the target image is not yet loaded.
 /// To implement this we define a variable that is read by the loader threads and
@@ -97,7 +103,7 @@ pub fn detect_format(path: &Path) -> Result<ImgFormat> {
 	Ok(ImgFormat::Image(ImageFormat::from_path(path)?))
 }
 
-pub fn detect_orientation(path: &Path) -> Result<Orientation> {
+pub fn detect_orientation(path: &Path) -> std::result::Result<Orientation, exif::Error> {
 	let file = std::fs::File::open(path)?;
 	let mut bufreader = std::io::BufReader::new(&file);
 	let exifreader = exif::Reader::new();
