@@ -120,7 +120,7 @@ impl Directory {
 
 	pub fn change_directory(&mut self, path: &Path) -> Result<()> {
 		if self.path != path {
-			self.path = path.to_owned();
+			path.clone_into(&mut self.path);
 			self.collect_directory()
 		} else {
 			Ok(())
