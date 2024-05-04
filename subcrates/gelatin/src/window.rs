@@ -178,12 +178,15 @@ impl Window {
 		//use glium::glutin::window::Icon;
 		//let exe_parent = std::env::current_exe().unwrap().parent().unwrap().to_owned();
 
-		let window_builder = WindowBuilder::new()
+		let mut window_builder = WindowBuilder::new()
 			.with_title("Loading")
 			.with_fullscreen(None)
 			.with_inner_size(desc.size)
-			.with_window_icon(desc.icon)
-			.with_visible(desc.position.is_none());
+			.with_window_icon(desc.icon);
+
+		if let Some(pos) = desc.position {
+			window_builder = window_builder.with_position(pos);
+		}
 
 		#[cfg(not(any(target_os = "macos", windows)))]
 		let window_builder = if let Some(app_id) = desc.app_id {
@@ -200,11 +203,6 @@ impl Window {
 
 		// let window = window.build(&application.event_loop).unwrap();
 		let (window, display) = Self::build_winit_window(window_builder, &application.event_loop);
-
-		if let Some(pos) = desc.position {
-			window.set_outer_position(pos);
-			window.set_visible(true);
-		}
 
 		window.set_cursor_icon(CursorIcon::Default);
 

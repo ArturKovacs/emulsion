@@ -113,17 +113,9 @@ fn main() {
 			window_cache.win_y = if let Some(y) = win_y { *y } else { window_defaults.win_y };
 			window_cache.win_w = if let Some(w) = win_w { *w } else { window_defaults.win_w };
 			window_cache.win_h = if let Some(h) = win_h { *h } else { window_defaults.win_h };
-		} else {
-			let right = window_cache.win_x as i64 + window_cache.win_w as i64;
-			if right < 20 {
-				window_cache.win_w = window_defaults.win_w;
-				window_cache.win_x = window_defaults.win_x;
-			}
-			if window_cache.win_y < 20 {
-				window_cache.win_y = window_defaults.win_y;
-			}
 		}
 		let pos = PhysicalPosition::new(window_cache.win_x, window_cache.win_y);
+		println!("Placing window to {:?}", pos);
 		let size = PhysicalSize::new(window_cache.win_w, window_cache.win_h);
 		let window_desc = WindowDescriptorBuilder::default()
 			.icon(Some(make_icon()))
