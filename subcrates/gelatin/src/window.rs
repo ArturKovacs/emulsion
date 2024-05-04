@@ -10,7 +10,7 @@ use glium::{
 	uniform, Blend, BlendingFunction, Display, Frame, IndexBuffer, Program, Rect, Surface,
 	VertexBuffer,
 };
-use log::error;
+use log::{error, warn};
 use raw_window_handle::HasRawWindowHandle;
 use winit::{
 	dpi::{PhysicalPosition, PhysicalSize},
@@ -50,6 +50,22 @@ use crate::{
 };
 
 const EVENT_UPDATE_DELTA: std::time::Duration = std::time::Duration::from_millis(2);
+
+/// Returns true if and only if of the give window postion is within the boundaries of the display.
+fn is_in_bounds(
+	display_pos: PhysicalPosition<i32>,
+	display_size: PhysicalSize<u32>,
+	window_pos: PhysicalPosition<i32>,
+) -> bool {
+	let is_within_bounds_on_one_axis = |display_pos: i32, display_size: u32, window_pos: i32| {
+		// We use this margin so that if the window is too far to the right, and would barely be visible,
+		// then we consider it not being on the screen so that the position is reset to 0, 0
+		const MARGIN_SIZE: i32 = 40;
+		window_pos >= display_pos && window_pos < (display_pos + display_size as i32 - MARGIN_SIZE)
+	};
+	is_within_bounds_on_one_axis(display_pos.x, display_size.width, window_pos.x)
+		&& is_within_bounds_on_one_axis(display_pos.y, display_size.height, window_pos.y)
+}
 
 /// Stores whether the window contets need to be re-rendered.
 ///
@@ -115,6 +131,10 @@ pub struct WindowDescriptor {
 	#[builder(default = "PhysicalSize::<u32>::new(800, 600)")]
 	size: PhysicalSize<u32>,
 
+	/// If true, then `position` and `size` are ignored
+	#[builder(default)]
+	maximized: bool,
+
 	#[builder(default)]
 	position: Option<PhysicalPosition<i32>>,
 
@@ -125,7 +145,7 @@ pub struct WindowDescriptor {
 	app_id: Option<String>,
 }
 
-pub type EventHandler = dyn FnMut(&WindowEvent);
+pub type EventHandler = dyn FnMut(&Window, &WindowEvent);
 
 struct WindowData {
 	display: glium::Display<WindowSurface>,
@@ -173,19 +193,32 @@ impl Eq for Window {}
 impl Window {
 	pub fn new<UserEvent: Debug>(
 		application: &mut Application<UserEvent>,
-		desc: WindowDescriptor,
+		mut desc: WindowDescriptor,
 	) -> Rc<Self> {
 		//use glium::glutin::window::Icon;
 		//let exe_parent = std::env::current_exe().unwrap().parent().unwrap().to_owned();
 
+		const MINIMUM_WINDOW_SIZE: u32 = 200;
+		if desc.size.width < MINIMUM_WINDOW_SIZE {
+			warn!("Window width was specified to be zero. Defaulting to {MINIMUM_WINDOW_SIZE} instead");
+			desc.size.width = MINIMUM_WINDOW_SIZE;
+		}
+		if desc.size.height < MINIMUM_WINDOW_SIZE {
+			warn!("Window height was specified to be zero. Defaulting to {MINIMUM_WINDOW_SIZE} instead");
+			desc.size.height = MINIMUM_WINDOW_SIZE;
+		}
+
 		let mut window_builder = WindowBuilder::new()
 			.with_title("Loading")
 			.with_fullscreen(None)
-			.with_inner_size(desc.size)
-			.with_window_icon(desc.icon);
+			.with_window_icon(desc.icon)
+			.with_maximized(desc.maximized);
 
-		if let Some(pos) = desc.position {
-			window_builder = window_builder.with_position(pos);
+		if !desc.maximized {
+			window_builder = window_builder.with_inner_size(desc.size);
+			if let Some(pos) = desc.position {
+				window_builder = window_builder.with_position(pos);
+			}
 		}
 
 		#[cfg(not(any(target_os = "macos", windows)))]
@@ -295,6 +328,7 @@ impl Window {
 		builder: WindowBuilder,
 		event_loop: &EventLoop<UserEvent>,
 	) -> (winit::window::Window, Display<WindowSurface>) {
+		// let is_maximized = builder.m
 		// First we start by opening a new Window
 		let display_builder =
 			glutin_winit::DisplayBuilder::new().with_window_builder(Some(builder));
@@ -317,6 +351,19 @@ impl Window {
 			})
 			.unwrap();
 		let window = window.unwrap();
+
+		// Check if the window would be placed outside of the screen
+		// (This can happen when using two displays, then disconnecting
+		// one of the displays and starting up emulsion)
+		let current_monitor = window.current_monitor();
+		if current_monitor.is_none() {
+			window.set_outer_position(PhysicalPosition::new(0, 0));
+		} else if let Some(monitor_handle) = current_monitor {
+			let window_pos = window.inner_position().or_else(|_| window.outer_position()).unwrap();
+			if !is_in_bounds(monitor_handle.position(), monitor_handle.size(), window_pos) {
+				window.set_outer_position(PhysicalPosition::new(0, 0));
+			}
+		}
 
 		// Now we get the window size to use as the initial size of the Surface
 		let (width, height): (u32, u32) = window.inner_size().into();
@@ -358,7 +405,7 @@ impl Window {
 		(window, display)
 	}
 
-	pub fn add_global_event_handler<F: FnMut(&WindowEvent) + 'static>(&self, fun: F) {
+	pub fn add_global_event_handler<F: FnMut(&Window, &WindowEvent) + 'static>(&self, fun: F) {
 		let mut borrowed = self.data.borrow_mut();
 		borrowed.global_event_handlers.push(Box::new(fun));
 	}
@@ -391,10 +438,15 @@ impl Window {
 
 		let event;
 		{
-			let mut borrowed = self.data.borrow_mut();
-			for handler in borrowed.global_event_handlers.iter_mut() {
-				handler(&native_event);
+			let mut event_handlers = Vec::new();
+			std::mem::swap(&mut event_handlers, &mut self.data.borrow_mut().global_event_handlers);
+			for handler in event_handlers.iter_mut() {
+				handler(self, &native_event);
 			}
+			let mut borrowed = self.data.borrow_mut();
+			// We don't expect any new event handlers to have been added to the window by the event handlers
+			assert!(borrowed.global_event_handlers.is_empty());
+			std::mem::swap(&mut event_handlers, &mut borrowed.global_event_handlers);
 			match native_event {
 				WindowEvent::Resized(size) => {
 					event = None;

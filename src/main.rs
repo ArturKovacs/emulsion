@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use directories_next::ProjectDirs;
 use lazy_static::lazy_static;
 
-use log::trace;
+use log::{debug, trace};
 
 use gelatin::winit::{
 	dpi::{PhysicalPosition, PhysicalSize},
@@ -85,6 +85,9 @@ fn main() {
 	let cache = Cache::load(&cache_path);
 	let config = Configuration::load(&config_path);
 
+	debug!("Read cache: {cache:#?}");
+	debug!("Read config: {config:#?}");
+
 	let first_launch = cache.is_err();
 	let cache = Arc::new(Mutex::new(cache.unwrap_or_default()));
 	let config = Rc::new(RefCell::new(config.unwrap_or_default()));
@@ -114,24 +117,24 @@ fn main() {
 			window_cache.win_w = if let Some(w) = win_w { *w } else { window_defaults.win_w };
 			window_cache.win_h = if let Some(h) = win_h { *h } else { window_defaults.win_h };
 		}
+
+		if let Some(window_cfg) = window_cfg {
+			if let Some(start_maximized) = window_cfg.start_maximized {
+				window_cache.maximized = start_maximized;
+			}
+		}
+
 		let pos = PhysicalPosition::new(window_cache.win_x, window_cache.win_y);
-		println!("Placing window to {:?}", pos);
 		let size = PhysicalSize::new(window_cache.win_w, window_cache.win_h);
 		let window_desc = WindowDescriptorBuilder::default()
 			.icon(Some(make_icon()))
+			.maximized(window_cache.maximized)
 			.size(size)
 			.position(Some(pos))
 			.app_id(Some("Emulsion".into()))
 			.build()
 			.unwrap();
 		let window = Window::new(&mut application, window_desc);
-		// This is just to fix the bug on Linux that the window doesn't start up at
-		// the specified position when the position is specified during initialization
-		window.window_mut().set_outer_position(pos);
-
-		if let Some(ConfigWindowSection { start_maximized: Some(true), .. }) = window_cfg {
-			window.set_maximized(true);
-		}
 
 		if let Some(ConfigWindowSection { start_fullscreen: Some(true), .. }) = window_cfg {
 			window.set_fullscreen(true);
@@ -328,16 +331,18 @@ fn make_icon() -> Icon {
 }
 
 fn add_window_movement_listener(window: &Window, cache: Arc<Mutex<Cache>>) {
-	window.add_global_event_handler(move |event| match event {
+	window.add_global_event_handler(move |window, event| match event {
 		WindowEvent::Resized(new_size) => {
 			let mut cache = cache.lock().unwrap();
 			cache.window.win_w = new_size.width;
 			cache.window.win_h = new_size.height;
+			cache.window.maximized = window.window_mut().is_maximized();
 		}
 		WindowEvent::Moved(new_pos) => {
 			let mut cache = cache.lock().unwrap();
 			cache.window.win_x = new_pos.x;
 			cache.window.win_y = new_pos.y;
+			cache.window.maximized = window.window_mut().is_maximized();
 		}
 		_ => (),
 	});

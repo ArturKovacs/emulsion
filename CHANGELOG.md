@@ -1,7 +1,10 @@
 ## Unreleased
 
-### Changed
+### Added
+- If emulsion was closed while being maximized, then the next it will start up maximized
+- If emulsion fails to load an image, then the image path will be shown in the title bar regardless (along with a message "FAILED TO OPEN")
 
+### Changed
 - **Breaking**: The name of some keys (used for key bindings) have changed. As of writing this, a list of all supported key names can be found in the `virtual_keycode_to_string` function in the source code.
 - **Breaking**: Dropped support for systems that don't have at least OpenGL 3.3 (In other words: from now on Emulsion requires OpenGL 3.3 to run. Which is more than 10 years old by now)
 
