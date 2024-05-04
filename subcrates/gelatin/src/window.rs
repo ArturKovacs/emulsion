@@ -216,9 +216,18 @@ impl Window {
 
 		if !desc.maximized {
 			window_builder = window_builder.with_inner_size(desc.size);
-			if let Some(pos) = desc.position {
-				println!("Requested position {:?}", pos);
-				window_builder = window_builder.with_position(pos);
+			if let Some(window_pos) = desc.position {
+				// Check if the window would be placed outside of the screen
+				// (This can happen when using two displays, then disconnecting
+				// one of the displays and starting up emulsion)
+				let in_bounds = application.event_loop.available_monitors().any(|monitor| {
+					debug!("Monitor pos: {:?}", monitor.position());
+					debug!("Monitor size: {:?}", monitor.size());
+					is_in_bounds(monitor.position(), monitor.size(), window_pos)
+				});
+				if in_bounds {
+					window_builder = window_builder.with_position(window_pos);
+				}
 			}
 		}
 
@@ -352,19 +361,6 @@ impl Window {
 			})
 			.unwrap();
 		let window = window.unwrap();
-
-		// Check if the window would be placed outside of the screen
-		// (This can happen when using two displays, then disconnecting
-		// one of the displays and starting up emulsion)
-		let window_pos = window.inner_position().or_else(|_| window.outer_position()).unwrap();
-		let in_bounds = window.available_monitors().any(|monitor| {
-			debug!("Monitor pos: {:?}", monitor.position());
-			debug!("Monitor size: {:?}", monitor.size());
-			is_in_bounds(monitor.position(), monitor.size(), window_pos)
-		});
-		if !in_bounds {
-			window.set_outer_position(PhysicalPosition::new(0, 0));
-		}
 
 		// Now we get the window size to use as the initial size of the Surface
 		let (width, height): (u32, u32) = window.inner_size().into();
