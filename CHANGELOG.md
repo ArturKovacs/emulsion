@@ -1,7 +1,9 @@
 ## Unreleased
 
+## 11.0 on 2024-05-05
+
 ### Added
-- If emulsion was closed while being maximized, then the next it will start up maximized
+- If emulsion was closed while being maximized, then next it will start up maximized
 - If emulsion fails to load an image, then the image path will be shown in the title bar regardless (along with a message "FAILED TO OPEN")
 
 ### Changed
