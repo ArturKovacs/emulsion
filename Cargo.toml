@@ -65,7 +65,7 @@ benchmark = ["gelatin/benchmark"]
 winres = "0.1.11"
 
 [dependencies]
-gelatin = { path = "./subcrates/gelatin", version = "0.11" }
+gelatin = { path = "./subcrates/gelatin", version = "0.12" }
 ureq = { version = "2.0.2", features = ["json"], optional = true }
 lazy_static = "1.4.0"
 directories-next = "2.0.0"
