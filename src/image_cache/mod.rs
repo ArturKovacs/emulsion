@@ -568,6 +568,8 @@ impl ImageCache {
 				}
 			}
 
+			// Clippy suggests an alternative that does not compile so we allow this case
+			#[allow(clippy::question_mark)]
 			if retval.is_err() {
 				return retval;
 			}
