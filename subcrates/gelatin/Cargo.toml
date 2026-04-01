@@ -19,6 +19,6 @@ derive_builder = "0.9.0"
 image = "0.25.1"
 glium = "0.36.0"
 winit = { version = "0.30.12" }
-glutin-winit = "*"
+glutin-winit = "0.5"
 raw-window-handle = "0.6.2"
 log = "0.4"
