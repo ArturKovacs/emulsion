@@ -1,5 +1,10 @@
 ## Unreleased
 
+## 12.0 on 2026-04-02
+
+### Changed
+- Windows: Fix for an issue where the window appeared with a briefly white background before the UI was loaded
+
 ## 11.0 on 2024-05-05
 
 ### Added
