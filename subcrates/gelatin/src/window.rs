@@ -213,6 +213,7 @@ impl Window {
 		window_attributes.fullscreen = None;
 		window_attributes.window_icon = desc.icon;
 		window_attributes.maximized = desc.maximized;
+		window_attributes.visible = false;
 
 		if !desc.maximized {
 			window_attributes.inner_size = Some(desc.size.into());
@@ -331,6 +332,8 @@ impl Window {
 				colored_program,
 			}),
 		});
+
+		resulting_window.data.borrow_mut().window.set_visible(true);
 
 		application.register_window(resulting_window.clone());
 		Ok(resulting_window)
