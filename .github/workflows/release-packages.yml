@@ -171,7 +171,7 @@ jobs:
 
   linux:
     needs: create_release
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     env:
       INSTALLER_NAME: ${{ format('Emulsion-Linux.deb-{0}.deb', needs.create_release.outputs.version) }}
     steps:
