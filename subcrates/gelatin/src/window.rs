@@ -477,7 +477,7 @@ impl Window {
 						return;
 					}
 
-					#[cfg(all(unix, not(target_os = "macos")))]
+					#[cfg(wayland_platform)]
 					if event_loop.is_wayland() {
 						// We need to set the framebuffer size explicitly on Wayland (god knows why)
 						borrowed.display.resize((size.width, size.height));
