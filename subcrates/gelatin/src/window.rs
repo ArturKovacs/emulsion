@@ -1,3 +1,5 @@
+#![allow(unexpected_cfgs)]
+
 use cgmath::{Matrix4, Vector3};
 use glium::{
 	glutin::{
