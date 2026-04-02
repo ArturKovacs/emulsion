@@ -7,11 +7,9 @@ use std::{
 };
 
 use winit::{
-	application::{ApplicationHandler as WinitApplicationHandler},
+	application::ApplicationHandler as WinitApplicationHandler,
 	event::{self, WindowEvent},
-	event_loop::{
-		ActiveEventLoop as WinitActiveEventLoop, ControlFlow
-	},
+	event_loop::{ActiveEventLoop as WinitActiveEventLoop, ControlFlow},
 	window::WindowId,
 };
 

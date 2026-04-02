@@ -1,6 +1,6 @@
 use gelatin::{
-	application::*, button::*, line_layout_container::*, misc::*, picture::*, slider::*, window::*,
-	event_loop::EventLoop
+	application::*, button::*, event_loop::EventLoop, line_layout_container::*, misc::*,
+	picture::*, slider::*, window::*,
 };
 
 use std::cell::Cell;
@@ -11,7 +11,8 @@ struct MyApplicationHandler;
 
 impl gelatin::application::ApplicationHandler for MyApplicationHandler {
 	fn handle_can_create_surface(&mut self, event_loop: &mut gelatin::event_loop::ActiveEventLoop) {
-		let window = event_loop.create_window(WindowDescriptorBuilder::default().build().unwrap()).unwrap();
+		let window =
+			event_loop.create_window(WindowDescriptorBuilder::default().build().unwrap()).unwrap();
 
 		let container = Rc::new(HorizontalLayoutContainer::new());
 		container.set_margin_top(5.0);
@@ -92,6 +93,6 @@ fn main() {
 	// A window
 
 	let my_application_handler = MyApplicationHandler;
-	
+
 	application.start_event_loop(my_application_handler, event_loop);
 }

@@ -15,7 +15,7 @@ use raw_window_handle::HasWindowHandle;
 use winit::{
 	dpi::{PhysicalPosition, PhysicalSize},
 	event::WindowEvent,
-	event_loop::{ActiveEventLoop},
+	event_loop::ActiveEventLoop,
 	keyboard::ModifiersState,
 	window::{CursorIcon, Fullscreen, Icon, WindowAttributes, WindowId},
 };

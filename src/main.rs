@@ -358,8 +358,7 @@ impl AppHandler {
 			}
 		};
 
-		self.ui_elements =
-			Some(UiElements { set_theme, update_notification, help_screen });
+		self.ui_elements = Some(UiElements { set_theme, update_notification, help_screen });
 
 		update_checker_join_handle
 	}
