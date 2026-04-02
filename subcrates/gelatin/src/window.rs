@@ -20,11 +20,11 @@ use winit::{
 	window::{CursorIcon, Fullscreen, Icon, WindowAttributes, WindowId},
 };
 
-#[cfg(not(any(target_os = "macos", windows)))]
-use winit::platform::{
-	wayland::{EventLoopWindowTargetExtWayland, WindowBuilderExtWayland},
-	x11::WindowBuilderExtX11,
-};
+#[cfg(x11_platform)]
+use winit::platform::x11::WindowBuilderExtX11;
+
+#[cfg(wayland_platform)]
+use winit::platform::wayland::{EventLoopWindowTargetExtWayland, WindowBuilderExtWayland};
 
 use std::{
 	cell::{Cell, RefCell, RefMut},
@@ -232,18 +232,33 @@ impl Window {
 			}
 		}
 
-		#[cfg(not(any(target_os = "macos", windows)))]
+		#[cfg(any(x11_platform, wayland_platform))]
 		let window_attributes = if let Some(app_id) = desc.app_id {
 			let is_wayland = std::env::var("XDG_SESSION_TYPE")
 				.map_or(false, |var| var.to_lowercase().contains("wayland"));
+
 			if is_wayland {
-				WindowAttributesExtWayland::with_name(
+				let result;
+				#[cfg(wayland_platform)]
+				result = WindowAttributesExtWayland::with_name(
 					window_attributes,
 					&app_id,
 					app_id.to_lowercase(),
-				)
+				);
+				#[cfg(not(wayland_platform))]
+				result = window_attributes;
+				result
 			} else {
-				WindowAttributesExtX11::with_name(window_attributes, &app_id, app_id.to_lowercase())
+				let result;
+				#[cfg(x11_platform)]
+				result = WindowAttributesExtX11::with_name(
+					window_attributes,
+					&app_id,
+					app_id.to_lowercase(),
+				);
+				#[cfg(not(x11_platform))]
+				result = window_attributes;
+				result
 			}
 		} else {
 			window_attributes
