@@ -55,7 +55,7 @@ pub fn parse_args(config_path: &Path, cache_path: &Path) -> Args {
 	let displayed_folders = if is_absolute {
 		// Subtract one because we later want to add one to this value, and we don't want
 		// an overflow
-		Some(std::u32::MAX - 1)
+		Some(u32::MAX - 1)
 	} else {
 		matches.get_one::<u32>("FOLDER_COUNT").copied()
 	};

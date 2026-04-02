@@ -31,8 +31,7 @@ impl From<std::io::Error> for Error {
 }
 impl From<Error> for std::io::Error {
 	fn from(value: Error) -> Self {
-		use std::io::ErrorKind;
-		std::io::Error::new(ErrorKind::Other, format!("directory::Error: {}", value))
+		std::io::Error::other(format!("directory::Error: {}", value))
 	}
 }
 

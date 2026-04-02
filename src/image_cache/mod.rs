@@ -890,10 +890,7 @@ fn get_file_name_and_parent(path: &Path) -> std::io::Result<(OsString, PathBuf)>
 	let file_name = match path.file_name() {
 		Some(f) => f.to_owned(),
 		None => {
-			return Err(io::Error::new(
-				io::ErrorKind::Other,
-				format!("Could not get file name from path {:?}", path),
-			))
+			return Err(io::Error::other(format!("Could not get file name from path {:?}", path)))
 		}
 	};
 	let parent = match path.parent() {
@@ -907,10 +904,10 @@ fn get_file_name_and_parent(path: &Path) -> std::io::Result<(OsString, PathBuf)>
 		None => {
 			let mut path = path.canonicalize()?;
 			if !path.pop() {
-				return Err(io::Error::new(
-					io::ErrorKind::Other,
-					format!("Could not get parent directory of {:?}", path),
-				));
+				return Err(io::Error::other(format!(
+					"Could not get parent directory of {:?}",
+					path
+				)));
 			}
 			path
 		}

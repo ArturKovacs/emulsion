@@ -126,6 +126,12 @@ impl Application {
 	}
 }
 
+impl Default for Application {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
 struct AppWithAppHandler<'a, AppHandler>
 where
 	AppHandler: ApplicationHandler,

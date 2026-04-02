@@ -24,6 +24,15 @@ where
 	}
 }
 
+impl<UserEvent> Default for EventLoop<UserEvent>
+where
+	UserEvent: Debug + 'static,
+{
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
 pub struct ActiveEventLoop<'a> {
 	pub(crate) inner: &'a winit::event_loop::ActiveEventLoop,
 	pub(crate) application: &'a mut Application,
@@ -34,6 +43,6 @@ impl<'a> ActiveEventLoop<'a> {
 		&mut self,
 		desc: WindowDescriptor,
 	) -> Result<Rc<Window>, Box<dyn std::error::Error>> {
-		Ok(Window::new(self.application, desc, self.inner)?)
+		Window::new(self.application, desc, self.inner)
 	}
 }

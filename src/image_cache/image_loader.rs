@@ -42,7 +42,7 @@ pub type Result<T> = std::result::Result<T, ImageLoaderError>;
 /// which will only carry out the request if the focused request id matches their request or
 /// if the focused is set to `NON_EXISTENT_REQUEST_ID`
 pub static PRIORITY_REQUEST_ID: AtomicU32 = AtomicU32::new(0); // The first request usually
-pub const NON_EXISTENT_REQUEST_ID: u32 = std::u32::MAX;
+pub const NON_EXISTENT_REQUEST_ID: u32 = u32::MAX;
 
 pub enum ImgFormat {
 	Image(ImageFormat),
